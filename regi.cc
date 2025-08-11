@@ -1,0 +1,104 @@
+#include <regi.h>
+
+template std::ostream &operator<< <Card>(std::ostream &os, std::vector<Card> &pile);
+template std::ostream &operator<< <regi::Enemy>(std::ostream &os,
+                                                std::vector<regi::Enemy> &pile);
+template std::ostream &operator<< <regi::Combo>(std::ostream &os,
+                                                std::vector<regi::Combo> &pile);
+
+std::ostream &operator<<(std::ostream &os, regi::Combo &c)
+{
+    os << c.parts;
+    return os;
+}
+
+namespace regi
+{
+    void GameState::initEnemy()
+    {
+        enemyPile.push_back(Enemy(JACK, CLUBS));
+        enemyPile.push_back(Enemy(JACK, DIAMONDS));
+        enemyPile.push_back(Enemy(JACK, HEARTS));
+        enemyPile.push_back(Enemy(JACK, SPADES));
+        enemyPile.push_back(Enemy(QUEEN, CLUBS));
+        enemyPile.push_back(Enemy(QUEEN, DIAMONDS));
+        enemyPile.push_back(Enemy(QUEEN, HEARTS));
+        enemyPile.push_back(Enemy(QUEEN, SPADES));
+        enemyPile.push_back(Enemy(KING, CLUBS));
+        enemyPile.push_back(Enemy(KING, DIAMONDS));
+        enemyPile.push_back(Enemy(KING, HEARTS));
+        enemyPile.push_back(Enemy(KING, SPADES));
+        shuffle(enemyPile, 0, 4);
+        shuffle(enemyPile, 4, 8);
+        shuffle(enemyPile, 8, 12);
+    }
+
+    void GameState::initDraw()
+    {
+        drawPile.push_back(Card(ACE, SPADES));      //
+        drawPile.push_back(Card(TWO, SPADES));      //
+        drawPile.push_back(Card(THREE, SPADES));    //
+        drawPile.push_back(Card(FOUR, SPADES));     //
+        drawPile.push_back(Card(FIVE, SPADES));     //
+        drawPile.push_back(Card(SIX, SPADES));      //
+        drawPile.push_back(Card(SEVEN, SPADES));    //
+        drawPile.push_back(Card(EIGHT, SPADES));    //
+        drawPile.push_back(Card(NINE, SPADES));     //
+        drawPile.push_back(Card(TEN, SPADES));      //
+                                                    /* new suit */
+        drawPile.push_back(Card(ACE, HEARTS));      //
+        drawPile.push_back(Card(TWO, HEARTS));      //
+        drawPile.push_back(Card(THREE, HEARTS));    //
+        drawPile.push_back(Card(FOUR, HEARTS));     //
+        drawPile.push_back(Card(FIVE, HEARTS));     //
+        drawPile.push_back(Card(SIX, HEARTS));      //
+        drawPile.push_back(Card(SEVEN, HEARTS));    //
+        drawPile.push_back(Card(EIGHT, HEARTS));    //
+        drawPile.push_back(Card(NINE, HEARTS));     //
+        drawPile.push_back(Card(TEN, HEARTS));      //
+                                                    /* new suit */
+        drawPile.push_back(Card(ACE, DIAMONDS));    //
+        drawPile.push_back(Card(TWO, DIAMONDS));    //
+        drawPile.push_back(Card(THREE, DIAMONDS));  //
+        drawPile.push_back(Card(FOUR, DIAMONDS));   //
+        drawPile.push_back(Card(FIVE, DIAMONDS));   //
+        drawPile.push_back(Card(SIX, DIAMONDS));    //
+        drawPile.push_back(Card(SEVEN, DIAMONDS));  //
+        drawPile.push_back(Card(EIGHT, DIAMONDS));  //
+        drawPile.push_back(Card(NINE, DIAMONDS));   //
+        drawPile.push_back(Card(TEN, DIAMONDS));    //
+                                                    /* new suit */
+        drawPile.push_back(Card(ACE, CLUBS));       //
+        drawPile.push_back(Card(TWO, CLUBS));       //
+        drawPile.push_back(Card(THREE, CLUBS));     //
+        drawPile.push_back(Card(FOUR, CLUBS));      //
+        drawPile.push_back(Card(FIVE, CLUBS));      //
+        drawPile.push_back(Card(SIX, CLUBS));       //
+        drawPile.push_back(Card(SEVEN, CLUBS));     //
+        drawPile.push_back(Card(EIGHT, CLUBS));     //
+        drawPile.push_back(Card(NINE, CLUBS));      //
+        drawPile.push_back(Card(TEN, CLUBS));       //
+                                                    /* 1 joker for 2p */
+        drawPile.push_back(Card(JOKER, GLITCH));
+        shuffle(drawPile, 0, 41);
+    }
+
+    void GameState::initPlayers()
+    {
+        players[0].alive = true;
+        players[0].id = 0;
+        playerDraws(players[0], Player::HAND_SIZE);
+        players[1].alive = true;
+        players[1].id = 1;
+        playerDraws(players[1], Player::HAND_SIZE);
+    }
+
+    void GameState::init()
+    {
+        initEnemy();
+        initDraw();
+        initPlayers();
+        gameRunning = true;
+    }
+
+} /* namespace regi */
