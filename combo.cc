@@ -5,9 +5,13 @@ namespace regi
 
     Combo::Combo() : powers(0), baseDmg(0) {};
 
-    int Combo::valid()
+    int Combo::valid(bool yieldAllowed)
     {
-        if (parts.size() == 0) { return 0; }
+        if (parts.size() == 0)
+        {
+            // yielding depends on context
+            return static_cast<int>(yieldAllowed);
+        }
         if (parts.size() == 1)
         {
             return 1;
@@ -41,7 +45,6 @@ namespace regi
 
     void Combo::loadDetails()
     {
-        if (!this->valid()) return;
         /* calculate only using card strength,
          * actual damage calc needs context */
         int dmg = 0;
@@ -55,8 +58,16 @@ namespace regi
         this->powers = pow;
     }
 
+    int Combo::getBaseDefense()
+    {
+        /* combo does not need to be valid
+         * for calculating defense */
+        int blk = 0;
+        for (auto c : parts) { blk += c.strength(); }
+        return blk;
+    }
+
     int Combo::getBaseDamage() { return this->baseDmg; }
     std::uint32_t Combo::getPowers() { return this->powers; }
 } /* namespace regi */
-
 

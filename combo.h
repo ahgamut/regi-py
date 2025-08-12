@@ -11,14 +11,15 @@ namespace regi
        private:
         int baseDmg;
         std::uint32_t powers;
-        void loadDetails();
 
        public:
-        Combo();
-        int valid();
         std::vector<Card> parts;
+        Combo();
+        int valid(bool);
+        void loadDetails();
         std::uint32_t getPowers();
         int getBaseDamage();
+        int getBaseDefense();
     };
 
 } /* namespace regi */

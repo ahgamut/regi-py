@@ -43,6 +43,9 @@ struct Card
     Entry entry() const;
     Suit suit() const;
     Card(Entry ee, Suit ss);
+    bool operator==(const Card &other) const {
+        return (this->e == other.e) && (this->s == other.s);
+    }
     friend std::ostream& operator<<(std::ostream& os, Card c);
 };
 

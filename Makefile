@@ -8,7 +8,8 @@ all: main
 main: main.o \
 	card.o deck.o \
 	player.o enemy.o \
-	regi.o combo.o effects.o interact.o
+	regi.o combo.o effects.o \
+	interact.o dfsel.o
 	$(CXX) -o $@ $^
 
 %.o: %.cc

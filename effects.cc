@@ -100,12 +100,16 @@ namespace regi
         }
 
         int dmg = 0;
-        for (auto &combo : usedPile)
+        Combo curcombo = usedPile.back();
+        if (curcombo.parts.size() == 0)
         {
-            dmg += combo.getBaseDamage();
-            bool dbl = ((combo.getPowers() & CLUBS_DOUBLE) ^ epow) != 0;
-            if (dbl) { dmg += combo.getBaseDamage(); }
+            // yielding
+            pastYieldsInARow += 1;
         }
+        else { pastYieldsInARow = 0; }
+        dmg += curcombo.getBaseDamage();
+        bool dbl = ((curcombo.getPowers() & CLUBS_DOUBLE) ^ epow) != 0;
+        if (dbl) { dmg += curcombo.getBaseDamage(); }
         return dmg;
     }
 
@@ -153,7 +157,7 @@ namespace regi
 
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
-        selectAttack(player);
+        selectAttack(player, pastYieldsInARow < (2 - 1));
         int damage = calcDamage(enemy);
         enemy.hp -= damage;
         postAttackEffects(player, enemy);

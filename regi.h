@@ -13,6 +13,7 @@ namespace regi
     struct GameState
     {
        private:
+        int pastYieldsInARow;
         bool gameRunning;
         void initPlayers();
         void initDraw();
@@ -34,12 +35,12 @@ namespace regi
         void gameOver();
         void postGameResult();
 
-        void playerDraws(Player &, int n);
+        void playerDraws(Player &, int);
         int playerDrawsOne(Player &);
-        void refreshDraws(int ip, int n);
-        void refreshDiscards(int n);
+        void refreshDraws(int, int);
+        void refreshDiscards(int);
 
-        void selectAttack(Player &);
+        void selectAttack(Player &, bool);
         int calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
         void postAttackEffects(Player &, Enemy &);
