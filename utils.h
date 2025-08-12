@@ -17,8 +17,8 @@ template <typename T>
 void shuffle(std::vector<T> &pile, std::uint32_t start, std::uint32_t end)
 {
     if (end <= 1 || end <= start) { return; }
-    int i, j;
-    int len = end - start;
+    std::int32_t i, j;
+    std::int32_t len = end - start;
     std::random_device dev;
     std::default_random_engine engine(dev());
     for (i = 0; i < len - 1; ++i)

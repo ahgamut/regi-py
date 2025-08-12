@@ -8,18 +8,18 @@ namespace regi
         // in a server-style setup we'd initialize the connections here
     }
 
-    void GameState::selectDefense(Player &player, int damage)
+    void GameState::selectDefense(Player &player, std::int32_t damage)
     {
         // we only enter this if it is actually possible to block
         std::vector<Combo> combos;
         Combo base;
-        for (int i = 0; i < player.cards.size(); ++i)
+        for (std::int32_t i = 0; i < player.cards.size(); ++i)
         {
             dfsel::collectDefense(player.cards, combos, damage, base, i);
         }
 
         Combo &def = dfsel::selectDefense(combos);
-        for (int i = 0; i < def.parts.size(); ++i)
+        for (std::int32_t i = 0; i < def.parts.size(); ++i)
         {
             for (auto it = player.cards.begin(); it != player.cards.end(); ++it)
             {
@@ -44,7 +44,7 @@ namespace regi
             combos.push_back(base);
             yieldAllowed = false;
         }
-        for (int i = 0; i < player.cards.size(); ++i)
+        for (std::int32_t i = 0; i < player.cards.size(); ++i)
         {
             dfsel::collectAttack(player.cards, combos, yieldAllowed, base, i);
         }
@@ -52,7 +52,7 @@ namespace regi
         Combo &atk = dfsel::selectAttack(combos);
         atk.loadDetails();
         std::vector<int> removes;
-        for (int i = 0; i < atk.parts.size(); ++i)
+        for (std::int32_t i = 0; i < atk.parts.size(); ++i)
         {
             for (auto it = player.cards.begin(); it != player.cards.end(); ++it)
             {

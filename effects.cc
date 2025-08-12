@@ -2,7 +2,7 @@
 
 namespace regi
 {
-    void GameState::playerDraws(Player &player, int n)
+    void GameState::playerDraws(Player &player, std::int32_t n)
     {
         for (; n > 0 && drawPile.size() != 0 && !player.full(); n--)
         {
@@ -11,7 +11,7 @@ namespace regi
         }
     }
 
-    int GameState::playerDrawsOne(Player &player)
+    std::int32_t GameState::playerDrawsOne(Player &player)
     {
         if (drawPile.size() != 0 && !player.full())
         {
@@ -22,7 +22,7 @@ namespace regi
         return 0;
     }
 
-    void GameState::refreshDiscards(int n)
+    void GameState::refreshDiscards(std::int32_t n)
     {
         shuffle(discardPile, 0, discardPile.size());
         for (; n > 0 && discardPile.size() != 0; n--)
@@ -32,10 +32,10 @@ namespace regi
         }
     }
 
-    void GameState::refreshDraws(int ip, int n)
+    void GameState::refreshDraws(std::int32_t ip, std::int32_t n)
     {
-        int i;
-        int full[] = {0, 0};
+        std::int32_t i;
+        std::int32_t full[] = {0, 0};
         if (ip < 0) { ip *= -1; }
         ip %= 2;
         for (i = ip; n > 0; n--)
@@ -48,7 +48,7 @@ namespace regi
     }
 
     /* defense */
-    int GameState::calcBlock(Enemy &enemy)
+    std::int32_t GameState::calcBlock(Enemy &enemy)
     {
         std::uint32_t epow = getPower(enemy) & SPADES_BLOCK;
         for (auto &combo : usedPile)
@@ -61,7 +61,7 @@ namespace regi
             return 0;
         }
 
-        int blk = 0;
+        std::int32_t blk = 0;
         for (auto &combo : usedPile)
         {
             if ((combo.getPowers() & SPADES_BLOCK) != 0)
@@ -74,10 +74,10 @@ namespace regi
 
     void GameState::defensePhase(Player &player, Enemy &enemy)
     {
-        int block = calcBlock(enemy);
-        int damage = enemy.strength() - block;
+        std::int32_t block = calcBlock(enemy);
+        std::int32_t damage = enemy.strength() - block;
         if (damage <= 0) { return; }
-        int tblock = 0;
+        std::int32_t tblock = 0;
         for (auto c : player.cards) { tblock += c.strength(); }
         if (damage > tblock)
         {
@@ -91,7 +91,7 @@ namespace regi
 
     /* attack */
 
-    int GameState::calcDamage(Enemy &enemy)
+    std::int32_t GameState::calcDamage(Enemy &enemy)
     {
         std::uint32_t epow = getPower(enemy) & CLUBS_DOUBLE;
         for (auto &combo : usedPile)
@@ -99,7 +99,7 @@ namespace regi
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
 
-        int dmg = 0;
+        std::int32_t dmg = 0;
         Combo curcombo = usedPile.back();
         if (curcombo.parts.size() == 0)
         {
@@ -136,7 +136,7 @@ namespace regi
         // else do nothing
     }
 
-    int GameState::enemyDead()
+    std::int32_t GameState::enemyDead()
     {
         Enemy &enemy = enemyPile.front();
         if (enemy.hp > 0) return 0;
@@ -158,7 +158,7 @@ namespace regi
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
         selectAttack(player, pastYieldsInARow < (2 - 1));
-        int damage = calcDamage(enemy);
+        std::int32_t damage = calcDamage(enemy);
         enemy.hp -= damage;
         postAttackEffects(player, enemy);
     }
@@ -193,6 +193,7 @@ namespace regi
         do {
             Enemy &enemy = enemyPile.front();
             attackPhase(player, enemy);
+            logState();
         } while (enemyDead());
 
         if (enemyPile.size() == 0 || !player.alive)
@@ -201,5 +202,6 @@ namespace regi
             return;
         }
         defensePhase(player, enemyPile.front());
+        logState();
     }
 } /* namespace regi */

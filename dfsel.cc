@@ -5,7 +5,7 @@ namespace regi
     namespace dfsel
     {
         void collectAttack(std::vector<Card> &cards, std::vector<Combo> &combos,
-                           bool yieldAllowed, Combo &cur, int i)
+                           bool yieldAllowed, Combo &cur, std::int32_t i)
         {
             if (i >= cards.size()) { return; }
             // try adding cards[i] to the combo
@@ -15,7 +15,7 @@ namespace regi
                 // if combo is valid, accumulate,
                 // and try extending the combo
                 combos.push_back(cur);
-                for (int j = i + 1; j < cards.size(); ++j)
+                for (std::int32_t j = i + 1; j < cards.size(); ++j)
                 {
                     collectAttack(cards, combos, yieldAllowed, cur, j);
                 }
@@ -25,15 +25,15 @@ namespace regi
 
         Combo &selectAttack(std::vector<Combo> &combos)
         {
-            int len = combos.size();
+            std::int32_t len = combos.size();
             std::random_device dev;
             std::default_random_engine engine(dev());
-            int i = engine() % len;
+            std::int32_t i = engine() % len;
             return combos[i];
         }
 
         void collectDefense(std::vector<Card> &cards, std::vector<Combo> &combos,
-                            int damage, Combo &cur, int i)
+                            std::int32_t damage, Combo &cur, std::int32_t i)
         {
             if (i >= cards.size()) { return; }
             // try adding cards[i] to the combo
@@ -44,7 +44,7 @@ namespace regi
                 combos.push_back(cur);
             }
             // try extending the combo
-            for (int j = i + 1; j < cards.size(); ++j)
+            for (std::int32_t j = i + 1; j < cards.size(); ++j)
             {
                 collectAttack(cards, combos, false, cur, j);
             }
@@ -53,10 +53,10 @@ namespace regi
 
         Combo &selectDefense(std::vector<Combo> &combos)
         {
-            int len = combos.size();
+            std::int32_t len = combos.size();
             std::random_device dev;
             std::default_random_engine engine(dev());
-            int i = engine() % len;
+            std::int32_t i = engine() % len;
             return combos[i];
         }
 

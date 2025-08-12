@@ -18,7 +18,7 @@ namespace regi
     struct GameState
     {
        private:
-        int pastYieldsInARow;
+        std::int32_t pastYieldsInARow;
         bool gameRunning;
         void initPlayers();
         void initDraw();
@@ -44,17 +44,17 @@ namespace regi
         void postGameResult();
 
         void playerDraws(Player &, int);
-        int playerDrawsOne(Player &);
+        std::int32_t playerDrawsOne(Player &);
         void refreshDraws(int, int);
         void refreshDiscards(int);
 
         void selectAttack(Player &, bool);
-        int calcDamage(Enemy &);
+        std::int32_t calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
         void postAttackEffects(Player &, Enemy &);
-        int enemyDead();
+        std::int32_t enemyDead();
 
-        int calcBlock(Enemy &);
+        std::int32_t calcBlock(Enemy &);
         void selectDefense(Player &, int);
         void defensePhase(Player &, Enemy &);
     };

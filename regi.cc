@@ -125,17 +125,16 @@ namespace regi
         std::cout << "Player 1: " << players[1];
         std::cout << "draw pile has " << drawPile.size() << " cards \n";
         std::cout << "discard pile has " << discardPile.size() << " cards \n";
-        std::cout << "used pile has " << usedPile.size()
-                  << " combos: ";
-        for(auto &u : usedPile) {
-            std::cout << u.parts;
-        }
+        std::cout << "used pile has " << usedPile.size() << " combos: ";
+        for (auto &u : usedPile) { std::cout << u.parts; }
+        std::cout << "\n";
         if (enemyPile.size() != 0)
         {
             Enemy &e = enemyPile.front();
-            std::cout << "current enemy: " << e << " with " << e.hp << ", dealing "
+            std::cout << "current enemy: " << e << " with " << e.hp << "HP, dealing "
                       << e.strength() << " damage \n";
         }
+        std::cout << "\n\n";
     }
 
     void GameState::logDebug()
@@ -146,10 +145,16 @@ namespace regi
         std::cout << "discard pile has " << discardPile.size()
                   << " cards: " << discardPile;
         std::cout << "used pile has " << usedPile.size() << " combos: ";
-        for(auto &u : usedPile) {
-            std::cout << u.parts;
-        }
+        for (auto &u : usedPile) { std::cout << u.parts; }
+        std::cout << "\n";
         std::cout << "enemies: " << enemyPile;
+        if (enemyPile.size() != 0)
+        {
+            Enemy &e = enemyPile.front();
+            std::cout << "current enemy: " << e << " with " << e.hp << "HP, dealing "
+                      << e.strength() << " damage \n";
+        }
+        std::cout << "\n\n";
     }
 
 } /* namespace regi */

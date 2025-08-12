@@ -8,17 +8,17 @@ Suit Card::suit() const { return this->s; }
 
 std::int32_t Card::strength() const
 {
-    std::int32_t st = 0L;
+    std::int32_t st = 0;
     switch (s)
     {
         case KING:
-            st = 20L;
+            st = 20;
             break;
         case QUEEN:
-            st = 15L;
+            st = 15;
             break;
         case JACK:
-            st = 10L;
+            st = 10;
             break;
         default:
             st = static_cast<std::int32_t>(s);
@@ -47,8 +47,6 @@ std::ostream& operator<<(std::ostream& os, Suit s)
         case GLITCH:
             os << "!";
             break;
-        default:
-            os.setstate(std::ios_base::failbit);
     }
     return os;
 }
@@ -74,8 +72,6 @@ std::ostream& operator<<(std::ostream& os, Suit s)
         case GLITCH:
             os << "!";
             break;
-        default:
-            os.setstate(std::ios_base::failbit);
     }
     return os;
 }

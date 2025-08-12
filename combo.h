@@ -9,17 +9,17 @@ namespace regi
     struct Combo
     {
        private:
-        int baseDmg;
+        std::int32_t baseDmg;
         std::uint32_t powers;
 
        public:
         std::vector<Card> parts;
         Combo();
-        int valid(bool);
+        std::int32_t valid(bool);
         void loadDetails();
         std::uint32_t getPowers();
-        int getBaseDamage();
-        int getBaseDefense();
+        std::int32_t getBaseDamage();
+        std::int32_t getBaseDefense();
     };
 
 } /* namespace regi */

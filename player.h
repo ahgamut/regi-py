@@ -11,7 +11,7 @@ namespace regi
         static constexpr std::uint32_t HAND_SIZE = 6;
 
        public:
-        int id;
+        std::int32_t id;
         bool alive;
         std::vector<Card> cards;
         bool full() { return cards.size() == HAND_SIZE; }

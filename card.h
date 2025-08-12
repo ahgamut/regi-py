@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <iostream>
 
-enum Suit : std::uint8_t
+enum Suit : std::int32_t
 {
     GLITCH = 0,
     CLUBS = 1,
@@ -13,7 +13,7 @@ enum Suit : std::uint8_t
 };
 std::ostream& operator<<(std::ostream& os, Suit s);
 
-enum Entry : std::uint8_t
+enum Entry : std::int32_t
 {
     JOKER = 0,
     ACE = 1,
@@ -35,8 +35,8 @@ std::ostream& operator<<(std::ostream& os, Entry e);
 struct Card
 {
    private:
-    Entry e : 5;
-    Suit s : 3;
+    Entry e;
+    Suit s;
 
    public:
     std::int32_t strength() const;

@@ -5,7 +5,7 @@ namespace regi
 
     Combo::Combo() : powers(0), baseDmg(0) {};
 
-    int Combo::valid(bool yieldAllowed)
+    std::int32_t Combo::valid(bool yieldAllowed)
     {
         if (parts.size() == 0)
         {
@@ -32,8 +32,8 @@ namespace regi
 
         /* numeric combo: all entries are same, but different suits
          * cannot have ACE, sum must be less than or equal to 10 */
-        int sum = 0;
-        for (int i = 1; i < parts.size(); ++i)
+        std::int32_t sum = 0;
+        for (std::int32_t i = 1; i < parts.size(); ++i)
         {
             sum += static_cast<int>(parts[i].entry());
             if (parts[i].entry() == ACE) return 0;
@@ -47,7 +47,7 @@ namespace regi
     {
         /* calculate only using card strength,
          * actual damage calc needs context */
-        int dmg = 0;
+        std::int32_t dmg = 0;
         std::uint32_t pow = 0;
         for (auto c : parts)
         {
@@ -58,16 +58,16 @@ namespace regi
         this->powers = pow;
     }
 
-    int Combo::getBaseDefense()
+    std::int32_t Combo::getBaseDefense()
     {
         /* combo does not need to be valid
          * for calculating defense */
-        int blk = 0;
+        std::int32_t blk = 0;
         for (auto c : parts) { blk += c.strength(); }
         return blk;
     }
 
-    int Combo::getBaseDamage() { return this->baseDmg; }
+    std::int32_t Combo::getBaseDamage() { return this->baseDmg; }
     std::uint32_t Combo::getPowers() { return this->powers; }
 } /* namespace regi */
 
