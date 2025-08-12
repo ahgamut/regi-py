@@ -100,6 +100,7 @@ namespace regi
         initEnemy();
         initDraw();
         initPlayers();
+        pastYieldsInARow = 0;
         gameRunning = true;
     }
 

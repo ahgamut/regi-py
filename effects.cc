@@ -145,8 +145,12 @@ namespace regi
         {
             /* exact kill, so add to top of draw pile */
             drawPile.insert(drawPile.begin(), econ);
+            enemyPile.erase(enemyPile.begin());
         }
-        else { discardPile.push_back(econ); }
+        else { 
+            discardPile.push_back(econ);
+            enemyPile.erase(enemyPile.begin());
+        }
         for (auto &comb : usedPile)
         {
             for (auto &c : comb.parts) { discardPile.push_back(c); }
@@ -176,6 +180,7 @@ namespace regi
     {
         while (gameRunning)
         {
+            logDebug();
             oneTurn(players[0]);
             oneTurn(players[1]);
         }
@@ -202,6 +207,5 @@ namespace regi
             return;
         }
         defensePhase(player, enemyPile.front());
-        logState();
     }
 } /* namespace regi */

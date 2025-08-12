@@ -17,6 +17,10 @@ namespace regi
         {
             dfsel::collectDefense(player.cards, combos, damage, base, i);
         }
+        if (combos.size() == 0) {
+            player.alive = false;
+            gameOver();
+        }
 
         Combo &def = dfsel::selectDefense(combos);
         for (std::int32_t i = 0; i < def.parts.size(); ++i)
@@ -47,6 +51,11 @@ namespace regi
         for (std::int32_t i = 0; i < player.cards.size(); ++i)
         {
             dfsel::collectAttack(player.cards, combos, yieldAllowed, base, i);
+        }
+
+        if (combos.size() == 0) {
+            player.alive = false;
+            gameOver();
         }
 
         Combo &atk = dfsel::selectAttack(combos);

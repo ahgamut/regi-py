@@ -46,7 +46,7 @@ namespace regi
             // try extending the combo
             for (std::int32_t j = i + 1; j < cards.size(); ++j)
             {
-                collectAttack(cards, combos, false, cur, j);
+                collectDefense(cards, combos, damage, cur, j);
             }
             cur.parts.pop_back();
         }

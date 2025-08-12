@@ -9,7 +9,7 @@ Suit Card::suit() const { return this->s; }
 std::int32_t Card::strength() const
 {
     std::int32_t st = 0;
-    switch (s)
+    switch (e)
     {
         case KING:
             st = 20;
@@ -21,7 +21,7 @@ std::int32_t Card::strength() const
             st = 10;
             break;
         default:
-            st = static_cast<std::int32_t>(s);
+            st = static_cast<std::int32_t>(e);
     }
     return st;
 }
