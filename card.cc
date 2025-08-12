@@ -28,7 +28,7 @@ std::int32_t Card::strength() const
 
 #ifdef USE_UNICODE
 
-std::ostream& operator<<(std::ostream& os, Suit s)
+std::ostream& operator<<(std::ostream& os, const Suit s)
 {
     switch (s)
     {
@@ -53,7 +53,7 @@ std::ostream& operator<<(std::ostream& os, Suit s)
 
 #else
 
-std::ostream& operator<<(std::ostream& os, Suit s)
+std::ostream& operator<<(std::ostream& os, const Suit s)
 {
     switch (s)
     {
@@ -78,7 +78,7 @@ std::ostream& operator<<(std::ostream& os, Suit s)
 
 #endif
 
-std::ostream& operator<<(std::ostream& os, Entry e)
+std::ostream& operator<<(std::ostream& os, const Entry e)
 {
     switch (e)
     {
@@ -107,15 +107,15 @@ std::ostream& operator<<(std::ostream& os, Entry e)
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, Card c)
+std::ostream& operator<<(std::ostream& os, const Card& c)
 {
     os << c.e << c.s;
     return os;
 }
 
-std::uint32_t getPower(Card& c)
+std::uint32_t getPower(const Card& c)
 {
-    std::uint32_t p;
+    std::uint32_t p = 0;
     switch (c.suit())
     {
         case CLUBS:

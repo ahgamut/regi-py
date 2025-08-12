@@ -14,7 +14,8 @@ main: main.o \
 	card.o deck.o \
 	player.o enemy.o \
 	regi.o combo.o effects.o \
-	interact.o dfsel.o
+	interact.o dfsel.o \
+	console.o
 	$(CXX) $(LINKFLAGS) -o $@ $^
 
 %.o: %.cc

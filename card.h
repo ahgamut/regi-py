@@ -11,7 +11,7 @@ enum Suit : std::int32_t
     HEARTS = 3,
     SPADES = 4
 };
-std::ostream& operator<<(std::ostream& os, Suit s);
+std::ostream& operator<<(std::ostream& os, const Suit s);
 
 enum Entry : std::int32_t
 {
@@ -30,7 +30,7 @@ enum Entry : std::int32_t
     QUEEN = 12,
     KING = 13
 };
-std::ostream& operator<<(std::ostream& os, Entry e);
+std::ostream& operator<<(std::ostream& os, const Entry e);
 
 struct Card
 {
@@ -46,7 +46,7 @@ struct Card
     bool operator==(const Card &other) const {
         return (this->e == other.e) && (this->s == other.s);
     }
-    friend std::ostream& operator<<(std::ostream& os, Card c);
+    friend std::ostream& operator<<(std::ostream& os, const Card& c);
 };
 
 enum Powers : std::uint32_t
@@ -58,6 +58,6 @@ enum Powers : std::uint32_t
     JOKER_NERF = 16
 };
 
-std::uint32_t getPower(Card& c);
+std::uint32_t getPower(const Card& c);
 
 #endif

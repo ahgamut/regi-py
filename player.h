@@ -16,7 +16,7 @@ namespace regi
         std::vector<Card> cards;
         bool full() { return cards.size() == HAND_SIZE; }
     };
-    std::ostream& operator<<(std::ostream& os, Player& p);
+    std::ostream& operator<<(std::ostream& os, const Player& p);
 } /* namespace regi */
 
 #endif

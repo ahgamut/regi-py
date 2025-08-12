@@ -109,79 +109,27 @@ namespace regi
     void GameState::logAttack(const Player &player, const Enemy &enemy,
                               const Combo &cur, const std::int32_t damage)
     {
-        std::cout << "Player " << player.id;
-        std::cout << " attacking " << enemy;
-        std::cout << " with " << cur;
-        std::cout << "\nDealt " << damage << " damage, ";
-        std::cout << enemy << " hp is now " << enemy.hp;
-        if (enemy.hp <= 0) { std::cout << " (KO)"; }
-        std::cout << "\n";
+        log.attack(player, enemy, cur, damage);
     }
 
     void GameState::logDefend(const Player &player, const Combo &cur,
                               const std::int32_t damage)
     {
-        std::cout << "Player " << player.id;
-        std::cout << " attacked for " << damage;
-        std::cout << ", blocked with " << cur;
-        std::cout << "\n";
+        log.defend(player, cur, damage);
     }
 
     void GameState::logFailBlock(const Player &player, const std::int32_t damage,
                                  const std::int32_t maxblock)
     {
-        std::cout << "Player " << player.id;
-        std::cout << " attacked for " << damage;
-        std::cout << ", but can only block for " << maxblock;
-        std::cout << "\n";
+        log.failBlock(player, damage, maxblock);
     }
 
-    void GameState::logDrawOne(const Player &player)
-    {
-        std::cout << "Player " << player.id << " drew a card\n";
-    }
+    void GameState::logDrawOne(const Player &player) { log.drawOne(player); }
 
-    void GameState::logReplenish(std::int32_t n)
-    {
-        std::cout << "added " << n << " cards from discard pile to draw pile\n";
-    }
+    void GameState::logReplenish(std::int32_t n) { log.replenish(n); }
 
-    void GameState::logState()
-    {
-        std::cout << "Round: " << currentRound << "\n";
-        std::cout << "Player 0: " << players[0];
-        std::cout << "Player 1: " << players[1];
-        std::cout << "draw pile has " << drawPile.size() << " cards \n";
-        std::cout << "discard pile has " << discardPile.size() << " cards \n";
-        std::cout << "used pile has " << usedPile.size() << " combos: ";
-        for (auto &u : usedPile) { std::cout << u; }
-        std::cout << "\n";
-        if (enemyPile.size() != 0)
-        {
-            Enemy &e = enemyPile.front();
-            std::cout << "current enemy: " << e << " with " << e.hp << "HP\n";
-        }
-        std::cout << "\n";
-    }
+    void GameState::logState() { log.state(*this); }
 
-    void GameState::logDebug()
-    {
-        std::cout << "Round: " << currentRound << "\n";
-        std::cout << "Player 0: " << players[0];
-        std::cout << "Player 1: " << players[1];
-        std::cout << "draw pile has " << drawPile.size() << " cards: " << drawPile;
-        std::cout << "discard pile has " << discardPile.size()
-                  << " cards: " << discardPile;
-        std::cout << "used pile has " << usedPile.size() << " combos: ";
-        for (auto &u : usedPile) { std::cout << u; }
-        std::cout << "\n";
-        std::cout << "enemies: " << enemyPile;
-        if (enemyPile.size() != 0)
-        {
-            Enemy &e = enemyPile.front();
-            std::cout << "current enemy: " << e << " with " << e.hp << "HP\n";
-        }
-        std::cout << "\n";
-    }
+    void GameState::logDebug() { log.debug(*this); }
 
 } /* namespace regi */
