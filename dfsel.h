@@ -3,22 +3,27 @@
 #include <card.h>
 #include <player.h>
 #include <combo.h>
+#include <regi.h>
 #include <vector>
 #include <random>
 
 namespace regi
 {
-    namespace dfsel
+    struct RandomStrategy : public Strategy
     {
+       private:
+        std::int32_t assign(Combo &, const std::vector<Combo> &);
 
-        void collectAttack(std::vector<Card> &, std::vector<Combo> &, bool, Combo &,
+       public:
+        void collectAttack(const std::vector<Card> &, std::vector<Combo> &, bool, Combo &,
                            int);
-        Combo &selectAttack(std::vector<Combo> &);
-
-        void collectDefense(std::vector<Card> &, std::vector<Combo> &, int, Combo &,
+        void collectDefense(const std::vector<Card> &, std::vector<Combo> &, int, Combo &,
                             int);
-        Combo &selectDefense(std::vector<Combo> &);
-    } /* namespace dfsel */
+        std::int32_t provideAttack(Combo &, const Player &, bool, const GameState &);
+        std::int32_t provideDefense(Combo &, const Player &, std::int32_t,
+                                    const GameState &);
+    };
+
 } /* namespace regi */
 
 #endif

@@ -10,20 +10,14 @@ namespace regi
 
     void GameState::selectDefense(Player &player, std::int32_t damage)
     {
-        // we only enter this if it is actually possible to block
-        std::vector<Combo> combos;
-        Combo base;
-        for (std::int32_t i = 0; i < player.cards.size(); ++i)
+        Combo def;
+
+        if (strat.provideDefense(def, player, damage, *this) == 0)
         {
-            dfsel::collectDefense(player.cards, combos, damage, base, i);
-        }
-        if (combos.size() == 0) {
             player.alive = false;
             gameOver();
             return;
         }
-
-        Combo &def = dfsel::selectDefense(combos);
         for (std::int32_t i = 0; i < def.parts.size(); ++i)
         {
             for (auto it = player.cards.begin(); it != player.cards.end(); ++it)
@@ -35,7 +29,6 @@ namespace regi
                 }
             }
         }
-
         log.defend(player, def, damage);
         // add to discard pile
         for (Card &c : def.parts) { discardPile.push_back(c); }
@@ -43,25 +36,14 @@ namespace regi
 
     void GameState::selectAttack(Player &player, bool yieldAllowed)
     {
-        std::vector<Combo> combos;
-        Combo base;
-        if (yieldAllowed && base.parts.size() == 0)
-        {
-            combos.push_back(base);
-            yieldAllowed = false;
-        }
-        for (std::int32_t i = 0; i < player.cards.size(); ++i)
-        {
-            dfsel::collectAttack(player.cards, combos, yieldAllowed, base, i);
-        }
+        Combo atk;
 
-        if (combos.size() == 0) {
+        if (strat.provideAttack(atk, player, yieldAllowed, *this) == 0)
+        {
             player.alive = false;
             gameOver();
             return;
         }
-
-        Combo &atk = dfsel::selectAttack(combos);
         atk.loadDetails();
         std::vector<int> removes;
         for (std::int32_t i = 0; i < atk.parts.size(); ++i)

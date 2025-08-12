@@ -9,10 +9,13 @@
 namespace regi
 {
     struct BaseLog;
+    struct Strategy;
+    //
     struct GameState
     {
        private:
         BaseLog &log;
+        Strategy &strat;
         void initPlayers();
         void initDraw();
         void initEnemy();
@@ -28,7 +31,7 @@ namespace regi
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l) : log(l) {};
+        GameState(BaseLog &l, Strategy &s) : log(l), strat(s) {};
         void init();
         void setup();
 
@@ -53,6 +56,7 @@ namespace regi
         void defensePhase(Player &, Enemy &);
         //
         friend struct BaseLog;
+        friend struct Strategy;
     };
 
     struct BaseLog
@@ -67,6 +71,15 @@ namespace regi
         virtual void replenish(const std::int32_t) = 0;
         virtual void state(const GameState &) = 0;
         virtual void debug(const GameState &) = 0;
+    };
+
+    struct Strategy
+    {
+       public:
+        virtual std::int32_t provideAttack(Combo &, const Player &, bool,
+                                           const GameState &) = 0;
+        virtual std::int32_t provideDefense(Combo &, const Player &, std::int32_t,
+                                            const GameState &) = 0;
     };
 
 } /* namespace regi */
