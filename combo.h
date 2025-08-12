@@ -17,9 +17,9 @@ namespace regi
         Combo();
         std::int32_t valid(bool);
         void loadDetails();
-        std::uint32_t getPowers();
-        std::int32_t getBaseDamage();
-        std::int32_t getBaseDefense();
+        std::uint32_t getPowers() const;
+        std::int32_t getBaseDamage() const;
+        std::int32_t getBaseDefense() const;
         friend std::ostream &operator<<(std::ostream &, const Combo &);
     };
 

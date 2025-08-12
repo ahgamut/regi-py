@@ -59,7 +59,7 @@ namespace regi
         this->powers = pow;
     }
 
-    std::int32_t Combo::getBaseDefense()
+    std::int32_t Combo::getBaseDefense() const
     {
         /* combo does not need to be valid
          * for calculating defense */
@@ -68,8 +68,8 @@ namespace regi
         return blk;
     }
 
-    std::int32_t Combo::getBaseDamage() { return this->baseDmg; }
-    std::uint32_t Combo::getPowers() { return this->powers; }
+    std::int32_t Combo::getBaseDamage() const { return this->baseDmg; }
+    std::uint32_t Combo::getPowers() const { return this->powers; }
 
     std::ostream &operator<<(std::ostream &os, const regi::Combo &combo)
     {

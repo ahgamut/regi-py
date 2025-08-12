@@ -5,7 +5,7 @@
 int main()
 {
     regi::ConsoleLog c;
-    regi::RandomStrategy s;
+    regi::DamageStrategy s;
     regi::GameState g(c, s);
     g.init();
     g.startLoop();
