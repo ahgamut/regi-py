@@ -5,7 +5,11 @@ namespace regi
     std::ostream& operator<<(std::ostream& os, const Player& p)
     {
         os << "[";
-        for (auto c : p.cards) { os << c << " "; }
+        for (std::size_t i = 0; i < p.cards.size(); ++i)
+        {
+            os << p.cards[i];
+            if (i != p.cards.size() - 1) { os << " "; }
+        }
         os << "]\n";
         return os;
     }
