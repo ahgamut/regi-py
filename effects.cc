@@ -190,6 +190,7 @@ namespace regi
             logDebug();
             oneTurn(players[0]);
             oneTurn(players[1]);
+            currentRound += 1;
         }
         postGameResult();
     }

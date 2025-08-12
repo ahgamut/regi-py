@@ -33,9 +33,10 @@ namespace regi
         /* numeric combo: all entries are same, but different suits
          * cannot have ACE, sum must be less than or equal to 10 */
         std::int32_t sum = 0;
+        sum += static_cast<std::int32_t>(parts[0].entry());
         for (std::int32_t i = 1; i < parts.size(); ++i)
         {
-            sum += static_cast<int>(parts[i].entry());
+            sum += static_cast<std::int32_t>(parts[i].entry());
             if (parts[i].entry() == ACE) return 0;
             if (parts[i].entry() != parts[0].entry()) return 0;
         }

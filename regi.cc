@@ -97,40 +97,22 @@ namespace regi
 
     void GameState::init()
     {
+        pastYieldsInARow = 0;
+        currentRound = 0;
         initEnemy();
         initDraw();
         initPlayers();
-        pastYieldsInARow = 0;
         gameRunning = true;
     }
 
     /* logging */
-    void GameState::logEvent(Event ev, Player &player)
-    {
-        if (enemyPile.size() == 0) return;
-        if (usedPile.size() == 0) return;
-        const Combo &cur = usedPile.back();
-        const Enemy &enemy = enemyPile.front();
-        switch (ev)
-        {
-            case ATTACK:
-                break;
-            case DEFEND:
-                break;
-            case DRAW:
-                break;
-            case REPLENISH:
-                break;
-        }
-    }
-
     void GameState::logAttack(const Player &player, const Enemy &enemy,
                               const Combo &cur, const std::int32_t damage)
     {
         std::cout << "Player " << player.id;
         std::cout << " attacking " << enemy;
         std::cout << " with " << cur;
-        std::cout << "Dealing " << damage << " damage ";
+        std::cout << "\nDealt " << damage << " damage, ";
         std::cout << enemy << " hp is now " << enemy.hp;
         if (enemy.hp <= 0) { std::cout << " (KO)"; }
         std::cout << "\n";
@@ -166,6 +148,7 @@ namespace regi
 
     void GameState::logState()
     {
+        std::cout << "Round: " << currentRound << "\n";
         std::cout << "Player 0: " << players[0];
         std::cout << "Player 1: " << players[1];
         std::cout << "draw pile has " << drawPile.size() << " cards \n";
@@ -176,14 +159,14 @@ namespace regi
         if (enemyPile.size() != 0)
         {
             Enemy &e = enemyPile.front();
-            std::cout << "current enemy: " << e << " with " << e.hp << "HP, dealing "
-                      << e.strength() << " damage \n";
+            std::cout << "current enemy: " << e << " with " << e.hp << "HP\n";
         }
-        std::cout << "\n\n";
+        std::cout << "\n";
     }
 
     void GameState::logDebug()
     {
+        std::cout << "Round: " << currentRound << "\n";
         std::cout << "Player 0: " << players[0];
         std::cout << "Player 1: " << players[1];
         std::cout << "draw pile has " << drawPile.size() << " cards: " << drawPile;
@@ -196,10 +179,9 @@ namespace regi
         if (enemyPile.size() != 0)
         {
             Enemy &e = enemyPile.front();
-            std::cout << "current enemy: " << e << " with " << e.hp << "HP, dealing "
-                      << e.strength() << " damage \n";
+            std::cout << "current enemy: " << e << " with " << e.hp << "HP\n";
         }
-        std::cout << "\n\n";
+        std::cout << "\n";
     }
 
 } /* namespace regi */

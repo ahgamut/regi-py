@@ -8,18 +8,11 @@
 
 namespace regi
 {
-    enum Event
-    {
-        ATTACK,
-        DEFEND,
-        DRAW,
-        REPLENISH
-    };
-
     struct GameState
     {
        private:
         std::int32_t pastYieldsInARow;
+        std::int32_t currentRound;
         bool gameRunning;
         void initPlayers();
         void initDraw();
@@ -35,7 +28,6 @@ namespace regi
         /* methods */
         void init();
         void setup();
-        void logEvent(const Event ev, Player &);
         void logAttack(const Player &, const Enemy &, const Combo &,
                        const std::int32_t);
         void logDefend(const Player &, const Combo &,
