@@ -79,6 +79,7 @@ namespace regi
         virtual void replenish(const std::int32_t) = 0;
         virtual void state(const GameState &) = 0;
         virtual void debug(const GameState &) = 0;
+        virtual void endTurn(const GameState &) = 0;
         virtual void endgame(EndGameReason, const GameState &) = 0;
         virtual void postgame(const GameState &) = 0;
     };

@@ -191,6 +191,7 @@ namespace regi
             if (!gameRunning) break;
             oneTurn(players[1]);
             currentRound += 1;
+            log.endTurn(*this);
         }
         postGameResult();
     }

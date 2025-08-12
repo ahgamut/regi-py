@@ -14,6 +14,7 @@ namespace regi
         void replenish(const std::int32_t);
         void state(const GameState &);
         void debug(const GameState &);
+        void endTurn(const GameState &);
         void endgame(EndGameReason, const GameState &);
         void postgame(const GameState &);
     };

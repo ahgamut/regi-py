@@ -18,7 +18,7 @@ namespace regi
                             const std::int32_t damage)
     {
         std::cout << "Player " << player.id;
-        std::cout << " blocks " << damage ;
+        std::cout << " blocks " << damage;
         std::cout << " damage with " << cur;
         std::cout << "\n";
     }
@@ -83,6 +83,12 @@ namespace regi
         std::cout << "\n";
     }
 
+    void ConsoleLog::endTurn(const GameState &g)
+    {
+        (void)g;
+        std::cout << "\n\n";
+    }
+
     void ConsoleLog::endgame(EndGameReason reason, const GameState &g)
     {
         switch (reason)
@@ -103,10 +109,17 @@ namespace regi
 
     void ConsoleLog::postgame(const GameState &g)
     {
+        std::cout << "Game Results: \n";
         if (!g.players[0].alive) { std::cout << "LOST! player 0 KO\n"; }
         else if (!g.players[1].alive) { std::cout << "LOST! player 1 KO\n"; }
-        else if (!g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
+        else if (g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
         else { std::cout << "unknown exit\n"; }
+
+        std::cout << "Game lasted " << g.currentRound << " rounds\n";
+        if (g.enemyPile.size() != 0)
+        {
+            std::cout << "Died to " << g.enemyPile.front() << "\n";
+        }
     }
 
 } /* namespace regi */
