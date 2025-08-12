@@ -3,7 +3,7 @@
 namespace regi
 {
 
-    Combo::Combo() : powers(0), baseDmg(0) {};
+    Combo::Combo() : baseDmg(0), powers(0) {};
 
     std::int32_t Combo::valid(bool yieldAllowed)
     {
