@@ -31,14 +31,6 @@ namespace regi
         GameState(BaseLog &l) : log(l) {};
         void init();
         void setup();
-        void logAttack(const Player &, const Enemy &, const Combo &,
-                       const std::int32_t);
-        void logDefend(const Player &, const Combo &, const std::int32_t);
-        void logFailBlock(const Player &, const std::int32_t, const std::int32_t);
-        void logDrawOne(const Player &);
-        void logReplenish(std::int32_t);
-        void logState();
-        void logDebug();
 
         void startLoop();
         void oneTurn(Player &);

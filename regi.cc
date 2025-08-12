@@ -105,31 +105,4 @@ namespace regi
         gameRunning = true;
     }
 
-    /* logging */
-    void GameState::logAttack(const Player &player, const Enemy &enemy,
-                              const Combo &cur, const std::int32_t damage)
-    {
-        log.attack(player, enemy, cur, damage);
-    }
-
-    void GameState::logDefend(const Player &player, const Combo &cur,
-                              const std::int32_t damage)
-    {
-        log.defend(player, cur, damage);
-    }
-
-    void GameState::logFailBlock(const Player &player, const std::int32_t damage,
-                                 const std::int32_t maxblock)
-    {
-        log.failBlock(player, damage, maxblock);
-    }
-
-    void GameState::logDrawOne(const Player &player) { log.drawOne(player); }
-
-    void GameState::logReplenish(std::int32_t n) { log.replenish(n); }
-
-    void GameState::logState() { log.state(*this); }
-
-    void GameState::logDebug() { log.debug(*this); }
-
 } /* namespace regi */

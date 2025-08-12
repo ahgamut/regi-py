@@ -16,7 +16,7 @@ namespace regi
         if (drawPile.size() != 0 && !player.full())
         {
             player.cards.push_back(drawPile.back());
-            logDrawOne(player);
+            log.drawOne(player);
             drawPile.pop_back();
             return 1;
         }
@@ -33,7 +33,7 @@ namespace regi
             discardPile.pop_back();
             count += 1;
         }
-        logReplenish(count);
+        log.replenish(count);
     }
 
     void GameState::refreshDraws(std::int32_t ip, std::int32_t n)
@@ -86,7 +86,7 @@ namespace regi
         if (damage > tblock)
         {
             /* impossible to block the damage, so game over */
-            logFailBlock(player, damage, tblock);
+            log.failBlock(player, damage, tblock);
             gameOver();
             player.alive = false;
             return;
@@ -170,7 +170,7 @@ namespace regi
         selectAttack(player, pastYieldsInARow < (2 - 1));
         std::int32_t damage = calcDamage(enemy);
         enemy.hp -= damage;
-        logAttack(player, enemy, usedPile.back(), damage);
+        log.attack(player, enemy, usedPile.back(), damage);
         postAttackEffects(player, enemy);
     }
 
@@ -187,7 +187,7 @@ namespace regi
     {
         while (gameRunning)
         {
-            logDebug();
+            log.debug(*this);
             oneTurn(players[0]);
             oneTurn(players[1]);
             currentRound += 1;

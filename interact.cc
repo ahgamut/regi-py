@@ -36,7 +36,7 @@ namespace regi
             }
         }
 
-        logDefend(player, def, damage);
+        log.defend(player, def, damage);
         // add to discard pile
         for (Card &c : def.parts) { discardPile.push_back(c); }
     }
