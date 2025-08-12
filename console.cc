@@ -83,4 +83,30 @@ namespace regi
         std::cout << "\n";
     }
 
+    void ConsoleLog::endgame(EndGameReason reason, const GameState &g)
+    {
+        switch (reason)
+        {
+            case BLOCK_FAILED:
+                std::cout << "endgame: someone was unable to block\n";
+                break;
+            case ATTACK_FAILED:
+                std::cout << "endgame: someone was unable to attack (?)\n";
+                break;
+            case PLAYER_DEAD:
+                std::cout << "endgame: someone was not able to play\n";
+                break;
+            case NO_ENEMIES:
+                break;
+        }
+    }
+
+    void ConsoleLog::postgame(const GameState &g)
+    {
+        if (!g.players[0].alive) { std::cout << "LOST! player 0 KO\n"; }
+        else if (!g.players[1].alive) { std::cout << "LOST! player 1 KO\n"; }
+        else if (!g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
+        else { std::cout << "unknown exit\n"; }
+    }
+
 } /* namespace regi */

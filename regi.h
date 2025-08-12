@@ -8,6 +8,14 @@
 
 namespace regi
 {
+    enum EndGameReason
+    {
+        NO_ENEMIES,
+        BLOCK_FAILED,
+        ATTACK_FAILED,
+        PLAYER_DEAD,
+    };
+
     struct BaseLog;
     struct Strategy;
     //
@@ -37,7 +45,7 @@ namespace regi
 
         void startLoop();
         void oneTurn(Player &);
-        void gameOver();
+        void gameOver(EndGameReason);
         void postGameResult();
 
         void playerDraws(Player &, int);
@@ -71,6 +79,8 @@ namespace regi
         virtual void replenish(const std::int32_t) = 0;
         virtual void state(const GameState &) = 0;
         virtual void debug(const GameState &) = 0;
+        virtual void endgame(EndGameReason, const GameState &) = 0;
+        virtual void postgame(const GameState &) = 0;
     };
 
     struct Strategy

@@ -87,7 +87,7 @@ namespace regi
         {
             /* impossible to block the damage, so game over */
             log.failBlock(player, damage, tblock);
-            gameOver();
+            gameOver(BLOCK_FAILED);
             player.alive = false;
             return;
         }
@@ -174,14 +174,13 @@ namespace regi
         postAttackEffects(player, enemy);
     }
 
-    void GameState::gameOver() { gameRunning = false; }
-    void GameState::postGameResult()
+    void GameState::gameOver(EndGameReason e)
     {
-        if (!players[0].alive) { std::cout << "LOST! player 0 KO\n"; }
-        else if (!players[1].alive) { std::cout << "LOST! player 1 KO\n"; }
-        else if (!enemyPile.size() == 0) { std::cout << "WIN!\n"; }
-        else { std::cout << "unknown exit\n"; }
+        gameRunning = false;
+        log.endgame(e, *this);
     }
+
+    void GameState::postGameResult() { log.postgame(*this); }
 
     void GameState::startLoop()
     {
@@ -197,9 +196,14 @@ namespace regi
 
     void GameState::oneTurn(Player &player)
     {
-        if (enemyPile.size() == 0 || !player.alive)
+        if (!player.alive)
         {
-            gameOver();
+            gameOver(PLAYER_DEAD);
+            return;
+        }
+        if (enemyPile.size() == 0)
+        {
+            gameOver(NO_ENEMIES);
             return;
         }
 
@@ -208,12 +212,16 @@ namespace regi
             attackPhase(player, enemy);
         } while (enemyDead());
 
-        if (enemyPile.size() == 0 || !player.alive)
+        if (!player.alive)
         {
-            gameOver();
+            gameOver(PLAYER_DEAD);
+            return;
+        }
+        if (enemyPile.size() == 0)
+        {
+            gameOver(NO_ENEMIES);
             return;
         }
         defensePhase(player, enemyPile.front());
-        std::cout << "\n";
     }
 } /* namespace regi */

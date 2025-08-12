@@ -15,7 +15,7 @@ namespace regi
         if (strat.provideDefense(def, player, damage, *this) == 0)
         {
             player.alive = false;
-            gameOver();
+            gameOver(BLOCK_FAILED);
             return;
         }
         for (std::int32_t i = 0; i < def.parts.size(); ++i)
@@ -41,7 +41,7 @@ namespace regi
         if (strat.provideAttack(atk, player, yieldAllowed, *this) == 0)
         {
             player.alive = false;
-            gameOver();
+            gameOver(ATTACK_FAILED);
             return;
         }
         atk.loadDetails();
