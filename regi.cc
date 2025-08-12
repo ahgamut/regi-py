@@ -1,14 +1,16 @@
 #include <regi.h>
 
-template std::ostream &operator<< <Card>(std::ostream &os, std::vector<Card> &pile);
-template std::ostream &operator<< <regi::Enemy>(std::ostream &os,
-                                                std::vector<regi::Enemy> &pile);
-template std::ostream &operator<< <regi::Combo>(std::ostream &os,
-                                                std::vector<regi::Combo> &pile);
-
-std::ostream &operator<<(std::ostream &os, regi::Combo &c)
+std::ostream &operator<<(std::ostream &os, const std::vector<Card> pile)
 {
-    os << c.parts;
+    for (auto c : pile) { os << c << " "; }
+    os << "\n";
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const std::vector<regi::Enemy> pile)
+{
+    for (auto c : pile) { os << c << " "; }
+    os << "\n";
     return os;
 }
 
@@ -99,6 +101,55 @@ namespace regi
         initDraw();
         initPlayers();
         gameRunning = true;
+    }
+
+    /* logging */
+    void GameState::logEvent(Event ev, Player &player)
+    {
+        switch (ev)
+        {
+            case ATTACK:
+                break;
+            case DEFEND:
+                break;
+            case DRAW:
+                break;
+            case REPLENISH:
+                break;
+        }
+    }
+
+    void GameState::logState()
+    {
+        std::cout << "Player 0: " << players[0];
+        std::cout << "Player 1: " << players[1];
+        std::cout << "draw pile has " << drawPile.size() << " cards \n";
+        std::cout << "discard pile has " << discardPile.size() << " cards \n";
+        std::cout << "used pile has " << usedPile.size()
+                  << " combos: ";
+        for(auto &u : usedPile) {
+            std::cout << u.parts;
+        }
+        if (enemyPile.size() != 0)
+        {
+            Enemy &e = enemyPile.front();
+            std::cout << "current enemy: " << e << " with " << e.hp << ", dealing "
+                      << e.strength() << " damage \n";
+        }
+    }
+
+    void GameState::logDebug()
+    {
+        std::cout << "Player 0: " << players[0];
+        std::cout << "Player 1: " << players[1];
+        std::cout << "draw pile has " << drawPile.size() << " cards: " << drawPile;
+        std::cout << "discard pile has " << discardPile.size()
+                  << " cards: " << discardPile;
+        std::cout << "used pile has " << usedPile.size() << " combos: ";
+        for(auto &u : usedPile) {
+            std::cout << u.parts;
+        }
+        std::cout << "enemies: " << enemyPile;
     }
 
 } /* namespace regi */

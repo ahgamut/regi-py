@@ -1,6 +1,5 @@
 #ifndef REGI_H
 #define REGI_H
-#include <vector>
 #include <card.h>
 #include <combo.h>
 #include <enemy.h>
@@ -9,6 +8,12 @@
 
 namespace regi
 {
+    enum Event {
+        ATTACK,
+        DEFEND,
+        DRAW,
+        REPLENISH
+    };
 
     struct GameState
     {
@@ -29,6 +34,9 @@ namespace regi
         /* methods */
         void init();
         void setup();
+        void logEvent(const Event ev, Player &);
+        void logState();
+        void logDebug();
 
         void startLoop();
         void oneTurn(Player &);

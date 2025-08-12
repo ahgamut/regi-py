@@ -3,15 +3,10 @@
 #include <cstdint>
 #include <vector>
 #include <random>
+#include <combo.h>
 
 template <typename T>
-void shuffle(std::vector<T> &pile, std::uint32_t start, std::uint32_t end);
-
-template <typename T>
-std::ostream &operator<<(std::ostream &os, std::vector<T> &pile);
-
-template <typename T>
-std::ostream &operator<<(std::ostream &os, std::vector<T> &pile)
+std::ostream &operator<<(std::ostream &os, const std::vector<T> pile)
 {
     for (auto c : pile) { os << c << " "; }
     os << "\n";
@@ -33,4 +28,5 @@ void shuffle(std::vector<T> &pile, std::uint32_t start, std::uint32_t end)
     }
 }
 
+std::ostream &operator<<(std::ostream &os, const std::vector<regi::Combo> pile);
 #endif

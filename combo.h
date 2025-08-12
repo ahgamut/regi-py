@@ -24,5 +24,4 @@ namespace regi
 
 } /* namespace regi */
 
-std::ostream& operator<<(std::ostream& os, regi::Combo& c);
 #endif
