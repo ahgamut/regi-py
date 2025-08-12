@@ -20,6 +20,7 @@ namespace regi
         if (combos.size() == 0) {
             player.alive = false;
             gameOver();
+            return;
         }
 
         Combo &def = dfsel::selectDefense(combos);
@@ -35,6 +36,7 @@ namespace regi
             }
         }
 
+        logDefend(player, def, damage);
         // add to discard pile
         for (Card &c : def.parts) { discardPile.push_back(c); }
     }
@@ -56,6 +58,7 @@ namespace regi
         if (combos.size() == 0) {
             player.alive = false;
             gameOver();
+            return;
         }
 
         Combo &atk = dfsel::selectAttack(combos);

@@ -16,6 +16,7 @@ namespace regi
         if (drawPile.size() != 0 && !player.full())
         {
             player.cards.push_back(drawPile.back());
+            logDrawOne(player);
             drawPile.pop_back();
             return 1;
         }
@@ -25,11 +26,14 @@ namespace regi
     void GameState::refreshDiscards(std::int32_t n)
     {
         shuffle(discardPile, 0, discardPile.size());
+        std::int32_t count = 0;
         for (; n > 0 && discardPile.size() != 0; n--)
         {
             drawPile.push_back(discardPile.back());
             discardPile.pop_back();
+            count += 1;
         }
+        logReplenish(count);
     }
 
     void GameState::refreshDraws(std::int32_t ip, std::int32_t n)
@@ -82,6 +86,7 @@ namespace regi
         if (damage > tblock)
         {
             /* impossible to block the damage, so game over */
+            logFailBlock(player, damage, tblock);
             gameOver();
             player.alive = false;
             return;
@@ -108,7 +113,7 @@ namespace regi
         }
         else { pastYieldsInARow = 0; }
         dmg += curcombo.getBaseDamage();
-        bool dbl = ((curcombo.getPowers() & CLUBS_DOUBLE) ^ epow) != 0;
+        bool dbl = ((curcombo.getPowers() & CLUBS_DOUBLE) & (~epow)) != 0;
         if (dbl) { dmg += curcombo.getBaseDamage(); }
         return dmg;
     }
@@ -128,7 +133,7 @@ namespace regi
         }
 
         Combo curcombo = usedPile.back();
-        std::uint32_t cpow = (curcombo.getPowers() ^ epow);
+        std::uint32_t cpow = (curcombo.getPowers() & (~epow));
         std::int32_t cval = (curcombo.getBaseDamage());
 
         if ((cpow & HEARTS_REPLENISH) != 0) { refreshDiscards(cval); }
@@ -147,7 +152,8 @@ namespace regi
             drawPile.insert(drawPile.begin(), econ);
             enemyPile.erase(enemyPile.begin());
         }
-        else { 
+        else
+        {
             discardPile.push_back(econ);
             enemyPile.erase(enemyPile.begin());
         }
@@ -164,6 +170,7 @@ namespace regi
         selectAttack(player, pastYieldsInARow < (2 - 1));
         std::int32_t damage = calcDamage(enemy);
         enemy.hp -= damage;
+        logAttack(player, enemy, usedPile.back(), damage);
         postAttackEffects(player, enemy);
     }
 
@@ -198,7 +205,6 @@ namespace regi
         do {
             Enemy &enemy = enemyPile.front();
             attackPhase(player, enemy);
-            logState();
         } while (enemyDead());
 
         if (enemyPile.size() == 0 || !player.alive)
@@ -207,5 +213,6 @@ namespace regi
             return;
         }
         defensePhase(player, enemyPile.front());
+        std::cout << "\n";
     }
 } /* namespace regi */

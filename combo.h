@@ -20,6 +20,7 @@ namespace regi
         std::uint32_t getPowers();
         std::int32_t getBaseDamage();
         std::int32_t getBaseDefense();
+        friend std::ostream &operator<<(std::ostream &, const Combo &);
     };
 
 } /* namespace regi */

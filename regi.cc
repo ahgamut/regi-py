@@ -107,6 +107,10 @@ namespace regi
     /* logging */
     void GameState::logEvent(Event ev, Player &player)
     {
+        if (enemyPile.size() == 0) return;
+        if (usedPile.size() == 0) return;
+        const Combo &cur = usedPile.back();
+        const Enemy &enemy = enemyPile.front();
         switch (ev)
         {
             case ATTACK:
@@ -120,6 +124,46 @@ namespace regi
         }
     }
 
+    void GameState::logAttack(const Player &player, const Enemy &enemy,
+                              const Combo &cur, const std::int32_t damage)
+    {
+        std::cout << "Player " << player.id;
+        std::cout << " attacking " << enemy;
+        std::cout << " with " << cur;
+        std::cout << "Dealing " << damage << " damage ";
+        std::cout << enemy << " hp is now " << enemy.hp;
+        if (enemy.hp <= 0) { std::cout << " (KO)"; }
+        std::cout << "\n";
+    }
+
+    void GameState::logDefend(const Player &player, const Combo &cur,
+                              const std::int32_t damage)
+    {
+        std::cout << "Player " << player.id;
+        std::cout << " attacked for " << damage;
+        std::cout << ", blocked with " << cur;
+        std::cout << "\n";
+    }
+
+    void GameState::logFailBlock(const Player &player, const std::int32_t damage,
+                                 const std::int32_t maxblock)
+    {
+        std::cout << "Player " << player.id;
+        std::cout << " attacked for " << damage;
+        std::cout << ", but can only block for " << maxblock;
+        std::cout << "\n";
+    }
+
+    void GameState::logDrawOne(const Player &player)
+    {
+        std::cout << "Player " << player.id << " drew a card\n";
+    }
+
+    void GameState::logReplenish(std::int32_t n)
+    {
+        std::cout << "added " << n << " cards from discard pile to draw pile\n";
+    }
+
     void GameState::logState()
     {
         std::cout << "Player 0: " << players[0];
@@ -127,7 +171,7 @@ namespace regi
         std::cout << "draw pile has " << drawPile.size() << " cards \n";
         std::cout << "discard pile has " << discardPile.size() << " cards \n";
         std::cout << "used pile has " << usedPile.size() << " combos: ";
-        for (auto &u : usedPile) { std::cout << u.parts; }
+        for (auto &u : usedPile) { std::cout << u; }
         std::cout << "\n";
         if (enemyPile.size() != 0)
         {
@@ -146,7 +190,7 @@ namespace regi
         std::cout << "discard pile has " << discardPile.size()
                   << " cards: " << discardPile;
         std::cout << "used pile has " << usedPile.size() << " combos: ";
-        for (auto &u : usedPile) { std::cout << u.parts; }
+        for (auto &u : usedPile) { std::cout << u; }
         std::cout << "\n";
         std::cout << "enemies: " << enemyPile;
         if (enemyPile.size() != 0)

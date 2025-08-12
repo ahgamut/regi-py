@@ -69,5 +69,21 @@ namespace regi
 
     std::int32_t Combo::getBaseDamage() { return this->baseDmg; }
     std::uint32_t Combo::getPowers() { return this->powers; }
+
+    std::ostream &operator<<(std::ostream &os, const regi::Combo &combo)
+    {
+        if (combo.parts.empty()) { os << "(yield) "; }
+        else
+        {
+            os << "(";
+            for (std::size_t i = 0; i < combo.parts.size(); ++i)
+            {
+                os << combo.parts[i];
+                if (i != combo.parts.size() - 1) { os << " "; }
+            }
+            os << ") ";
+        }
+        return os;
+    }
 } /* namespace regi */
 
