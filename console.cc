@@ -18,8 +18,8 @@ namespace regi
                             const std::int32_t damage)
     {
         std::cout << "Player " << player.id;
-        std::cout << " attacked for " << damage;
-        std::cout << ", blocked with " << cur;
+        std::cout << " blocks " << damage ;
+        std::cout << " damage with " << cur;
         std::cout << "\n";
     }
 
@@ -27,8 +27,8 @@ namespace regi
                                const std::int32_t maxblock)
     {
         std::cout << "Player " << player.id;
-        std::cout << " attacked for " << damage;
-        std::cout << ", but can only block for " << maxblock;
+        std::cout << " needs to block " << damage;
+        std::cout << " damage, but can only block for " << maxblock;
         std::cout << "\n";
     }
 

@@ -188,6 +188,7 @@ namespace regi
         {
             log.debug(*this);
             oneTurn(players[0]);
+            if (!gameRunning) break;
             oneTurn(players[1]);
             currentRound += 1;
         }
