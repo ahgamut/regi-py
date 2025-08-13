@@ -38,16 +38,20 @@ namespace regi
 
     void GameState::refreshDraws(std::int32_t ip, std::int32_t n)
     {
-        std::int32_t i;
-        std::int32_t full[] = {0, 0};
+        std::int32_t i, j;
+        std::int32_t full[NUM_PLAYERS] = {0};
+        std::int32_t fullct = 0;
         if (ip < 0) { ip *= -1; }
-        ip %= 2;
+        ip %= NUM_PLAYERS;
         for (i = ip; n > 0; n--)
         {
             if (playerDrawsOne(players[i]) == 0) { full[i] = 1; }
             i += 1;
-            i %= 2;
-            if (full[0] == 1 && full[1] == 1) break;
+            i %= NUM_PLAYERS;
+            // if all players are full, stop draw
+            fullct = 0;
+            for (j = 0; j < NUM_PLAYERS; ++j) { fullct += (full[j] == 1); }
+            if (fullct == NUM_PLAYERS) break;
         }
     }
 
@@ -167,7 +171,7 @@ namespace regi
 
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
-        selectAttack(player, pastYieldsInARow < (2 - 1));
+        selectAttack(player, pastYieldsInARow < (NUM_PLAYERS - 1));
         std::int32_t damage = calcDamage(enemy);
         enemy.hp -= damage;
         log.attack(player, enemy, usedPile.back(), damage);
@@ -184,12 +188,14 @@ namespace regi
 
     void GameState::startLoop()
     {
+        std::int32_t i;
         while (gameRunning)
         {
             log.debug(*this);
-            oneTurn(players[0]);
-            if (!gameRunning) break;
-            oneTurn(players[1]);
+            for(i = 0; i < NUM_PLAYERS; ++i) {
+                oneTurn(players[i]);
+                if (!gameRunning) break;
+            }
             currentRound += 1;
             log.endTurn(*this);
         }

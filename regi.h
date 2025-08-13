@@ -32,7 +32,7 @@ namespace regi
         std::int32_t pastYieldsInARow;
         std::int32_t currentRound;
         bool gameRunning;
-        Player players[2];
+        Player players[NUM_PLAYERS];
         std::vector<Card> drawPile;    /* cards that can be drawn */
         std::vector<Enemy> enemyPile;  /* enemies still left to KO */
         std::vector<Card> discardPile; /* cards used up to KO enemies */

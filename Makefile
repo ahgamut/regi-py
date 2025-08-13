@@ -1,4 +1,6 @@
-CXXFLAGS  =  -I. -DUSE_UNICODE -std=c++11 -O3 -c -g3 -Wall -Wpedantic -Wextra -fno-omit-frame-pointer -Wno-sign-compare
+CXXFLAGS  =  -I. -DUSE_UNICODE -DNUM_PLAYERS=4\
+			 -std=c++11 -O3 -c -g3 -Wall -Wpedantic -Wextra \
+			 -fno-omit-frame-pointer -Wno-sign-compare
 LINKFLAGS = -fno-omit-frame-pointer
 CC := gcc
 CXX := g++

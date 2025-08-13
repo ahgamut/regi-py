@@ -80,19 +80,24 @@ namespace regi
         drawPile.push_back(Card(EIGHT, CLUBS));     //
         drawPile.push_back(Card(NINE, CLUBS));      //
         drawPile.push_back(Card(TEN, CLUBS));       //
-                                                    /* 1 joker for 2p */
+#if NUM_PLAYERS == 3
+                                                    /* 1 joker for 3p */
         drawPile.push_back(Card(JOKER, GLITCH));
-        shuffle(drawPile, 0, 41);
+#elif NUM_PLAYERS == 4
+                                                    /* 2 joker for 4p */
+        drawPile.push_back(Card(JOKER, GLITCH));
+        drawPile.push_back(Card(JOKER, GLITCH));
+#endif
+        shuffle(drawPile, 0, drawPile.size());
     }
 
     void GameState::initPlayers()
     {
-        players[0].alive = true;
-        players[0].id = 0;
-        playerDraws(players[0], Player::HAND_SIZE);
-        players[1].alive = true;
-        players[1].id = 1;
-        playerDraws(players[1], Player::HAND_SIZE);
+        for(int i = 0; i < NUM_PLAYERS; ++i) {
+            players[i].alive = true;
+            players[i].id = i;
+            playerDraws(players[i], Player::HAND_SIZE);
+        }
     }
 
     void GameState::init()

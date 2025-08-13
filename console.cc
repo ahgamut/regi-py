@@ -48,8 +48,10 @@ namespace regi
     void ConsoleLog::state(const GameState &g)
     {
         std::cout << "Round: " << g.currentRound << "\n";
-        std::cout << "Player 0: " << g.players[0];
-        std::cout << "Player 1: " << g.players[1];
+        for (std::int32_t i = 0; i < NUM_PLAYERS; ++i)
+        {
+            std::cout << "Player " << i << ": " << g.players[i];
+        }
         std::cout << "draw pile has " << g.drawPile.size() << " cards \n";
         std::cout << "discard pile has " << g.discardPile.size() << " cards \n";
         std::cout << "used pile has " << g.usedPile.size() << " combos: ";
@@ -66,8 +68,10 @@ namespace regi
     void ConsoleLog::debug(const GameState &g)
     {
         std::cout << "Round: " << g.currentRound << "\n";
-        std::cout << "Player 0: " << g.players[0];
-        std::cout << "Player 1: " << g.players[1];
+        for (std::int32_t i = 0; i < NUM_PLAYERS; ++i)
+        {
+            std::cout << "Player " << i << ": " << g.players[i];
+        }
         std::cout << "draw pile has " << g.drawPile.size() << " cards: " << g.drawPile;
         std::cout << "discard pile has " << g.discardPile.size()
                   << " cards: " << g.discardPile;
@@ -110,9 +114,16 @@ namespace regi
     void ConsoleLog::postgame(const GameState &g)
     {
         std::cout << "Game Results: \n";
-        if (!g.players[0].alive) { std::cout << "LOST! player 0 KO\n"; }
-        else if (!g.players[1].alive) { std::cout << "LOST! player 1 KO\n"; }
-        else if (g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
+        bool allAlive = true;
+        for (std::int32_t i = 0; i < NUM_PLAYERS; ++i)
+        {
+            if (!g.players[i].alive)
+            {
+                allAlive = false;
+                std::cout << "LOST! player " << i << " KO\n";
+            }
+        }
+        if (allAlive && g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
         else { std::cout << "unknown exit\n"; }
 
         std::cout << "Game lasted " << g.currentRound << " rounds\n";
