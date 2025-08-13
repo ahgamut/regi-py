@@ -1,5 +1,5 @@
 #include <regi.h>
-#include <logger.h>
+#include <console.h>
 #include <dfsel.h>
 
 int main()

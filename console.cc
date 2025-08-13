@@ -1,4 +1,4 @@
-#include <logger.h>
+#include <console.h>
 
 namespace regi
 {

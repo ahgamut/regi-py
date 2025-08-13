@@ -191,7 +191,7 @@ namespace regi
         std::int32_t i;
         while (gameRunning)
         {
-            log.debug(*this);
+            log.state(*this);
             for(i = 0; i < NUM_PLAYERS; ++i) {
                 oneTurn(players[i]);
                 if (!gameRunning) break;
