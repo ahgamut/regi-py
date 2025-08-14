@@ -80,34 +80,55 @@ namespace regi
         drawPile.push_back(Card(EIGHT, CLUBS));     //
         drawPile.push_back(Card(NINE, CLUBS));      //
         drawPile.push_back(Card(TEN, CLUBS));       //
-#if NUM_PLAYERS == 3
-                                                    /* 1 joker for 3p */
-        drawPile.push_back(Card(JOKER, GLITCH));
-#elif NUM_PLAYERS == 4
-                                                    /* 2 joker for 4p */
-        drawPile.push_back(Card(JOKER, GLITCH));
-        drawPile.push_back(Card(JOKER, GLITCH));
-#endif
+        if (NUM_PLAYERS == 3)
+        {
+            /* 1 joker for 3p */
+            drawPile.push_back(Card(JOKER, GLITCH));
+        }
+        else if (NUM_PLAYERS == 4)
+        {
+            /* 2 joker for 4p */
+            drawPile.push_back(Card(JOKER, GLITCH));
+            drawPile.push_back(Card(JOKER, GLITCH));
+        }
+        else if (NUM_PLAYERS > 4 || NUM_PLAYERS < 2)
+        {
+            gameRunning = false;
+            log.endgame(INVALID_START, *this);
+            return;
+        }
         shuffle(drawPile, 0, drawPile.size());
     }
 
     void GameState::initPlayers()
     {
-        for(int i = 0; i < NUM_PLAYERS; ++i) {
+        if (NUM_PLAYERS > 4 || NUM_PLAYERS < 2)
+        {
+            gameRunning = false;
+            log.endgame(INVALID_START, *this);
+            return;
+        }
+        std::int32_t hs;
+        if (NUM_PLAYERS == 2) { hs = 7; }
+        else if (NUM_PLAYERS == 3) { hs = 6; }
+        else /* (NUM_PLAYERS == 4) */ { hs = 5; }
+        for (int i = 0; i < NUM_PLAYERS; ++i)
+        {
+            players.push_back(Player(hs));
             players[i].alive = true;
             players[i].id = i;
-            playerDraws(players[i], Player::HAND_SIZE);
+            playerDraws(players[i], players[i].HAND_SIZE);
         }
     }
 
     void GameState::init()
     {
+        gameRunning = true;
         pastYieldsInARow = 0;
         currentRound = 0;
         initEnemy();
         initDraw();
         initPlayers();
-        gameRunning = true;
         log.startgame(*this);
     }
 

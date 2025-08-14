@@ -18,10 +18,7 @@ namespace regi
     {
         if (enemy.hp > 0)
             return;
-        else if (enemy.hp == 0)
-        {
-            std::cout << enemy << " killed exact!\n";
-        }
+        else if (enemy.hp == 0) { std::cout << enemy << " killed exact!\n"; }
         else { std::cout << enemy << " killed!\n"; }
         std::cout << "adding to discard pile: ";
         for (const auto &comb : g.usedPile)
@@ -65,7 +62,7 @@ namespace regi
     void ConsoleLog::state(const GameState &g)
     {
         std::cout << "Round: " << g.currentRound << "\n";
-        for (std::int32_t i = 0; i < NUM_PLAYERS; ++i)
+        for (std::int32_t i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
         }
@@ -85,7 +82,7 @@ namespace regi
     void ConsoleLog::debug(const GameState &g)
     {
         std::cout << "Round: " << g.currentRound << "\n";
-        for (std::int32_t i = 0; i < NUM_PLAYERS; ++i)
+        for (std::int32_t i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
         }
@@ -121,6 +118,9 @@ namespace regi
         (void)g;
         switch (reason)
         {
+            case INVALID_START:
+                std::cout << "endgame: only 2, 3, or 4 players allowed\n";
+                break;
             case BLOCK_FAILED:
                 std::cout << "endgame: someone was unable to block\n";
                 break;
@@ -139,7 +139,7 @@ namespace regi
     {
         std::cout << "Game Results: \n";
         bool allAlive = true;
-        for (std::int32_t i = 0; i < NUM_PLAYERS; ++i)
+        for (std::int32_t i = 0; i < g.players.size(); ++i)
         {
             if (!g.players[i].alive)
             {
@@ -147,8 +147,12 @@ namespace regi
                 std::cout << "LOST! player " << i << " KO\n";
             }
         }
+        if (g.players.size() < 2 || g.players.size() > 4)
+        {
+            std::cout << "invalid team!\n";
+            return;
+        }
         if (allAlive && g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
-        else { std::cout << "unknown exit\n"; }
 
         std::cout << "Game lasted " << g.currentRound << " rounds\n";
         if (g.enemyPile.size() != 0)

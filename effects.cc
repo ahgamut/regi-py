@@ -39,8 +39,10 @@ namespace regi
     void GameState::refreshDraws(std::int32_t ip, std::int32_t n)
     {
         std::int32_t i, j;
-        std::int32_t full[NUM_PLAYERS] = {0};
+        std::vector<std::int32_t> full(NUM_PLAYERS);
         std::int32_t fullct = 0;
+
+        for (j = 0; j < NUM_PLAYERS; ++j) { full[j] = 0; }
         if (ip < 0) { ip *= -1; }
         ip %= NUM_PLAYERS;
         for (i = ip; n > 0; n--)
@@ -193,7 +195,8 @@ namespace regi
         while (gameRunning)
         {
             log.state(*this);
-            for(i = 0; i < NUM_PLAYERS; ++i) {
+            for (i = 0; i < NUM_PLAYERS; ++i)
+            {
                 oneTurn(players[i]);
                 if (!gameRunning) break;
             }

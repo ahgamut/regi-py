@@ -10,6 +10,7 @@ namespace regi
 {
     enum EndGameReason
     {
+        INVALID_START,
         NO_ENEMIES,
         BLOCK_FAILED,
         ATTACK_FAILED,
@@ -24,6 +25,7 @@ namespace regi
        private:
         BaseLog &log;
         Strategy &strat;
+        const std::int32_t NUM_PLAYERS;
         void initPlayers();
         void initDraw();
         void initEnemy();
@@ -32,14 +34,15 @@ namespace regi
         std::int32_t pastYieldsInARow;
         std::int32_t currentRound;
         bool gameRunning;
-        Player players[NUM_PLAYERS];
+        std::vector<Player> players;
         std::vector<Card> drawPile;    /* cards that can be drawn */
         std::vector<Enemy> enemyPile;  /* enemies still left to KO */
         std::vector<Card> discardPile; /* cards used up to KO enemies */
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l, Strategy &s) : log(l), strat(s) {};
+        GameState(BaseLog &l, Strategy &s, std::int32_t n)
+            : log(l), strat(s), NUM_PLAYERS(n) {};
         void init();
         void setup();
 
