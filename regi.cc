@@ -108,6 +108,7 @@ namespace regi
         initDraw();
         initPlayers();
         gameRunning = true;
+        log.startgame(*this);
     }
 
 } /* namespace regi */

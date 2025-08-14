@@ -14,6 +14,23 @@ namespace regi
         std::cout << "\n";
     }
 
+    void ConsoleLog::enemyKill(const Enemy &enemy, const GameState &g)
+    {
+        if (enemy.hp > 0)
+            return;
+        else if (enemy.hp == 0)
+        {
+            std::cout << enemy << " killed exact!\n";
+        }
+        else { std::cout << enemy << " killed!\n"; }
+        std::cout << "adding to discard pile: ";
+        for (const auto &comb : g.usedPile)
+        {
+            for (const auto &c : comb.parts) { std::cout << c << " "; }
+        }
+        std::cout << "\n";
+    }
+
     void ConsoleLog::defend(const Player &player, const Combo &cur,
                             const std::int32_t damage)
     {
@@ -93,8 +110,15 @@ namespace regi
         std::cout << "\n\n";
     }
 
+    void ConsoleLog::startgame(const GameState &g)
+    {
+        (void)g;
+        std::cout << "starting game\n\n";
+    }
+
     void ConsoleLog::endgame(EndGameReason reason, const GameState &g)
     {
+        (void)g;
         switch (reason)
         {
             case BLOCK_FAILED:

@@ -15,9 +15,9 @@ namespace regi
     {
         if (drawPile.size() != 0 && !player.full())
         {
-            player.cards.push_back(drawPile.back());
+            player.cards.push_back(drawPile.front());
             log.drawOne(player);
-            drawPile.pop_back();
+            drawPile.erase(drawPile.begin());
             return 1;
         }
         return 0;
@@ -150,6 +150,7 @@ namespace regi
         Enemy &enemy = enemyPile.front();
         if (enemy.hp > 0) return 0;
         Card econ(enemy.entry(), enemy.suit());
+        log.enemyKill(enemy, *this);
         if (enemy.hp == 0)
         {
             /* exact kill, so add to top of draw pile */
