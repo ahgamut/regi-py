@@ -57,6 +57,7 @@ namespace regi
     std::int32_t RandomStrategy::provideAttack(Combo &result, const Player &player,
                                                bool yieldAllowed, const GameState &g)
     {
+        (void)g;
         std::vector<Combo> combos;
         Combo base;
         if (yieldAllowed && base.parts.size() == 0)
@@ -74,6 +75,7 @@ namespace regi
     std::int32_t RandomStrategy::provideDefense(Combo &result, const Player &player,
                                                 std::int32_t damage, const GameState &g)
     {
+        (void)g;
         // we only enter this if it is actually possible to block
         std::vector<Combo> combos;
         Combo base;
@@ -198,6 +200,7 @@ namespace regi
     std::int32_t DamageStrategy::provideDefense(Combo &result, const Player &player,
                                             std::int32_t damage, const GameState &g)
     {
+        (void)g;
         // we only enter this if it is actually possible to block
         std::vector<Combo> combos;
         Combo base;
