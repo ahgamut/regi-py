@@ -7,12 +7,12 @@ namespace regi
     class ConsoleLog : public BaseLog
     {
        public:
-        void attack(const Player &, const Enemy &, const Combo &, const std::int32_t);
+        void attack(const Player &, const Enemy &, const Combo &, const i32);
         void enemyKill(const Enemy &, const GameState &);
-        void defend(const Player &, const Combo &, const std::int32_t);
-        void failBlock(const Player &, const std::int32_t, const std::int32_t);
+        void defend(const Player &, const Combo &, const i32);
+        void failBlock(const Player &, const i32, const i32);
         void drawOne(const Player &);
-        void replenish(const std::int32_t);
+        void replenish(const i32);
         void state(const GameState &);
         void debug(const GameState &);
         void endTurn(const GameState &);

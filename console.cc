@@ -3,7 +3,7 @@
 namespace regi
 {
     void ConsoleLog::attack(const Player &player, const Enemy &enemy, const Combo &cur,
-                            const std::int32_t damage)
+                            const i32 damage)
     {
         std::cout << "Player " << player.id;
         std::cout << " attacking " << enemy;
@@ -29,7 +29,7 @@ namespace regi
     }
 
     void ConsoleLog::defend(const Player &player, const Combo &cur,
-                            const std::int32_t damage)
+                            const i32 damage)
     {
         std::cout << "Player " << player.id;
         std::cout << " blocks " << damage;
@@ -37,8 +37,8 @@ namespace regi
         std::cout << "\n";
     }
 
-    void ConsoleLog::failBlock(const Player &player, const std::int32_t damage,
-                               const std::int32_t maxblock)
+    void ConsoleLog::failBlock(const Player &player, const i32 damage,
+                               const i32 maxblock)
     {
         std::cout << "Player " << player.id;
         std::cout << " needs to block " << damage;
@@ -51,7 +51,7 @@ namespace regi
         std::cout << "Player " << player.id << " drew a card\n";
     }
 
-    void ConsoleLog::replenish(const std::int32_t n)
+    void ConsoleLog::replenish(const i32 n)
     {
         if (n > 0)
         {
@@ -62,7 +62,7 @@ namespace regi
     void ConsoleLog::state(const GameState &g)
     {
         std::cout << "Round: " << g.currentRound << "\n";
-        for (std::int32_t i = 0; i < g.players.size(); ++i)
+        for (i32 i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
         }
@@ -82,7 +82,7 @@ namespace regi
     void ConsoleLog::debug(const GameState &g)
     {
         std::cout << "Round: " << g.currentRound << "\n";
-        for (std::int32_t i = 0; i < g.players.size(); ++i)
+        for (i32 i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
         }
@@ -139,7 +139,7 @@ namespace regi
     {
         std::cout << "Game Results: \n";
         bool allAlive = true;
-        for (std::int32_t i = 0; i < g.players.size(); ++i)
+        for (i32 i = 0; i < g.players.size(); ++i)
         {
             if (!g.players[i].alive)
             {

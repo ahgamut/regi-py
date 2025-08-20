@@ -3,7 +3,11 @@
 #include <cstdint>
 #include <iostream>
 
-enum Suit : std::int32_t
+typedef std::int32_t i32;
+typedef std::uint32_t u32;
+typedef std::size_t u64;
+
+enum Suit : i32
 {
     GLITCH = 0,
     CLUBS = 1,
@@ -13,7 +17,7 @@ enum Suit : std::int32_t
 };
 std::ostream& operator<<(std::ostream& os, const Suit s);
 
-enum Entry : std::int32_t
+enum Entry : i32
 {
     JOKER = 0,
     ACE = 1,
@@ -39,17 +43,18 @@ struct Card
     Suit s;
 
    public:
-    std::int32_t strength() const;
+    i32 strength() const;
     Entry entry() const;
     Suit suit() const;
     Card(Entry ee, Suit ss);
-    bool operator==(const Card &other) const {
+    bool operator==(const Card& other) const
+    {
         return (this->e == other.e) && (this->s == other.s);
     }
     friend std::ostream& operator<<(std::ostream& os, const Card& c);
 };
 
-enum Powers : std::uint32_t
+enum Powers : u32
 {
     CLUBS_DOUBLE = 1,
     DIAMONDS_DRAW = 2,
@@ -58,6 +63,6 @@ enum Powers : std::uint32_t
     JOKER_NERF = 16
 };
 
-std::uint32_t getPower(const Card& c);
+u32 getPower(const Card& c);
 
 #endif

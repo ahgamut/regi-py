@@ -2,7 +2,7 @@
 
 namespace regi
 {
-    void GameState::playerDraws(Player &player, std::int32_t n)
+    void GameState::playerDraws(Player &player, i32 n)
     {
         for (; n > 0 && drawPile.size() != 0 && !player.full(); n--)
         {
@@ -11,7 +11,7 @@ namespace regi
         }
     }
 
-    std::int32_t GameState::playerDrawsOne(Player &player)
+    i32 GameState::playerDrawsOne(Player &player)
     {
         if (drawPile.size() != 0 && !player.full())
         {
@@ -23,10 +23,10 @@ namespace regi
         return 0;
     }
 
-    void GameState::refreshDiscards(std::int32_t n)
+    void GameState::refreshDiscards(i32 n)
     {
         shuffle(discardPile, 0, discardPile.size());
-        std::int32_t count = 0;
+        i32 count = 0;
         for (; n > 0 && discardPile.size() != 0; n--)
         {
             drawPile.push_back(discardPile.back());
@@ -36,11 +36,11 @@ namespace regi
         log.replenish(count);
     }
 
-    void GameState::refreshDraws(std::int32_t ip, std::int32_t n)
+    void GameState::refreshDraws(i32 ip, i32 n)
     {
-        std::int32_t i, j;
-        std::vector<std::int32_t> full(NUM_PLAYERS);
-        std::int32_t fullct = 0;
+        i32 i, j;
+        std::vector<i32> full(NUM_PLAYERS);
+        i32 fullct = 0;
 
         for (j = 0; j < NUM_PLAYERS; ++j) { full[j] = 0; }
         if (ip < 0) { ip *= -1; }
@@ -58,9 +58,9 @@ namespace regi
     }
 
     /* defense */
-    std::int32_t GameState::calcBlock(Enemy &enemy)
+    i32 GameState::calcBlock(Enemy &enemy)
     {
-        std::uint32_t epow = getPower(enemy) & SPADES_BLOCK;
+        u32 epow = getPower(enemy) & SPADES_BLOCK;
         for (auto &combo : usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
@@ -71,7 +71,7 @@ namespace regi
             return 0;
         }
 
-        std::int32_t blk = 0;
+        i32 blk = 0;
         for (auto &combo : usedPile)
         {
             if ((combo.getPowers() & SPADES_BLOCK) != 0)
@@ -84,10 +84,10 @@ namespace regi
 
     void GameState::defensePhase(Player &player, Enemy &enemy)
     {
-        std::int32_t block = calcBlock(enemy);
-        std::int32_t damage = enemy.strength() - block;
+        i32 block = calcBlock(enemy);
+        i32 damage = enemy.strength() - block;
         if (damage <= 0) { return; }
-        std::int32_t tblock = 0;
+        i32 tblock = 0;
         for (auto c : player.cards) { tblock += c.strength(); }
         if (damage > tblock)
         {
@@ -102,15 +102,15 @@ namespace regi
 
     /* attack */
 
-    std::int32_t GameState::calcDamage(Enemy &enemy)
+    i32 GameState::calcDamage(Enemy &enemy)
     {
-        std::uint32_t epow = getPower(enemy) & CLUBS_DOUBLE;
+        u32 epow = getPower(enemy) & CLUBS_DOUBLE;
         for (auto &combo : usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
 
-        std::int32_t dmg = 0;
+        i32 dmg = 0;
         Combo curcombo = usedPile.back();
         if (curcombo.parts.size() == 0)
         {
@@ -126,7 +126,7 @@ namespace regi
 
     void GameState::postAttackEffects(Player &player, Enemy &enemy)
     {
-        std::uint32_t epow = getPower(enemy);
+        u32 epow = getPower(enemy);
         if (enemy.hp <= 0)
         {
             /* we check effects before removing dead enemies,
@@ -139,15 +139,15 @@ namespace regi
         }
 
         Combo curcombo = usedPile.back();
-        std::uint32_t cpow = (curcombo.getPowers() & (~epow));
-        std::int32_t cval = (curcombo.getBaseDamage());
+        u32 cpow = (curcombo.getPowers() & (~epow));
+        i32 cval = (curcombo.getBaseDamage());
 
         if ((cpow & HEARTS_REPLENISH) != 0) { refreshDiscards(cval); }
         else if ((cpow & DIAMONDS_DRAW) != 0) { refreshDraws(player.id, cval); }
         // else do nothing
     }
 
-    std::int32_t GameState::enemyDead()
+    i32 GameState::enemyDead()
     {
         Enemy &enemy = enemyPile.front();
         if (enemy.hp > 0) return 0;
@@ -175,7 +175,7 @@ namespace regi
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
         selectAttack(player, pastYieldsInARow < (NUM_PLAYERS - 1));
-        std::int32_t damage = calcDamage(enemy);
+        i32 damage = calcDamage(enemy);
         enemy.hp -= damage;
         log.attack(player, enemy, usedPile.back(), damage);
         postAttackEffects(player, enemy);
@@ -191,7 +191,7 @@ namespace regi
 
     void GameState::startLoop()
     {
-        std::int32_t i;
+        i32 i;
         while (gameRunning)
         {
             log.state(*this);

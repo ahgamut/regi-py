@@ -7,7 +7,7 @@ namespace regi
     struct Enemy : public Card
     {
        public:
-        std::int32_t hp;
+        i32 hp;
         Enemy(Entry ee, Suit ss);
     };
 } /* namespace regi */

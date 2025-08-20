@@ -25,14 +25,14 @@ namespace regi
        private:
         BaseLog &log;
         Strategy &strat;
-        const std::int32_t NUM_PLAYERS;
+        const i32 NUM_PLAYERS;
         void initPlayers();
         void initDraw();
         void initEnemy();
 
        public:
-        std::int32_t pastYieldsInARow;
-        std::int32_t currentRound;
+        i32 pastYieldsInARow;
+        i32 currentRound;
         bool gameRunning;
         std::vector<Player> players;
         std::vector<Card> drawPile;    /* cards that can be drawn */
@@ -41,7 +41,7 @@ namespace regi
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l, Strategy &s, std::int32_t n)
+        GameState(BaseLog &l, Strategy &s, i32 n)
             : log(l), strat(s), NUM_PLAYERS(n) {};
         void init();
         void setup();
@@ -52,17 +52,17 @@ namespace regi
         void postGameResult();
 
         void playerDraws(Player &, int);
-        std::int32_t playerDrawsOne(Player &);
+        i32 playerDrawsOne(Player &);
         void refreshDraws(int, int);
         void refreshDiscards(int);
 
         void selectAttack(Player &, bool);
-        std::int32_t calcDamage(Enemy &);
+        i32 calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
         void postAttackEffects(Player &, Enemy &);
-        std::int32_t enemyDead();
+        i32 enemyDead();
 
-        std::int32_t calcBlock(Enemy &);
+        i32 calcBlock(Enemy &);
         void selectDefense(Player &, int);
         void defensePhase(Player &, Enemy &);
         //
@@ -74,12 +74,12 @@ namespace regi
     {
        public:
         virtual void attack(const Player &, const Enemy &, const Combo &,
-                            const std::int32_t) = 0;
-        virtual void defend(const Player &, const Combo &, const std::int32_t) = 0;
-        virtual void failBlock(const Player &, const std::int32_t,
-                               const std::int32_t) = 0;
+                            const i32) = 0;
+        virtual void defend(const Player &, const Combo &, const i32) = 0;
+        virtual void failBlock(const Player &, const i32,
+                               const i32) = 0;
         virtual void drawOne(const Player &) = 0;
-        virtual void replenish(const std::int32_t) = 0;
+        virtual void replenish(const i32) = 0;
         virtual void enemyKill(const Enemy &, const GameState &) = 0;
         virtual void state(const GameState &) = 0;
         virtual void debug(const GameState &) = 0;
@@ -92,9 +92,9 @@ namespace regi
     struct Strategy
     {
        public:
-        virtual std::int32_t provideAttack(Combo &, const Player &, bool,
+        virtual i32 provideAttack(Combo &, const Player &, bool,
                                            const GameState &) = 0;
-        virtual std::int32_t provideDefense(Combo &, const Player &, std::int32_t,
+        virtual i32 provideDefense(Combo &, const Player &, i32,
                                             const GameState &) = 0;
     };
 

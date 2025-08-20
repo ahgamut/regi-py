@@ -6,9 +6,9 @@ Entry Card::entry() const { return this->e; }
 
 Suit Card::suit() const { return this->s; }
 
-std::int32_t Card::strength() const
+i32 Card::strength() const
 {
-    std::int32_t st = 0;
+    i32 st = 0;
     switch (e)
     {
         case KING:
@@ -21,7 +21,7 @@ std::int32_t Card::strength() const
             st = 10;
             break;
         default:
-            st = static_cast<std::int32_t>(e);
+            st = static_cast<i32>(e);
     }
     return st;
 }
@@ -102,7 +102,7 @@ std::ostream& operator<<(std::ostream& os, const Entry e)
             break;
         default:
             if (e < 2 || e > 9) { os.setstate(std::ios_base::failbit); }
-            else { os << static_cast<uint32_t>(e); }
+            else { os << static_cast<u32>(e); }
     }
     return os;
 }
@@ -113,9 +113,9 @@ std::ostream& operator<<(std::ostream& os, const Card& c)
     return os;
 }
 
-std::uint32_t getPower(const Card& c)
+u32 getPower(const Card& c)
 {
-    std::uint32_t p = 0;
+    u32 p = 0;
     switch (c.suit())
     {
         case CLUBS:

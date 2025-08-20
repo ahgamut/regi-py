@@ -9,17 +9,17 @@ namespace regi
     struct Combo
     {
        private:
-        std::int32_t baseDmg;
-        std::uint32_t powers;
+        i32 baseDmg;
+        u32 powers;
 
        public:
         std::vector<Card> parts;
         Combo();
-        std::int32_t valid(bool);
+        i32 valid(bool);
         void loadDetails();
-        std::uint32_t getPowers() const;
-        std::int32_t getBaseDamage() const;
-        std::int32_t getBaseDefense() const;
+        u32 getPowers() const;
+        i32 getBaseDamage() const;
+        i32 getBaseDefense() const;
         friend std::ostream &operator<<(std::ostream &, const Combo &);
     };
 

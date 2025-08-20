@@ -8,7 +8,7 @@ namespace regi
         // in a server-style setup we'd initialize the connections here
     }
 
-    void GameState::selectDefense(Player &player, std::int32_t damage)
+    void GameState::selectDefense(Player &player, i32 damage)
     {
         Combo def;
 
@@ -18,7 +18,7 @@ namespace regi
             gameOver(BLOCK_FAILED);
             return;
         }
-        for (std::int32_t i = 0; i < def.parts.size(); ++i)
+        for (i32 i = 0; i < def.parts.size(); ++i)
         {
             for (auto it = player.cards.begin(); it != player.cards.end(); ++it)
             {
@@ -46,7 +46,7 @@ namespace regi
         }
         atk.loadDetails();
         std::vector<int> removes;
-        for (std::int32_t i = 0; i < atk.parts.size(); ++i)
+        for (i32 i = 0; i < atk.parts.size(); ++i)
         {
             for (auto it = player.cards.begin(); it != player.cards.end(); ++it)
             {

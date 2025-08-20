@@ -66,7 +66,7 @@ Deck::Deck()
 Deck Deck::standard() { return Deck(); }
 
 void Deck::show() {
-    for (std::int32_t i = 0; i < 52; ++i) {
+    for (i32 i = 0; i < 52; ++i) {
         std::cout << cards[i] << " ";
         if (i % 13 == 12) {
             std::cout << "\n";
@@ -75,7 +75,7 @@ void Deck::show() {
 }
 
 void Deck::shuffle() {
-    std::int32_t i, j;
+    i32 i, j;
     std::random_device dev;
     std::default_random_engine engine(dev());
     for (i = 0; i < 50; ++i) {

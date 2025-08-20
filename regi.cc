@@ -108,7 +108,7 @@ namespace regi
             log.endgame(INVALID_START, *this);
             return;
         }
-        std::int32_t hs;
+        i32 hs;
         if (NUM_PLAYERS == 2) { hs = 7; }
         else if (NUM_PLAYERS == 3) { hs = 6; }
         else /* (NUM_PLAYERS == 4) */ { hs = 5; }

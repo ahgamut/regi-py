@@ -5,7 +5,7 @@ namespace regi
 {
     void RandomStrategy::collectAttack(const std::vector<Card> &cards,
                                        std::vector<Combo> &combos, bool yieldAllowed,
-                                       Combo &cur, std::int32_t i)
+                                       Combo &cur, i32 i)
     {
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
@@ -15,7 +15,7 @@ namespace regi
             // if combo is valid, accumulate,
             // and try extending the combo
             combos.push_back(cur);
-            for (std::int32_t j = i + 1; j < cards.size(); ++j)
+            for (i32 j = i + 1; j < cards.size(); ++j)
             {
                 collectAttack(cards, combos, yieldAllowed, cur, j);
             }
@@ -24,8 +24,8 @@ namespace regi
     }
 
     void RandomStrategy::collectDefense(const std::vector<Card> &cards,
-                                        std::vector<Combo> &combos, std::int32_t damage,
-                                        Combo &cur, std::int32_t i)
+                                        std::vector<Combo> &combos, i32 damage,
+                                        Combo &cur, i32 i)
     {
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
@@ -36,25 +36,25 @@ namespace regi
             combos.push_back(cur);
         }
         // try extending the combo
-        for (std::int32_t j = i + 1; j < cards.size(); ++j)
+        for (i32 j = i + 1; j < cards.size(); ++j)
         {
             collectDefense(cards, combos, damage, cur, j);
         }
         cur.parts.pop_back();
     }
 
-    std::int32_t RandomStrategy::assign(Combo &result, const std::vector<Combo> &combos)
+    i32 RandomStrategy::assign(Combo &result, const std::vector<Combo> &combos)
     {
-        std::int32_t len = combos.size();
+        i32 len = combos.size();
         if (len == 0) return 0;
         std::random_device dev;
         std::default_random_engine engine(dev());
-        std::int32_t i = engine() % len;
+        i32 i = engine() % len;
         result = combos[i];
         return 1;
     }
 
-    std::int32_t RandomStrategy::provideAttack(Combo &result, const Player &player,
+    i32 RandomStrategy::provideAttack(Combo &result, const Player &player,
                                                bool yieldAllowed, const GameState &g)
     {
         (void)g;
@@ -65,21 +65,21 @@ namespace regi
             combos.push_back(base);
             yieldAllowed = false;
         }
-        for (std::int32_t i = 0; i < player.cards.size(); ++i)
+        for (i32 i = 0; i < player.cards.size(); ++i)
         {
             collectAttack(player.cards, combos, yieldAllowed, base, i);
         }
         return assign(result, combos);
     }
 
-    std::int32_t RandomStrategy::provideDefense(Combo &result, const Player &player,
-                                                std::int32_t damage, const GameState &g)
+    i32 RandomStrategy::provideDefense(Combo &result, const Player &player,
+                                                i32 damage, const GameState &g)
     {
         (void)g;
         // we only enter this if it is actually possible to block
         std::vector<Combo> combos;
         Combo base;
-        for (std::int32_t i = 0; i < player.cards.size(); ++i)
+        for (i32 i = 0; i < player.cards.size(); ++i)
         {
             collectDefense(player.cards, combos, damage, base, i);
         }
@@ -88,7 +88,7 @@ namespace regi
 
     void DamageStrategy::collectAttack(const std::vector<Card> &cards,
                                    std::vector<Combo> &combos, bool yieldAllowed,
-                                   Combo &cur, std::int32_t i)
+                                   Combo &cur, i32 i)
     {
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
@@ -98,7 +98,7 @@ namespace regi
             // if combo is valid, accumulate,
             // and try extending the combo
             combos.push_back(cur);
-            for (std::int32_t j = i + 1; j < cards.size(); ++j)
+            for (i32 j = i + 1; j < cards.size(); ++j)
             {
                 collectAttack(cards, combos, yieldAllowed, cur, j);
             }
@@ -107,8 +107,8 @@ namespace regi
     }
 
     void DamageStrategy::collectDefense(const std::vector<Card> &cards,
-                                    std::vector<Combo> &combos, std::int32_t damage,
-                                    Combo &cur, std::int32_t i)
+                                    std::vector<Combo> &combos, i32 damage,
+                                    Combo &cur, i32 i)
     {
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
@@ -119,29 +119,29 @@ namespace regi
             combos.push_back(cur);
         }
         // try extending the combo
-        for (std::int32_t j = i + 1; j < cards.size(); ++j)
+        for (i32 j = i + 1; j < cards.size(); ++j)
         {
             collectDefense(cards, combos, damage, cur, j);
         }
         cur.parts.pop_back();
     }
 
-    std::int32_t DamageStrategy::calcDamage(const Combo &cur, const Enemy &enemy,
+    i32 DamageStrategy::calcDamage(const Combo &cur, const Enemy &enemy,
                                         const GameState &g)
     {
-        std::uint32_t epow = getPower(enemy) & CLUBS_DOUBLE;
+        u32 epow = getPower(enemy) & CLUBS_DOUBLE;
         for (const auto &combo : g.usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
-        std::int32_t dmg = 0;
+        i32 dmg = 0;
         dmg += cur.getBaseDamage();
         bool dbl = ((cur.getPowers() & CLUBS_DOUBLE) & (~epow)) != 0;
         if (dbl) { dmg += cur.getBaseDamage(); }
         return dmg;
     }
 
-    std::int32_t DamageStrategy::provideAttack(Combo &result, const Player &player,
+    i32 DamageStrategy::provideAttack(Combo &result, const Player &player,
                                            bool yieldAllowed, const GameState &g)
     {
         std::vector<Combo> combos;
@@ -151,7 +151,7 @@ namespace regi
             combos.push_back(base);
             yieldAllowed = false;
         }
-        for (std::int32_t i = 0; i < player.cards.size(); ++i)
+        for (i32 i = 0; i < player.cards.size(); ++i)
         {
             collectAttack(player.cards, combos, yieldAllowed, base, i);
         }
@@ -165,10 +165,10 @@ namespace regi
 
         // pick highest-damage combo if cannot kill
         // or pick lowest-killing combo
-        std::int32_t dmg = calcDamage(combos[0], enemy, g);
-        std::size_t pick = 0;
-        std::int32_t tempDmg = 0;
-        for (std::size_t i = 1; i < combos.size(); ++i)
+        i32 dmg = calcDamage(combos[0], enemy, g);
+        u64 pick = 0;
+        i32 tempDmg = 0;
+        for (u64 i = 1; i < combos.size(); ++i)
         {
             tempDmg = calcDamage(combos[i], enemy, g);
             if (tempDmg >= enemy.hp)
@@ -197,23 +197,23 @@ namespace regi
         return 1;
     }
 
-    std::int32_t DamageStrategy::provideDefense(Combo &result, const Player &player,
-                                            std::int32_t damage, const GameState &g)
+    i32 DamageStrategy::provideDefense(Combo &result, const Player &player,
+                                            i32 damage, const GameState &g)
     {
         (void)g;
         // we only enter this if it is actually possible to block
         std::vector<Combo> combos;
         Combo base;
-        for (std::int32_t i = 0; i < player.cards.size(); ++i)
+        for (i32 i = 0; i < player.cards.size(); ++i)
         {
             collectDefense(player.cards, combos, damage, base, i);
         }
         if (combos.size() == 0) { return 0; }
         // pick lowest block combo that works
-        std::int32_t blk = 1000;
-        std::size_t pick = 0;
-        std::int32_t tempBlk = 0;
-        for (std::size_t i = 0; i < combos.size(); ++i)
+        i32 blk = 1000;
+        u64 pick = 0;
+        i32 tempBlk = 0;
+        for (u64 i = 0; i < combos.size(); ++i)
         {
             tempBlk = combos[i].getBaseDefense();
             if (tempBlk < blk)

@@ -14,11 +14,11 @@ std::ostream &operator<<(std::ostream &os, const std::vector<T> pile)
 }
 
 template <typename T>
-void shuffle(std::vector<T> &pile, std::uint32_t start, std::uint32_t end)
+void shuffle(std::vector<T> &pile, u32 start, u32 end)
 {
     if (end <= 1 || end <= start) { return; }
-    std::int32_t i, j;
-    std::int32_t len = end - start;
+    i32 i, j;
+    i32 len = end - start;
     std::random_device dev;
     std::default_random_engine engine(dev());
     for (i = 0; i < len - 1; ++i)
