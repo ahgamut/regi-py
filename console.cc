@@ -152,12 +152,16 @@ namespace regi
             std::cout << "invalid team!\n";
             return;
         }
-        if (allAlive && g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
+        if (g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
+        if (!allAlive) {
+            std::cout << "Someone didn't make it\n";
+        }
 
         std::cout << "Game lasted " << g.currentRound << " rounds\n";
         if (g.enemyPile.size() != 0)
         {
             std::cout << "Died to " << g.enemyPile.front() << "\n";
+            std::cout << g.enemyPile.size() << " enemies left\n";
         }
     }
 
