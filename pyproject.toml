@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0", "pybind11>=2.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "regi_py"
+dependencies = ["pybind11>=2.2"]
+version = "0.0.1"
+license = {file = "LICENSE"}
+authors = [
+  { name="Gautham Venkatasubramanian" },
+]
+description="C++ implementation of game mechanics of Regicide"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
