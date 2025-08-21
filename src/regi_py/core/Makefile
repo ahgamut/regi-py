@@ -2,7 +2,7 @@ AR := ar
 CC := gcc
 CXX := g++
 
-CXXFLAGS  :=  -I. -DUSE_UNICODE\
+CXXFLAGS  :=  -I. -DUSE_UNICODE -DSOLO_BUILD\
 			 -std=c++17 -O3 -c -g3 -Wall -Wpedantic -Wextra \
 			 -fno-omit-frame-pointer -Wno-sign-compare
 LINKFLAGS := -fno-omit-frame-pointer

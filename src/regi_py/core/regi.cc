@@ -93,7 +93,7 @@ namespace regi
         }
         else if (totalPlayers() > 4 || totalPlayers() < 2)
         {
-            gameRunning = false;
+            status = GameStatus::ENDED;
             log.endgame(INVALID_START, *this);
             return;
         }
@@ -105,7 +105,7 @@ namespace regi
         i32 tp = totalPlayers();
         if (tp > 4 || tp < 2)
         {
-            gameRunning = false;
+            status = GameStatus::ENDED;
             log.endgame(INVALID_START, *this);
             return;
         }
@@ -127,13 +127,13 @@ namespace regi
 
     void GameState::init()
     {
-        gameRunning = true;
         pastYieldsInARow = 0;
         currentRound = 0;
         initEnemy();
         initDraw();
         initHandSize();
         initPlayers();
+        status = GameStatus::RUNNING;
         log.startgame(*this);
     }
 
@@ -144,10 +144,17 @@ namespace regi
         {
             if (!players[i].alive || players[i].strat.setup(players[i], *this) != 0)
             {
-                gameRunning = false;
+                status = GameStatus::ENDED;
                 log.endgame(INVALID_START, *this);
             }
         }
+    }
+
+    i32 GameState::addPlayer(Strategy &s)
+    {
+        if (status != GameStatus::LOADING) { return -1; }
+        players.push_back(Player(s));
+        return 0;
     }
 
 } /* namespace regi */

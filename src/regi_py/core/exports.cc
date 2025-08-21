@@ -50,6 +50,13 @@ void bind_enums(pybind11::object &m)
         .export_values()
         .finalize();
 
+    py::native_enum<GameStatus>(m, "GameStatus", "enum.IntEnum")
+        .value("LOADING", GameStatus::LOADING)
+        .value("RUNNING", GameStatus::RUNNING)
+        .value("ENDED", GameStatus::ENDED)
+        .export_values()
+        .finalize();
+
     py::native_enum<EndGameReason>(m, "EndGameReason", "enum.IntEnum")
         .value("INVALID_START", EndGameReason::INVALID_START)
         .value("NO_ENEMIES", EndGameReason::NO_ENEMIES)
@@ -126,16 +133,21 @@ class PyBaseStrategy : public Strategy, py::trampoline_self_life_support
     }
 };
 
+class PyRandomStrategy : public RandomStrategy, py::trampoline_self_life_support
+{
+    using RandomStrategy::RandomStrategy;
+};
+
 void bind_strat(pybind11::object &m)
 {
-    py::class_<Strategy, PyBaseStrategy /* trampoline */, py::smart_holder>(
-        m, "BaseStrategy")
-        .def(py::init<>())
+    py::class_<Strategy, PyBaseStrategy /* trampoline */, py::smart_holder> base(
+        m, "BaseStrategy");
+    base.def(py::init<>())
         .def("setup", &Strategy::setup)
         .def("getAttackIndex", &Strategy::getAttackIndex)
         .def("getDefenseIndex", &Strategy::getDefenseIndex);
-    /* keep an example here */
-    py::class_<RandomStrategy>(m, "RandomStrategy")
+    py::class_<RandomStrategy, PyRandomStrategy, py::smart_holder>(m, "RandomStrategy",
+                                                                   base)
         .def(py::init<>())
         .def("setup", &RandomStrategy::setup)
         .def("getAttackIndex", &RandomStrategy::getAttackIndex)
@@ -145,9 +157,6 @@ void bind_strat(pybind11::object &m)
 void bind_player(pybind11::object &m)
 {
     py::class_<Player>(m, "Player")
-        .def(py::init([](Strategy &s) { return Player(s); }), py::keep_alive<1, 2>())
-        .def(py::init([](RandomStrategy &rs) { return Player(rs); }),
-             py::keep_alive<1, 2>())
         .def_readonly("cards", &Player::cards)
         .def_readonly("ID", &Player::id)
         .def_readonly("alive", &Player::alive)
@@ -232,23 +241,22 @@ void bind_log(pybind11::object &m)
         .def("startgame", &BaseLog::startgame)
         .def("endgame", &BaseLog::endgame)
         .def("postgame", &BaseLog::postgame);
-
+    /* TODO: why isn't this the same as RandomStrategy? */
     py::class_<ConsoleLog>(m, "CXXConsoleLog").def(py::init<>());
 }
 
 void bind_gamestate(pybind11::object &m)
 {
     py::class_<GameState>(m, "GameState")
-        .def(py::init([](BaseLog &log, std::vector<Player> &players)
-                      { return GameState(log, players); }),
-             py::keep_alive<1, 3>())
-        .def(py::init([](ConsoleLog &log, std::vector<Player> &players)
-                      { return GameState(log, players); }),
-             py::keep_alive<1, 3>())
+        .def(py::init([](BaseLog &log) { return GameState(log); }),
+             py::keep_alive<1, 2>())
+        .def(py::init([](ConsoleLog &log) { return GameState(log); }),
+             py::keep_alive<1, 2>())
+        .def("add_player", &GameState::addPlayer)
         .def_property_readonly("total_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
         .def_readonly("past_yields", &GameState::pastYieldsInARow)
-        .def_readonly("running", &GameState::gameRunning)
+        .def_readonly("status", &GameState::status)
         .def_readonly("draw_pile", &GameState::drawPile)
         .def_readonly("discard_pile", &GameState::discardPile)
         .def_readonly("enemy_pile", &GameState::enemyPile)
@@ -258,7 +266,7 @@ void bind_gamestate(pybind11::object &m)
              {
                  g.init();
                  g.setup();
-                 return g.gameRunning;
+                 return g.status;
              })
         .def("start_loop", &GameState::startLoop);
 }

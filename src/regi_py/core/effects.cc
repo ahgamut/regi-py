@@ -190,7 +190,7 @@ namespace regi
 
     void GameState::gameOver(EndGameReason e)
     {
-        gameRunning = false;
+        status = GameStatus::ENDED;
         log.endgame(e, *this);
     }
 
@@ -200,17 +200,18 @@ namespace regi
     {
         i32 i, tp;
         tp = totalPlayers();
-        while (gameRunning)
+        while (gameRunning())
         {
             log.state(*this);
             for (i = 0; i < tp; ++i)
             {
                 oneTurn(players[i]);
-                if (!gameRunning) break;
+                if (!gameRunning()) break;
             }
             currentRound += 1;
             log.endTurn(*this);
         }
+        status = GameStatus::ENDED;
         postGameResult();
     }
 

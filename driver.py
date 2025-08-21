@@ -2,10 +2,9 @@ from regi_py import GameState, Player, RandomStrategy, CXXConsoleLog
 
 strat = RandomStrategy()
 log = CXXConsoleLog()
-players = [Player(strat), Player(strat)]
+game = GameState(log)
 
-print(players[0])
-
-game = GameState(log, players)
+game.add_player(strat)
+game.add_player(strat)
 game.initialize()
-# game.start_loop()
+game.start_loop()

@@ -8,6 +8,13 @@
 
 namespace regi
 {
+    enum GameStatus
+    {
+        LOADING,
+        RUNNING,
+        ENDED
+    };
+
     enum EndGameReason
     {
         INVALID_START,
@@ -30,19 +37,22 @@ namespace regi
         void initEnemy();
 
        public:
+        GameStatus status;
         i32 pastYieldsInARow;
         i32 currentRound;
-        bool gameRunning;
-        std::vector<Player> &players;
+        std::vector<Player> players;
         std::vector<Card> drawPile;    /* cards that can be drawn */
         std::vector<Enemy> enemyPile;  /* enemies still left to KO */
         std::vector<Card> discardPile; /* cards used up to KO enemies */
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l, std::vector<Player> &plrs) : log(l), players(plrs) {};
+        GameState(BaseLog &l) : log(l) { status = GameStatus::LOADING; };
+        i32 addPlayer(Strategy &);
         void init();
         void setup();
+        bool gameRunning() { return this->status == GameStatus::RUNNING; }
+
         i32 getHandSize() { return handSize; }
         i32 totalPlayers() { return static_cast<i32>(players.size()); }
 
