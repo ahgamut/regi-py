@@ -3,16 +3,9 @@
 
 namespace regi
 {
-    i32 RandomStrategy::setup(const Player &player, const GameState &g)
-    {
-        (void)player;
-        (void)g;
-        return 0;
-    }
-
-    void RandomStrategy::collectAttack(const std::vector<Card> &cards,
-                                       std::vector<Combo> &combos, bool yieldAllowed,
-                                       Combo &cur, i32 i)
+    void Strategy::calcAttackMoves(const std::vector<Card> &cards,
+                                   std::vector<Combo> &combos, bool yieldAllowed,
+                                   Combo &cur, i32 i)
     {
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
@@ -24,45 +17,14 @@ namespace regi
             combos.push_back(cur);
             for (i32 j = i + 1; j < cards.size(); ++j)
             {
-                collectAttack(cards, combos, yieldAllowed, cur, j);
+                calcAttackMoves(cards, combos, yieldAllowed, cur, j);
             }
         }
         cur.parts.pop_back();
     }
 
-    void RandomStrategy::collectDefense(const std::vector<Card> &cards,
-                                        std::vector<Combo> &combos, i32 damage,
-                                        Combo &cur, i32 i)
-    {
-        if (i >= cards.size()) { return; }
-        // try adding cards[i] to the combo
-        cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
-        if (cur.getBaseDefense() >= damage)
-        {
-            // if combo can defend, accumulate
-            combos.push_back(cur);
-        }
-        // try extending the combo
-        for (i32 j = i + 1; j < cards.size(); ++j)
-        {
-            collectDefense(cards, combos, damage, cur, j);
-        }
-        cur.parts.pop_back();
-    }
-
-    i32 RandomStrategy::assign(Combo &result, const std::vector<Combo> &combos)
-    {
-        i32 len = combos.size();
-        if (len == 0) return 0;
-        std::random_device dev;
-        std::default_random_engine engine(dev());
-        i32 i = engine() % len;
-        result = combos[i];
-        return 1;
-    }
-
-    i32 RandomStrategy::provideAttack(Combo &result, const Player &player,
-                                      bool yieldAllowed, const GameState &g)
+    i32 Strategy::provideAttack(Combo &result, const Player &player, bool yieldAllowed,
+                                const GameState &g)
     {
         (void)g;
         std::vector<Combo> combos;
@@ -74,55 +36,24 @@ namespace regi
         }
         for (i32 i = 0; i < player.cards.size(); ++i)
         {
-            collectAttack(player.cards, combos, yieldAllowed, base, i);
+            calcAttackMoves(player.cards, combos, yieldAllowed, base, i);
         }
-        return assign(result, combos);
-    }
+        if (combos.size() == 0) { return -1; }
+        if (g.enemyPile.empty()) { return -1; }
+        for (auto &cc : combos) { cc.loadDetails(); }
 
-    i32 RandomStrategy::provideDefense(Combo &result, const Player &player, i32 damage,
-                                       const GameState &g)
-    {
-        (void)g;
-        // we only enter this if it is actually possible to block
-        std::vector<Combo> combos;
-        Combo base;
-        for (i32 i = 0; i < player.cards.size(); ++i)
+        i32 ind = getAttackIndex(combos, player, yieldAllowed, g);
+        if (ind < 0) { return -1; }
+        else
         {
-            collectDefense(player.cards, combos, damage, base, i);
+            result = combos[ind];
+            return 0;
         }
-        return assign(result, combos);
     }
 
-    void DamageStrategy::collectAttack(const std::vector<Card> &cards,
-                                       std::vector<Combo> &combos, bool yieldAllowed,
-                                       Combo &cur, i32 i)
-    {
-        if (i >= cards.size()) { return; }
-        // try adding cards[i] to the combo
-        cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
-        if (cur.valid(yieldAllowed))
-        {
-            // if combo is valid, accumulate,
-            // and try extending the combo
-            combos.push_back(cur);
-            for (i32 j = i + 1; j < cards.size(); ++j)
-            {
-                collectAttack(cards, combos, yieldAllowed, cur, j);
-            }
-        }
-        cur.parts.pop_back();
-    }
-
-    i32 DamageStrategy::setup(const Player &player, const GameState &g)
-    {
-        (void)player;
-        (void)g;
-        return 0;
-    }
-
-    void DamageStrategy::collectDefense(const std::vector<Card> &cards,
-                                        std::vector<Combo> &combos, i32 damage,
-                                        Combo &cur, i32 i)
+    void Strategy::calcDefenseMoves(const std::vector<Card> &cards,
+                                    std::vector<Combo> &combos, i32 damage, Combo &cur,
+                                    i32 i)
     {
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
@@ -135,13 +66,43 @@ namespace regi
         // try extending the combo
         for (i32 j = i + 1; j < cards.size(); ++j)
         {
-            collectDefense(cards, combos, damage, cur, j);
+            calcDefenseMoves(cards, combos, damage, cur, j);
         }
         cur.parts.pop_back();
     }
 
-    i32 DamageStrategy::calcDamage(const Combo &cur, const Enemy &enemy,
-                                   const GameState &g)
+    i32 Strategy::provideDefense(Combo &result, const Player &player, i32 damage,
+                                 const GameState &g)
+    {
+        (void)g;
+        // we only enter this if it is actually possible to block
+        std::vector<Combo> combos;
+        Combo base;
+        for (i32 i = 0; i < player.cards.size(); ++i)
+        {
+            calcDefenseMoves(player.cards, combos, damage, base, i);
+        }
+        if (combos.size() == 0) { return -1; }
+
+        i32 ind = getDefenseIndex(combos, player, damage, g);
+        if (ind < 0) { return -1; }
+        else
+        {
+            result = combos[ind];
+            return 0;
+        }
+    }
+
+    i32 selectRandomCombo(const std::vector<Combo> &combos)
+    {
+        i32 len = combos.size();
+        if (len == 0) return -1;
+        std::random_device dev;
+        std::default_random_engine engine(dev());
+        return engine() % len;
+    }
+
+    i32 calcDamage(const Combo &cur, const Enemy &enemy, const GameState &g)
     {
         u32 epow = getPower(enemy) & CLUBS_DOUBLE;
         for (const auto &combo : g.usedPile)
@@ -155,24 +116,48 @@ namespace regi
         return dmg;
     }
 
-    i32 DamageStrategy::provideAttack(Combo &result, const Player &player,
-                                      bool yieldAllowed, const GameState &g)
+    i32 RandomStrategy::setup(const Player &player, const GameState &g)
     {
-        std::vector<Combo> combos;
-        Combo base;
-        if (yieldAllowed && base.parts.size() == 0)
-        {
-            combos.push_back(base);
-            yieldAllowed = false;
-        }
-        for (i32 i = 0; i < player.cards.size(); ++i)
-        {
-            collectAttack(player.cards, combos, yieldAllowed, base, i);
-        }
-        if (combos.size() == 0) { return 0; }
-        if (g.enemyPile.empty()) { return 0; }
+        (void)player;
+        (void)g;
+        return 0;
+    }
+
+    i32 RandomStrategy::getAttackIndex(const std::vector<Combo> &combos,
+                                       const Player &player, bool yieldAllowed,
+                                       const GameState &g)
+    {
+        (void)player;
+        (void)yieldAllowed;
+        (void)g;
+        return selectRandomCombo(combos);
+    }
+
+    i32 RandomStrategy::getDefenseIndex(const std::vector<Combo> &combos,
+                                        const Player &player, i32 damage,
+                                        const GameState &g)
+    {
+        (void)player;
+        (void)damage;
+        (void)g;
+        return selectRandomCombo(combos);
+    }
+
+    i32 DamageStrategy::setup(const Player &player, const GameState &g)
+    {
+        (void)player;
+        (void)g;
+        return 0;
+    }
+
+    i32 DamageStrategy::getAttackIndex(const std::vector<Combo> &combos,
+                                       const Player &player, bool yieldAllowed,
+                                       const GameState &g)
+    {
+        (void)yieldAllowed;
+        (void)player;
+
         const Enemy &enemy = g.enemyPile.front();
-        for (auto &cc : combos) { cc.loadDetails(); }
 
         // pick highest-damage combo if cannot kill
         // or pick lowest-killing combo
@@ -204,22 +189,17 @@ namespace regi
                 }
             }
         }
-        result = combos[pick];
-        return 1;
+        return static_cast<i32>(pick);
     }
 
-    i32 DamageStrategy::provideDefense(Combo &result, const Player &player, i32 damage,
-                                       const GameState &g)
+    i32 DamageStrategy::getDefenseIndex(const std::vector<Combo> &combos,
+                                        const Player &player, i32 damage,
+                                        const GameState &g)
     {
+        (void)player;
+        (void)damage;
         (void)g;
         // we only enter this if it is actually possible to block
-        std::vector<Combo> combos;
-        Combo base;
-        for (i32 i = 0; i < player.cards.size(); ++i)
-        {
-            collectDefense(player.cards, combos, damage, base, i);
-        }
-        if (combos.size() == 0) { return 0; }
         // pick lowest block combo that works
         i32 blk = 1000;
         u64 pick = 0;
@@ -233,8 +213,7 @@ namespace regi
                 pick = i;
             }
         }
-        result = combos[pick];
-        return 1;
+        return static_cast<i32>(pick);
     }
 
 } /* namespace regi */

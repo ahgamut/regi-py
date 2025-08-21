@@ -8,7 +8,7 @@ namespace regi
         Combo def;
         Strategy &strat = player.strat;
 
-        if (strat.provideDefense(def, player, damage, *this) == 0)
+        if (strat.provideDefense(def, player, damage, *this) < 0)
         {
             player.alive = false;
             gameOver(BLOCK_FAILED);
@@ -35,7 +35,7 @@ namespace regi
         Combo atk;
         Strategy &strat = player.strat;
 
-        if (strat.provideAttack(atk, player, yieldAllowed, *this) == 0)
+        if (strat.provideAttack(atk, player, yieldAllowed, *this) < 0)
         {
             player.alive = false;
             gameOver(ATTACK_FAILED);

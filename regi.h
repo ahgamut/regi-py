@@ -40,13 +40,10 @@ namespace regi
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l, std::vector<Player>& plrs)
-            : log(l), players(plrs) {};
+        GameState(BaseLog &l, std::vector<Player> &plrs) : log(l), players(plrs) {};
         void init();
         void setup();
-        i32 totalPlayers() {
-            return static_cast<i32>(players.size());
-        }
+        i32 totalPlayers() { return static_cast<i32>(players.size()); }
 
         void startLoop();
         void oneTurn(Player &);
@@ -79,8 +76,7 @@ namespace regi
         virtual void attack(const Player &, const Enemy &, const Combo &,
                             const i32) = 0;
         virtual void defend(const Player &, const Combo &, const i32) = 0;
-        virtual void failBlock(const Player &, const i32,
-                               const i32) = 0;
+        virtual void failBlock(const Player &, const i32, const i32) = 0;
         virtual void drawOne(const Player &) = 0;
         virtual void replenish(const i32) = 0;
         virtual void enemyKill(const Enemy &, const GameState &) = 0;
@@ -96,10 +92,18 @@ namespace regi
     {
        public:
         virtual i32 setup(const Player &, const GameState &) = 0;
-        virtual i32 provideAttack(Combo &, const Player &, bool,
-                                           const GameState &) = 0;
-        virtual i32 provideDefense(Combo &, const Player &, i32,
-                                            const GameState &) = 0;
+        virtual i32 getDefenseIndex(const std::vector<Combo> &, const Player &, i32,
+                                    const GameState &) = 0;
+        virtual i32 getAttackIndex(const std::vector<Combo> &, const Player &, bool,
+                                   const GameState &) = 0;
+        //
+        void calcAttackMoves(const std::vector<Card> &, std::vector<Combo> &, bool,
+                             Combo &, i32);
+        i32 provideAttack(Combo &, const Player &, bool, const GameState &);
+        //
+        void calcDefenseMoves(const std::vector<Card> &, std::vector<Combo> &, i32,
+                              Combo &, i32);
+        i32 provideDefense(Combo &, const Player &, i32, const GameState &);
     };
 
 } /* namespace regi */

@@ -15,30 +15,26 @@ namespace regi
 
        public:
         i32 setup(const Player &, const GameState &);
-        void collectAttack(const std::vector<Card> &, std::vector<Combo> &, bool,
-                           Combo &, int);
-        void collectDefense(const std::vector<Card> &, std::vector<Combo> &, int,
-                            Combo &, int);
-        i32 provideAttack(Combo &, const Player &, bool, const GameState &);
-        i32 provideDefense(Combo &, const Player &, i32,
-                                    const GameState &);
+        i32 getAttackIndex(const std::vector<Combo> &, const Player &, bool,
+                           const GameState &);
+        i32 getDefenseIndex(const std::vector<Combo> &, const Player &, i32,
+                            const GameState &);
     };
 
     struct DamageStrategy : public Strategy
     {
        private:
-        i32 calcDamage(const Combo &, const Enemy &, const GameState &);
 
        public:
         i32 setup(const Player &, const GameState &);
-        void collectAttack(const std::vector<Card> &, std::vector<Combo> &, bool,
-                           Combo &, int);
-        void collectDefense(const std::vector<Card> &, std::vector<Combo> &, int,
-                            Combo &, int);
-        i32 provideAttack(Combo &, const Player &, bool, const GameState &);
-        i32 provideDefense(Combo &, const Player &, i32,
-                                    const GameState &);
+        i32 getAttackIndex(const std::vector<Combo> &, const Player &, bool,
+                           const GameState &);
+        i32 getDefenseIndex(const std::vector<Combo> &, const Player &, i32,
+                            const GameState &);
     };
+
+    i32 selectRandomCombo(const std::vector<Combo> &);
+    i32 calcDamage(const Combo &, const Enemy &, const GameState &);
 
 } /* namespace regi */
 
