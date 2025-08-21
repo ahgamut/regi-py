@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "pybind11>=2.2"]
+requires = ["setuptools>=61.0", "pybind11>=3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "regi_py"
-dependencies = ["pybind11>=2.2"]
+dependencies = ["pybind11>=3"]
 version = "0.0.1"
 license = {file = "LICENSE"}
 authors = [

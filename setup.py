@@ -97,8 +97,8 @@ setup(
         "Programming Language :: Python :: 3",
     ],
     zip_safe=False,
-    install_requires=["pybind11>=2.2"],
-    setup_requires=["pybind11>=2.2"],
+    install_requires=["pybind11>=3"],
+    setup_requires=["pybind11>=3"],
     ext_modules=ext_modules,
     cmdclass={"build_ext": BuildExt},
 )
