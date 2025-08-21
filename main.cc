@@ -6,7 +6,12 @@ int main()
 {
     regi::ConsoleLog c;
     regi::DamageStrategy s;
-    regi::GameState g(c, s, 3);
+
+    std::vector<regi::Player> players;
+    players.push_back(regi::Player(s));
+    players.push_back(regi::Player(s));
+    players.push_back(regi::Player(s));
+    regi::GameState g(c, players);
     g.init();
     g.startLoop();
     return 0;

@@ -18,14 +18,13 @@ namespace regi
     };
 
     struct BaseLog;
-    struct Strategy;
     //
     struct GameState
     {
        private:
         BaseLog &log;
-        Strategy &strat;
-        const i32 NUM_PLAYERS;
+        i32 handSize;
+        void initHandSize();
         void initPlayers();
         void initDraw();
         void initEnemy();
@@ -34,23 +33,27 @@ namespace regi
         i32 pastYieldsInARow;
         i32 currentRound;
         bool gameRunning;
-        std::vector<Player> players;
+        std::vector<Player> &players;
         std::vector<Card> drawPile;    /* cards that can be drawn */
         std::vector<Enemy> enemyPile;  /* enemies still left to KO */
         std::vector<Card> discardPile; /* cards used up to KO enemies */
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l, Strategy &s, i32 n)
-            : log(l), strat(s), NUM_PLAYERS(n) {};
+        GameState(BaseLog &l, std::vector<Player>& plrs)
+            : log(l), players(plrs) {};
         void init();
         void setup();
+        i32 totalPlayers() {
+            return static_cast<i32>(players.size());
+        }
 
         void startLoop();
         void oneTurn(Player &);
         void gameOver(EndGameReason);
         void postGameResult();
 
+        bool canDraw(Player &);
         void playerDraws(Player &, int);
         i32 playerDrawsOne(Player &);
         void refreshDraws(int, int);
@@ -92,6 +95,7 @@ namespace regi
     struct Strategy
     {
        public:
+        virtual i32 setup(const Player &, const GameState &) = 0;
         virtual i32 provideAttack(Combo &, const Player &, bool,
                                            const GameState &) = 0;
         virtual i32 provideDefense(Combo &, const Player &, i32,

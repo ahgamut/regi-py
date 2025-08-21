@@ -80,18 +80,18 @@ namespace regi
         drawPile.push_back(Card(EIGHT, CLUBS));     //
         drawPile.push_back(Card(NINE, CLUBS));      //
         drawPile.push_back(Card(TEN, CLUBS));       //
-        if (NUM_PLAYERS == 3)
+        if (totalPlayers() == 3)
         {
             /* 1 joker for 3p */
             drawPile.push_back(Card(JOKER, GLITCH));
         }
-        else if (NUM_PLAYERS == 4)
+        else if (totalPlayers() == 4)
         {
             /* 2 joker for 4p */
             drawPile.push_back(Card(JOKER, GLITCH));
             drawPile.push_back(Card(JOKER, GLITCH));
         }
-        else if (NUM_PLAYERS > 4 || NUM_PLAYERS < 2)
+        else if (totalPlayers() > 4 || totalPlayers() < 2)
         {
             gameRunning = false;
             log.endgame(INVALID_START, *this);
@@ -100,24 +100,28 @@ namespace regi
         shuffle(drawPile, 0, drawPile.size());
     }
 
-    void GameState::initPlayers()
+    void GameState::initHandSize()
     {
-        if (NUM_PLAYERS > 4 || NUM_PLAYERS < 2)
+        i32 tp = totalPlayers();
+        if (tp > 4 || tp < 2)
         {
             gameRunning = false;
             log.endgame(INVALID_START, *this);
             return;
         }
-        i32 hs;
-        if (NUM_PLAYERS == 2) { hs = 7; }
-        else if (NUM_PLAYERS == 3) { hs = 6; }
-        else /* (NUM_PLAYERS == 4) */ { hs = 5; }
-        for (int i = 0; i < NUM_PLAYERS; ++i)
+        if (tp == 2) { handSize = 7; }
+        else if (tp == 3) { handSize = 6; }
+        else /* (tp == 4) */ { handSize = 5; }
+    }
+
+    void GameState::initPlayers()
+    {
+        for (i32 i = 0; i < totalPlayers(); ++i)
         {
-            players.push_back(Player(hs));
             players[i].alive = true;
             players[i].id = i;
-            playerDraws(players[i], players[i].HAND_SIZE);
+            players[i].cards.clear();
+            playerDraws(players[i], handSize);
         }
     }
 
@@ -128,8 +132,22 @@ namespace regi
         currentRound = 0;
         initEnemy();
         initDraw();
+        initHandSize();
         initPlayers();
         log.startgame(*this);
+    }
+
+    void GameState::setup()
+    {
+        // in a server-style setup we'd initialize the connections here
+        for (i32 i = 0; i < totalPlayers(); ++i)
+        {
+            if (!players[i].alive || players[i].strat.setup(players[i], *this) != 0)
+            {
+                gameRunning = false;
+                log.endgame(INVALID_START, *this);
+            }
+        }
     }
 
 } /* namespace regi */

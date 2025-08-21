@@ -3,14 +3,10 @@
 
 namespace regi
 {
-    void GameState::setup()
-    {
-        // in a server-style setup we'd initialize the connections here
-    }
-
     void GameState::selectDefense(Player &player, i32 damage)
     {
         Combo def;
+        Strategy &strat = player.strat;
 
         if (strat.provideDefense(def, player, damage, *this) == 0)
         {
@@ -37,6 +33,7 @@ namespace regi
     void GameState::selectAttack(Player &player, bool yieldAllowed)
     {
         Combo atk;
+        Strategy &strat = player.strat;
 
         if (strat.provideAttack(atk, player, yieldAllowed, *this) == 0)
         {

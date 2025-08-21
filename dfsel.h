@@ -14,6 +14,7 @@ namespace regi
         i32 assign(Combo &, const std::vector<Combo> &);
 
        public:
+        i32 setup(const Player &, const GameState &);
         void collectAttack(const std::vector<Card> &, std::vector<Combo> &, bool,
                            Combo &, int);
         void collectDefense(const std::vector<Card> &, std::vector<Combo> &, int,
@@ -29,6 +30,7 @@ namespace regi
         i32 calcDamage(const Combo &, const Enemy &, const GameState &);
 
        public:
+        i32 setup(const Player &, const GameState &);
         void collectAttack(const std::vector<Card> &, std::vector<Combo> &, bool,
                            Combo &, int);
         void collectDefense(const std::vector<Card> &, std::vector<Combo> &, int,

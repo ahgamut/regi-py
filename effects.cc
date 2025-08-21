@@ -2,18 +2,24 @@
 
 namespace regi
 {
+
+    bool GameState::canDraw(Player &player)
+    {
+        return (drawPile.size() != 0) && player.cards.size() < handSize;
+    }
+
     void GameState::playerDraws(Player &player, i32 n)
     {
-        for (; n > 0 && drawPile.size() != 0 && !player.full(); n--)
+        for (; n > 0 && canDraw(player); n--)
         {
-            player.cards.push_back(drawPile.back());
-            drawPile.pop_back();
+            player.cards.push_back(drawPile.front());
+            drawPile.erase(drawPile.begin());
         }
     }
 
     i32 GameState::playerDrawsOne(Player &player)
     {
-        if (drawPile.size() != 0 && !player.full())
+        if (canDraw(player))
         {
             player.cards.push_back(drawPile.front());
             log.drawOne(player);
@@ -39,21 +45,22 @@ namespace regi
     void GameState::refreshDraws(i32 ip, i32 n)
     {
         i32 i, j;
-        std::vector<i32> full(NUM_PLAYERS);
+        i32 tp = totalPlayers();
+        std::vector<i32> full(tp);
         i32 fullct = 0;
 
-        for (j = 0; j < NUM_PLAYERS; ++j) { full[j] = 0; }
+        for (j = 0; j < tp; ++j) { full[j] = 0; }
         if (ip < 0) { ip *= -1; }
-        ip %= NUM_PLAYERS;
+        ip %= tp;
         for (i = ip; n > 0; n--)
         {
             if (playerDrawsOne(players[i]) == 0) { full[i] = 1; }
             i += 1;
-            i %= NUM_PLAYERS;
+            i %= tp;
             // if all players are full, stop draw
             fullct = 0;
-            for (j = 0; j < NUM_PLAYERS; ++j) { fullct += (full[j] == 1); }
-            if (fullct == NUM_PLAYERS) break;
+            for (j = 0; j < tp; ++j) { fullct += (full[j] == 1); }
+            if (fullct == tp) break;
         }
     }
 
@@ -174,7 +181,7 @@ namespace regi
 
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
-        selectAttack(player, pastYieldsInARow < (NUM_PLAYERS - 1));
+        selectAttack(player, pastYieldsInARow < (totalPlayers() - 1));
         i32 damage = calcDamage(enemy);
         enemy.hp -= damage;
         log.attack(player, enemy, usedPile.back(), damage);
@@ -191,11 +198,12 @@ namespace regi
 
     void GameState::startLoop()
     {
-        i32 i;
+        i32 i, tp;
+        tp = totalPlayers();
         while (gameRunning)
         {
             log.state(*this);
-            for (i = 0; i < NUM_PLAYERS; ++i)
+            for (i = 0; i < tp; ++i)
             {
                 oneTurn(players[i]);
                 if (!gameRunning) break;

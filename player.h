@@ -6,15 +6,20 @@
 
 namespace regi
 {
+    struct Strategy;
+    //
     struct Player
     {
        public:
-        const i32 HAND_SIZE;
+        struct Strategy& strat;
         i32 id;
         bool alive;
         std::vector<Card> cards;
-        bool full() { return cards.size() == HAND_SIZE; }
-        Player(i32 hs) : HAND_SIZE(hs) {};
+        Player(struct Strategy& s) : strat(s)
+        {
+            id = 0;
+            alive = false;
+        };
     };
     std::ostream& operator<<(std::ostream& os, const Player& p);
 } /* namespace regi */
