@@ -5,3 +5,5 @@ from .core import BaseStrategy, RandomStrategy
 from .core import Player
 from .core import BaseLog, CXXConsoleLog
 from .core import GameState
+
+from .basic import start_game as basic_game

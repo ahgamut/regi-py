@@ -43,7 +43,7 @@ namespace regi
         for (auto &cc : combos) { cc.loadDetails(); }
 
         i32 ind = getAttackIndex(combos, player, yieldAllowed, g);
-        if (ind < 0) { return -1; }
+        if (ind < 0 || ind >= combos.size()) { return -1; }
         else
         {
             result = combos[ind];
@@ -85,7 +85,7 @@ namespace regi
         if (combos.size() == 0) { return -1; }
 
         i32 ind = getDefenseIndex(combos, player, damage, g);
-        if (ind < 0) { return -1; }
+        if (ind < 0 || ind >= combos.size()) { return -1; }
         else
         {
             result = combos[ind];

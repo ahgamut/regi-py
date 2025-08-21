@@ -119,17 +119,17 @@ class PyBaseStrategy : public Strategy, py::trampoline_self_life_support
     using Strategy::Strategy;
     i32 setup(const Player &player, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(i32, Strategy, player, g);
+        PYBIND11_OVERRIDE_PURE(i32, Strategy, setup, player, g);
     }
     i32 getDefenseIndex(const std::vector<Combo> &combos, const Player &player,
                         i32 damage, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(i32, Strategy, combos, player, damage, g);
+        PYBIND11_OVERRIDE_PURE(i32, Strategy, getDefenseIndex, combos, player, damage, g);
     }
     i32 getAttackIndex(const std::vector<Combo> &combos, const Player &player,
                        bool yieldAllowed, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(i32, Strategy, combos, player, yieldAllowed, g);
+        PYBIND11_OVERRIDE_PURE(i32, Strategy, getAttackIndex, combos, player, yieldAllowed, g);
     }
 };
 
@@ -252,7 +252,7 @@ void bind_gamestate(pybind11::object &m)
              py::keep_alive<1, 2>())
         .def(py::init([](ConsoleLog &log) { return GameState(log); }),
              py::keep_alive<1, 2>())
-        .def("add_player", &GameState::addPlayer)
+        .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>())
         .def_property_readonly("total_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
         .def_readonly("past_yields", &GameState::pastYieldsInARow)
