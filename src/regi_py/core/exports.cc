@@ -12,6 +12,14 @@ using namespace regi;
 // PYBIND11_MAKE_OPAQUE(std::vector<Card>)
 // PYBIND11_MAKE_OPAQUE(std::vector<Combo>)
 
+template <typename T>
+std::string stringify(const T &t)
+{
+    std::stringstream ss;
+    ss << t;
+    return ss.str();
+}
+
 void bind_enums(pybind11::object &m)
 {
     py::native_enum<Suit>(m, "Suit", "enum.IntEnum")
@@ -76,26 +84,16 @@ void bind_cards(pybind11::object &m)
         .def(
             "__eq__", [](const Card &c1, const Card &c2) { return c1 == c2; },
             py::is_operator())
-        .def("__str__",
-             [](const Card &c)
-             {
-                 std::stringstream ss;
-                 ss << c;
-                 return ss.str();
-             });
+        .def("__repr__", &stringify<Card>)
+        .def("__str__", &stringify<Card>);
 
     py::class_<Enemy>(m, "Enemy")
         .def_readonly("HP", &Enemy::hp)
         .def_property_readonly("entry", &Enemy::entry)
         .def_property_readonly("suit", &Enemy::suit)
         .def_property_readonly("strength", &Enemy::strength)
-        .def("__str__",
-             [](const Enemy &e)
-             {
-                 std::stringstream ss;
-                 ss << e;
-                 return ss.str();
-             });
+        .def("__repr__", &stringify<Enemy>)
+        .def("__str__", &stringify<Enemy>);
 
     py::class_<Combo>(m, "Combo")
         .def_readonly("parts", &Combo::parts)
@@ -103,13 +101,8 @@ void bind_cards(pybind11::object &m)
                                [](Combo &c) { return c.valid(true) != 0; })
         .def_property_readonly("base_damage", &Combo::getBaseDamage)
         .def_property_readonly("base_defense", &Combo::getBaseDefense)
-        .def("__str__",
-             [](const Combo &c)
-             {
-                 std::stringstream ss;
-                 ss << c;
-                 return ss.str();
-             });
+        .def("__repr__", &stringify<Combo>)
+        .def("__str__", &stringify<Combo>);
 }
 
 class PyBaseStrategy : public Strategy, py::trampoline_self_life_support
@@ -124,12 +117,14 @@ class PyBaseStrategy : public Strategy, py::trampoline_self_life_support
     i32 getDefenseIndex(const std::vector<Combo> &combos, const Player &player,
                         i32 damage, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(i32, Strategy, getDefenseIndex, combos, player, damage, g);
+        PYBIND11_OVERRIDE_PURE(i32, Strategy, getDefenseIndex, combos, player, damage,
+                               g);
     }
     i32 getAttackIndex(const std::vector<Combo> &combos, const Player &player,
                        bool yieldAllowed, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(i32, Strategy, getAttackIndex, combos, player, yieldAllowed, g);
+        PYBIND11_OVERRIDE_PURE(i32, Strategy, getAttackIndex, combos, player,
+                               yieldAllowed, g);
     }
 };
 
@@ -160,13 +155,8 @@ void bind_player(pybind11::object &m)
         .def_readonly("cards", &Player::cards)
         .def_readonly("ID", &Player::id)
         .def_readonly("alive", &Player::alive)
-        .def("__str__",
-             [](const Player &player)
-             {
-                 std::stringstream ss;
-                 ss << player;
-                 return ss.str();
-             });
+        .def("__repr__", &stringify<Player>)
+        .def("__str__", &stringify<Player>);
 }
 
 class PyBaseLog : public BaseLog, py::trampoline_self_life_support
@@ -225,10 +215,16 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
     }
 };
 
+class PyConsoleLog : public ConsoleLog, py::trampoline_self_life_support
+{
+    using ConsoleLog::ConsoleLog;
+};
+
 void bind_log(pybind11::object &m)
 {
-    py::class_<BaseLog, PyBaseLog /* trampoline */, py::smart_holder>(m, "BaseLog")
-        .def(py::init<>())
+    py::class_<BaseLog, PyBaseLog /* trampoline */, py::smart_holder> base(m,
+                                                                           "BaseLog");
+    base.def(py::init<>())
         .def("attack", &BaseLog::attack)
         .def("defend", &BaseLog::defend)
         .def("failBlock", &BaseLog::failBlock)
@@ -242,15 +238,15 @@ void bind_log(pybind11::object &m)
         .def("endgame", &BaseLog::endgame)
         .def("postgame", &BaseLog::postgame);
     /* TODO: why isn't this the same as RandomStrategy? */
-    py::class_<ConsoleLog>(m, "CXXConsoleLog").def(py::init<>());
+    py::class_<ConsoleLog, PyConsoleLog /* trampoline */, py::smart_holder>(
+        m, "CXXConsoleLog", base)
+        .def(py::init<>());
 }
 
 void bind_gamestate(pybind11::object &m)
 {
     py::class_<GameState>(m, "GameState")
         .def(py::init([](BaseLog &log) { return GameState(log); }),
-             py::keep_alive<1, 2>())
-        .def(py::init([](ConsoleLog &log) { return GameState(log); }),
              py::keep_alive<1, 2>())
         .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>())
         .def_property_readonly("total_players", &GameState::totalPlayers)
