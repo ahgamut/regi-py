@@ -119,7 +119,7 @@ namespace regi
         switch (reason)
         {
             case INVALID_START:
-                std::cout << "endgame: only 2, 3, or 4 players allowed\n";
+                std::cout << "endgame: only 2, 3, or 4 players allowed, but there are " <<  g.players.size() <<"\n";
                 break;
             case BLOCK_FAILED:
                 std::cout << "endgame: someone was unable to block\n";

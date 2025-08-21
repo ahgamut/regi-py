@@ -43,6 +43,7 @@ namespace regi
         GameState(BaseLog &l, std::vector<Player> &plrs) : log(l), players(plrs) {};
         void init();
         void setup();
+        i32 getHandSize() { return handSize; }
         i32 totalPlayers() { return static_cast<i32>(players.size()); }
 
         void startLoop();
