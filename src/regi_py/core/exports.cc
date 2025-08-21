@@ -237,7 +237,6 @@ void bind_log(pybind11::object &m)
         .def("startgame", &BaseLog::startgame)
         .def("endgame", &BaseLog::endgame)
         .def("postgame", &BaseLog::postgame);
-    /* TODO: why isn't this the same as RandomStrategy? */
     py::class_<ConsoleLog, PyConsoleLog /* trampoline */, py::smart_holder>(
         m, "CXXConsoleLog", base)
         .def(py::init<>());
