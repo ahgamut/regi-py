@@ -73,7 +73,7 @@ namespace regi
 
     std::ostream &operator<<(std::ostream &os, const regi::Combo &combo)
     {
-        if (combo.parts.empty()) { os << "(yield) "; }
+        if (combo.parts.empty()) { os << "(yield)"; }
         else
         {
             os << "(";
@@ -82,7 +82,7 @@ namespace regi
                 os << combo.parts[i];
                 if (i != combo.parts.size() - 1) { os << " "; }
             }
-            os << ") ";
+            os << ")";
         }
         return os;
     }

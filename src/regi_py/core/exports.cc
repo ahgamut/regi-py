@@ -9,9 +9,6 @@
 namespace py = pybind11;
 using namespace regi;
 
-// PYBIND11_MAKE_OPAQUE(std::vector<Card>)
-// PYBIND11_MAKE_OPAQUE(std::vector<Combo>)
-
 template <typename T>
 std::string stringify(const T &t)
 {
@@ -135,8 +132,7 @@ class PyRandomStrategy : public RandomStrategy, py::trampoline_self_life_support
 
 void bind_strat(pybind11::object &m)
 {
-    py::class_<Strategy, PyBaseStrategy /* trampoline */, py::smart_holder> base(
-        m, "BaseStrategy");
+    py::class_<Strategy, PyBaseStrategy, py::smart_holder> base(m, "BaseStrategy");
     base.def(py::init<>())
         .def("setup", &Strategy::setup)
         .def("getAttackIndex", &Strategy::getAttackIndex)
@@ -222,8 +218,7 @@ class PyConsoleLog : public ConsoleLog, py::trampoline_self_life_support
 
 void bind_log(pybind11::object &m)
 {
-    py::class_<BaseLog, PyBaseLog /* trampoline */, py::smart_holder> base(m,
-                                                                           "BaseLog");
+    py::class_<BaseLog, PyBaseLog, py::smart_holder> base(m, "BaseLog");
     base.def(py::init<>())
         .def("attack", &BaseLog::attack)
         .def("defend", &BaseLog::defend)
@@ -237,8 +232,7 @@ void bind_log(pybind11::object &m)
         .def("startgame", &BaseLog::startgame)
         .def("endgame", &BaseLog::endgame)
         .def("postgame", &BaseLog::postgame);
-    py::class_<ConsoleLog, PyConsoleLog /* trampoline */, py::smart_holder>(
-        m, "CXXConsoleLog", base)
+    py::class_<ConsoleLog, PyConsoleLog, py::smart_holder>(m, "CXXConsoleLog", base)
         .def(py::init<>());
 }
 
@@ -248,10 +242,11 @@ void bind_gamestate(pybind11::object &m)
         .def(py::init([](BaseLog &log) { return GameState(log); }),
              py::keep_alive<1, 2>())
         .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>())
-        .def_property_readonly("total_players", &GameState::totalPlayers)
+        .def_property_readonly("num_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
         .def_readonly("past_yields", &GameState::pastYieldsInARow)
         .def_readonly("status", &GameState::status)
+        .def_readonly("players", &GameState::players)
         .def_readonly("draw_pile", &GameState::drawPile)
         .def_readonly("discard_pile", &GameState::discardPile)
         .def_readonly("enemy_pile", &GameState::enemyPile)
