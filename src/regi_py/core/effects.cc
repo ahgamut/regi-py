@@ -99,7 +99,7 @@ namespace regi
         if (damage > tblock)
         {
             /* impossible to block the damage, so game over */
-            log.failBlock(player, damage, tblock);
+            log.failBlock(player, damage, tblock, *this);
             gameOver(BLOCK_FAILED);
             player.alive = false;
             return;
@@ -184,7 +184,7 @@ namespace regi
         selectAttack(player, pastYieldsInARow < (totalPlayers() - 1));
         i32 damage = calcDamage(enemy);
         enemy.hp -= damage;
-        log.attack(player, enemy, usedPile.back(), damage);
+        log.attack(player, enemy, usedPile.back(), damage, *this);
         postAttackEffects(player, enemy);
     }
 
@@ -198,14 +198,14 @@ namespace regi
 
     void GameState::startLoop()
     {
-        i32 i, tp;
+        i32 tp;
         tp = totalPlayers();
         while (gameRunning())
         {
             log.state(*this);
-            for (i = 0; i < tp; ++i)
+            for (activePlayerID = 0; activePlayerID < tp; ++activePlayerID)
             {
-                oneTurn(players[i]);
+                oneTurn(players[activePlayerID]);
                 if (!gameRunning()) break;
             }
             currentRound += 1;

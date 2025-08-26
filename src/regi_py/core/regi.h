@@ -31,6 +31,7 @@ namespace regi
        private:
         BaseLog &log;
         i32 handSize;
+        i32 activePlayerID;
         void initHandSize();
         void initPlayers();
         void initDraw();
@@ -47,12 +48,17 @@ namespace regi
         std::vector<Combo> usedPile;   /* combos used on current enemy */
 
         /* methods */
-        GameState(BaseLog &l) : log(l) { status = GameStatus::LOADING; };
+        GameState(BaseLog &l) : log(l)
+        {
+            status = GameStatus::LOADING;
+            activePlayerID = -1;
+        };
         i32 addPlayer(Strategy &);
         void init();
         void setup();
         bool gameRunning() { return this->status == GameStatus::RUNNING; }
 
+        i32 getActivePlayer() { return activePlayerID; }
         i32 getHandSize() { return handSize; }
         i32 totalPlayers() { return static_cast<i32>(players.size()); }
 
@@ -84,10 +90,12 @@ namespace regi
     struct BaseLog
     {
        public:
-        virtual void attack(const Player &, const Enemy &, const Combo &,
-                            const i32) = 0;
-        virtual void defend(const Player &, const Combo &, const i32) = 0;
-        virtual void failBlock(const Player &, const i32, const i32) = 0;
+        virtual void attack(const Player &, const Enemy &, const Combo &, const i32,
+                            const GameState &) = 0;
+        virtual void defend(const Player &, const Combo &, const i32,
+                            const GameState &) = 0;
+        virtual void failBlock(const Player &, const i32, const i32,
+                               const GameState &) = 0;
         virtual void drawOne(const Player &) = 0;
         virtual void replenish(const i32) = 0;
         virtual void enemyKill(const Enemy &, const GameState &) = 0;

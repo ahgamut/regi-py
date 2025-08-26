@@ -3,8 +3,9 @@
 namespace regi
 {
     void ConsoleLog::attack(const Player &player, const Enemy &enemy, const Combo &cur,
-                            const i32 damage)
+                            const i32 damage, const GameState &g)
     {
+        (void)g;
         std::cout << "Player " << player.id;
         std::cout << " attacking " << enemy;
         std::cout << " with " << cur;
@@ -29,8 +30,9 @@ namespace regi
     }
 
     void ConsoleLog::defend(const Player &player, const Combo &cur,
-                            const i32 damage)
+                            const i32 damage, const GameState &g)
     {
+        (void)g;
         std::cout << "Player " << player.id;
         std::cout << " blocks " << damage;
         std::cout << " damage with " << cur;
@@ -38,8 +40,9 @@ namespace regi
     }
 
     void ConsoleLog::failBlock(const Player &player, const i32 damage,
-                               const i32 maxblock)
+                               const i32 maxblock, const GameState &g)
     {
+        (void)g;
         std::cout << "Player " << player.id;
         std::cout << " needs to block " << damage;
         std::cout << " damage, but can only block for " << maxblock;

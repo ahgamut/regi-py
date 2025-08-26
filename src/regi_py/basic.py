@@ -1,6 +1,7 @@
 from regi_py.core import *
 import random
 
+
 class DummyStrategy(BaseStrategy):
     def setup(self, player, game):
         return 0
@@ -16,6 +17,7 @@ class DummyStrategy(BaseStrategy):
             return -1
         print("available defenses: ", combos)
         return random.randint(0, len(combos) - 1)
+
 
 def start_game(n_players=2, log=None) -> GameState:
     assert n_players in [2, 3, 4], "only 2, 3, or 4 players"

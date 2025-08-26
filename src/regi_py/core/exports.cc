@@ -85,7 +85,7 @@ void bind_cards(pybind11::object &m)
         .def("__str__", &stringify<Card>);
 
     py::class_<Enemy>(m, "Enemy")
-        .def_readonly("HP", &Enemy::hp)
+        .def_readonly("hp", &Enemy::hp)
         .def_property_readonly("entry", &Enemy::entry)
         .def_property_readonly("suit", &Enemy::suit)
         .def_property_readonly("strength", &Enemy::strength)
@@ -149,7 +149,7 @@ void bind_player(pybind11::object &m)
 {
     py::class_<Player>(m, "Player")
         .def_readonly("cards", &Player::cards)
-        .def_readonly("ID", &Player::id)
+        .def_readonly("id", &Player::id)
         .def_readonly("alive", &Player::alive)
         .def("__repr__", &stringify<Player>)
         .def("__str__", &stringify<Player>);
@@ -161,17 +161,17 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
    public:
     using BaseLog::BaseLog;
     void attack(const Player &player, const Enemy &enemy, const Combo &combo,
-                const i32 damage) override
+                const i32 damage, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(void, BaseLog, attack, player, enemy, combo, damage);
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, attack, player, enemy, combo, damage, g);
     }
-    void defend(const Player &player, const Combo &combo, const i32 damage) override
+    void defend(const Player &player, const Combo &combo, const i32 damage, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(void, BaseLog, defend, player, combo, damage);
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, defend, player, combo, damage, g);
     }
-    void failBlock(const Player &player, const i32 damage, const i32 maxblock) override
+    void failBlock(const Player &player, const i32 damage, const i32 maxblock, const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(void, BaseLog, failBlock, player, damage, maxblock);
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, failBlock, player, damage, maxblock, g);
     }
     void drawOne(const Player &player) override
     {
@@ -244,6 +244,8 @@ void bind_gamestate(pybind11::object &m)
         .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>())
         .def_property_readonly("num_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
+        .def_property_readonly("active_player", &GameState::getActivePlayer)
+        .def_readonly("current_round", &GameState::currentRound)
         .def_readonly("past_yields", &GameState::pastYieldsInARow)
         .def_readonly("status", &GameState::status)
         .def_readonly("players", &GameState::players)
