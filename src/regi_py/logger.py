@@ -1,7 +1,7 @@
 from regi_py.core import *
 import json
 
-__all__ = ("JSONLog", "RegiEncoder")
+__all__ = ("JSONLog", "RegiEncoder", "dump_game", "dump_debug")
 
 
 def dump_game(game):
