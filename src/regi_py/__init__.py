@@ -7,4 +7,4 @@ from .core import BaseLog, CXXConsoleLog
 from .core import GameState
 
 from .basic import start_game as basic_game
-from .logger import JSONLog, RegiEncoder
+from .logger import JSONBaseLog, JSONLog, RegiEncoder

@@ -1,7 +1,7 @@
 from regi_py.core import *
 import json
 
-__all__ = ("JSONLog", "RegiEncoder", "dump_game", "dump_debug")
+__all__ = ("JSONBaseLog", "JSONLog", "RegiEncoder")
 
 
 def dump_game(game):
@@ -24,9 +24,9 @@ def dump_game(game):
 def dump_debug(game):
     result = dump_game(game)
     result["players"] = [dump_player(player) for player in game.players]
-    result["draw_pile"] = str(game.draw_pile)
-    result["discard_pile"] = str(game.discard_pile)
-    result["enemy_pile"] = str(game.enemy_pile)
+    result["draw_pile"] = [str(x) for x in game.draw_pile]
+    result["discard_pile"] = [str(x) for x in game.discard_pile]
+    result["enemy_pile"] = [str(x) for x in game.enemy_pile]
     return result
 
 
@@ -92,24 +92,12 @@ class RegiEncoder(json.JSONEncoder):
             return super().default(obj)
 
 
-class JSONLog(BaseLog):
-    def __init__(self, fname):
+class JSONBaseLog(BaseLog):
+    def __init__(self):
         super().__init__()
-        self.fname = fname
-        self.fptr = open(fname, "w")
-        self.count = 0
-        self.fptr.write("[\n")
-
-    def __del__(self):
-        if self.fptr:
-            self.fptr.write("{}]\n")
-            self.fptr.close()
-        self.fptr = None
 
     def log(self, obj):
-        json.dump(obj, self.fptr, cls=RegiEncoder)
-        self.fptr.write(",\n")
-        self.count += 1
+        raise NotImplemented("subclass this to log objects")
 
     ####
     def startgame(self, game):
@@ -178,3 +166,23 @@ class JSONLog(BaseLog):
 
     def endTurn(self, game):
         self.log({"event": "TURNEND", "state": dump_game(game)})
+
+
+class JSONLog(JSONBaseLog):
+    def __init__(self, fname):
+        super().__init__()
+        self.fname = fname
+        self.fptr = open(fname, "w")
+        self.count = 0
+        self.fptr.write("[\n")
+
+    def __del__(self):
+        if self.fptr:
+            self.fptr.write("{}]\n")
+            self.fptr.close()
+        self.fptr = None
+
+    def log(self, obj):
+        json.dump(obj, self.fptr, cls=RegiEncoder)
+        self.fptr.write(",\n")
+        self.count += 1
