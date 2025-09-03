@@ -1,5 +1,5 @@
 
-from .core import Suit, Entry, SuitPower, EndGameReason
+from .core import Suit, Entry, SuitPower, GameStatus, EndGameReason
 from .core import Card, Enemy
 from .core import BaseStrategy, RandomStrategy
 from .core import Player

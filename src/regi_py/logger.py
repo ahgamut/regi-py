@@ -101,13 +101,13 @@ class JSONBaseLog(BaseLog):
 
     ####
     def startgame(self, game):
-        self.log({"event": "STARTGAME", "state": dump_debug(game)})
+        self.log({"event": "STARTGAME", "game": dump_debug(game)})
 
     def endgame(self, reason, game):
-        self.log({"event": "ENDGAME", "state": dump_game(game)})
+        self.log({"event": "ENDGAME", "game": dump_game(game)})
 
     def postgame(self, game):
-        self.log({"event": "POSTGAME", "state": dump_debug(game)})
+        self.log({"event": "POSTGAME", "game": dump_debug(game)})
 
     ####
 
@@ -159,13 +159,13 @@ class JSONBaseLog(BaseLog):
     ####
 
     def state(self, game):
-        self.log({"event": "TURNSTART", "state": dump_game(game)})
+        self.log({"event": "TURNSTART", "game": dump_game(game)})
 
     def debug(self, game):
-        self.log({"event": "DEBUG", "state": dump_debug(game)})
+        self.log({"event": "DEBUG", "game": dump_debug(game)})
 
     def endTurn(self, game):
-        self.log({"event": "TURNEND", "state": dump_game(game)})
+        self.log({"event": "TURNEND", "game": dump_game(game)})
 
 
 class JSONLog(JSONBaseLog):
