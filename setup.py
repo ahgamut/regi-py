@@ -41,7 +41,7 @@ ext_modules = [
             str(get_pybind_include(False)),
             "src/regi_py/core",
         ],
-        extra_compile_args=[],
+        extra_compile_args=["-DUSE_UNICODE"],
         extra_link_args=[],
         language="c++",
     )
