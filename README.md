@@ -26,6 +26,18 @@ each player randomly selects a valid move to play.
 python driver.py
 ```
 
+## Playing with a bot
+
+Run `webdriver/driver.py` to play a 2-player game with a bot that picks random
+moves
+
+```sh
+# install the package first
+cd webdriver
+python driver.py
+# go to http://localhost:8888 in your browser
+```
+
 ## Adding your own strategies
 
 Subclass the `BaseStrategy` class with your own implementations that select what
