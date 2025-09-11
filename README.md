@@ -38,6 +38,8 @@ python driver.py
 # go to http://localhost:8888 in your browser
 ```
 
+![](./webdriver/regi-runtime.png)
+
 ## Adding your own strategies
 
 Subclass the `BaseStrategy` class with your own implementations that select what
