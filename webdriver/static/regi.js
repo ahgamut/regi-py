@@ -486,6 +486,7 @@ function sideButtonText() {
 }
 
 function sideButtonRedirect() {
+    let g = Alpine.store('gamestate');
     let button = document.getElementById("side-button");
     if (button.classList.contains("is-loading")) {
         return;
