@@ -220,7 +220,6 @@ function makeOtherPlayerInfo(game) {
     let els = document.createElement("ul");
     els.className = "subtitle";
     for (let player of game.players) {
-        console.log(player);
         let el = document.createElement("li");
         el.appendChild(document.createTextNode(`Player ${player.id}: ${player.num_cards} cards`));
         els.appendChild(el);
@@ -380,7 +379,6 @@ function addNotification(content, subtype) {
     res.appendChild(document.createTextNode(content));
 
     tray.appendChild(res);
-    console.log(tray.children);
     let removeDelay = tray.children.length * 1000 + 2 * duration + 2000;
     setTimeout(() => { 
         res.style.animation = `fadeOut 2000ms ease-in 1 forwards`;
