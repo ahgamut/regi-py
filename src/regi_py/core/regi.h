@@ -76,7 +76,7 @@ namespace regi
         void selectAttack(Player &, bool);
         i32 calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
-        void postAttackEffects(Player &, Enemy &);
+        void preAttackEffects(Player &, Enemy &);
         i32 enemyDead();
 
         i32 calcBlock(Enemy &);

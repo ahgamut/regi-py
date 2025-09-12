@@ -131,15 +131,9 @@ namespace regi
         return dmg;
     }
 
-    void GameState::postAttackEffects(Player &player, Enemy &enemy)
+    void GameState::preAttackEffects(Player &player, Enemy &enemy)
     {
         u32 epow = getPower(enemy);
-        if (enemy.hp <= 0)
-        {
-            /* we check effects before removing dead enemies,
-             * so ignore STAB if enemy was killed just now */
-            epow = 0;
-        }
         for (auto &combo : usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
@@ -150,7 +144,7 @@ namespace regi
         i32 cval = (curcombo.getBaseDamage());
 
         if ((cpow & HEARTS_REPLENISH) != 0) { refreshDiscards(cval); }
-        else if ((cpow & DIAMONDS_DRAW) != 0) { refreshDraws(player.id, cval); }
+        if ((cpow & DIAMONDS_DRAW) != 0) { refreshDraws(player.id, cval); }
         // else do nothing
     }
 
@@ -182,10 +176,10 @@ namespace regi
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
         selectAttack(player, pastYieldsInARow < (totalPlayers() - 1));
+        preAttackEffects(player, enemy);
         i32 damage = calcDamage(enemy);
         enemy.hp -= damage;
         log.attack(player, enemy, usedPile.back(), damage, *this);
-        postAttackEffects(player, enemy);
     }
 
     void GameState::gameOver(EndGameReason e)
