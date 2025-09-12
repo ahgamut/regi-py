@@ -182,7 +182,7 @@ function makeUsedCombos(combos) {
     for (let combo of combos) {
         let el = document.createElement("li");
         for (let card of combo) {
-    let b = document.createElement("div");
+            let b = document.createElement("div");
             b.className = "button is-link";
             b.innerHTML = card.value;
             el.appendChild(b);
@@ -215,6 +215,20 @@ function makeContextInfo(game) {
     return res;
 }
 
+function makeOtherPlayerInfo(game) {
+    let res = document.createElement("div");
+    let els = document.createElement("ul");
+    els.className = "subtitle";
+    for (let player of game.players) {
+        console.log(player);
+        let el = document.createElement("li");
+        el.appendChild(document.createTextNode(`Player ${player.id}: ${player.num_cards} cards`));
+        els.appendChild(el);
+    }
+    res.appendChild(els);
+    return res;
+}
+
 function updateBoard(game) {
     let g = Alpine.store('gamestate');
     let game_view = document.getElementById('game-view');
@@ -222,6 +236,7 @@ function updateBoard(game) {
     game_view.replaceChildren();
     game_view.appendChild(makeCurrentEnemy(game.current_enemy));
     game_view.appendChild(makeContextInfo(game));
+    game_view.appendChild(makeOtherPlayerInfo(game));
     game_view.appendChild(makeUsedCombos(game.used_combos));
 }
 
