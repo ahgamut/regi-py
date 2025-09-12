@@ -182,7 +182,7 @@ function makeUsedCombos(combos) {
     for (let combo of combos) {
         let el = document.createElement("li");
         for (let card of combo) {
-            let b = document.createElement("div");
+    let b = document.createElement("div");
             b.className = "button is-link";
             b.innerHTML = card.value;
             el.appendChild(b);
@@ -193,12 +193,35 @@ function makeUsedCombos(combos) {
     return res;
 }
 
+function makeContextInfo(game) {
+    let res = document.createElement("div");
+    let els = document.createElement("ul");
+    els.className = "subtitle";
+    //
+    let el1 = document.createElement("li");
+    el1.appendChild(document.createTextNode(`Deck: ${game.draw_pile_size} cards`))
+    //
+    let el2 = document.createElement("li");
+    el2.appendChild(document.createTextNode(`Discard Pile: ${game.discard_pile_size} cards`))
+    //
+    let el3 = document.createElement("li");
+    el3.appendChild(document.createTextNode(`${game.enemy_pile_size} enemies left`))
+    //
+    els.appendChild(el1);
+    els.appendChild(el2);
+    els.appendChild(el3);
+    res.append(els);
+    // console.log(game);
+    return res;
+}
+
 function updateBoard(game) {
     let g = Alpine.store('gamestate');
     let game_view = document.getElementById('game-view');
     // console.log(game);
     game_view.replaceChildren();
     game_view.appendChild(makeCurrentEnemy(game.current_enemy));
+    game_view.appendChild(makeContextInfo(game));
     game_view.appendChild(makeUsedCombos(game.used_combos));
 }
 
@@ -284,7 +307,7 @@ function processLog(data) {
             break;
         case 'DEFEND':
             let combo2 = data.combo.map(x => x.value);
-            logMessage(`${data.enemy.value} attacked ${data.player.id} for ${data.damage} damage`, 'is-info');
+            logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage} damage`, 'is-info');
             logMessage(`Player ${data.player.id} blocked with ${combo2}`, 'is-info');
             break;
         case 'ENEMYKILL':
@@ -315,8 +338,8 @@ function processLog(data) {
             logMessage("End of Round");
             break;
         case 'FAILBLOCK':
-            logMessage(`${data.enemy.value} attacked ${data.player.id} for ${data.damage}`, 'is-danger');
-            logMessage(`${data.player.id} can block at most ${data.maxblock}!`, 'is-danger');
+            logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage}`, 'is-danger');
+            logMessage(`Player ${data.player.id} can block at most ${data.maxblock}!`, 'is-danger');
             break;
         // default:
             // console.log(data.event);

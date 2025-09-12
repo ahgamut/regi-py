@@ -16,6 +16,9 @@ def dump_game(game):
     result["status"] = str(game.status.name)
     result["used_combos"] = [dump_combo(combo) for combo in game.used_combos]
     result["current_enemy"] = None
+    result["draw_pile_size"] = len(game.draw_pile)
+    result["discard_pile_size"] = len(game.discard_pile)
+    result["enemy_pile_size"] = len(game.enemy_pile)
     if len(game.enemy_pile) > 0:
         result["current_enemy"] = dump_enemy(game.enemy_pile[0])
     return result
