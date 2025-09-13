@@ -34,9 +34,11 @@ function receive_ws(event) {
             processLog(info.data);
             break;
         case "select-attack":
+            logMessage(`you have to attack`, 'is-primary');
             selectAttack(info.data);
             break;
         case "select-defend":
+            logMessage(`you have to defend`, 'is-primary');
             selectDefend(info.data);
             break;
         default:
