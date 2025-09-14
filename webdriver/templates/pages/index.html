@@ -32,17 +32,17 @@ document.addEventListener('alpine:init', () => {
         <h1 class="title" x-text="'Player: ' + $store.gamestate.playerid"></h1>
         <div id="game-overall" style="min-height: 320px; border: 1px solid black;">
             <div class="columns is-vcentered">
-                <div class="column" x-show="$store.gamestate.statusz == 'RUNNING'"> 
+                <div class="column is-two-fifths" x-show="$store.gamestate.statusz == 'RUNNING'"> 
                     <h1 class="subtitle" x-text="'Enemy View'"></h1>
                     <div id="enemy-view">
                     </div>
                 </div>
-                <div class="column" x-show="$store.gamestate.statusz == 'RUNNING'"> 
+                <div class="column is-one-fifth" x-show="$store.gamestate.statusz == 'RUNNING'"> 
                     <h1 class="subtitle" x-text="'Game View'"></h1>
                     <div id="game-view">
                     </div>
                 </div>
-                <div class="column"  x-show="$store.gamestate.statusz == 'RUNNING'"> 
+                <div class="column is-two-fifths"  x-show="$store.gamestate.statusz == 'RUNNING'"> 
                     <h1 id="player-should" class="subtitle" x-text="$store.gamestate.playerShould"></h1>
                     <h1 class="subtitle" x-text="'Your cards'"></h1>
                     <div id="player-cards">

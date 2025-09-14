@@ -237,10 +237,10 @@ function updateBoard(game) {
     // console.log(game);
     game_view.replaceChildren();
     game_view.appendChild(makeContextInfo(game));
-    game_view.appendChild(makeUsedCombos(game.used_combos));
+    game_view.appendChild(makeOtherPlayerInfo(game));
     enemy_view.replaceChildren();
     enemy_view.appendChild(makeCurrentEnemy(game.current_enemy));
-    enemy_view.appendChild(makeOtherPlayerInfo(game));
+    enemy_view.appendChild(makeUsedCombos(game.used_combos));
 }
 
 function getCardButton(card) {
