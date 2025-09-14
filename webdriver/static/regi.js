@@ -232,13 +232,15 @@ function makeOtherPlayerInfo(game) {
 
 function updateBoard(game) {
     let g = Alpine.store('gamestate');
+    let enemy_view = document.getElementById('enemy-view');
     let game_view = document.getElementById('game-view');
     // console.log(game);
     game_view.replaceChildren();
-    game_view.appendChild(makeCurrentEnemy(game.current_enemy));
     game_view.appendChild(makeContextInfo(game));
-    game_view.appendChild(makeOtherPlayerInfo(game));
     game_view.appendChild(makeUsedCombos(game.used_combos));
+    enemy_view.replaceChildren();
+    enemy_view.appendChild(makeCurrentEnemy(game.current_enemy));
+    enemy_view.appendChild(makeOtherPlayerInfo(game));
 }
 
 function getCardButton(card) {
