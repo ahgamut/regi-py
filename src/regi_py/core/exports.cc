@@ -130,6 +130,11 @@ class PyRandomStrategy : public RandomStrategy, py::trampoline_self_life_support
     using RandomStrategy::RandomStrategy;
 };
 
+class PyDamageStrategy : public DamageStrategy, py::trampoline_self_life_support
+{
+    using DamageStrategy::DamageStrategy;
+};
+
 void bind_strat(pybind11::object &m)
 {
     py::class_<Strategy, PyBaseStrategy, py::smart_holder> base(m, "BaseStrategy");
@@ -143,6 +148,12 @@ void bind_strat(pybind11::object &m)
         .def("setup", &RandomStrategy::setup)
         .def("getAttackIndex", &RandomStrategy::getAttackIndex)
         .def("getDefenseIndex", &RandomStrategy::getDefenseIndex);
+    py::class_<DamageStrategy, PyDamageStrategy, py::smart_holder>(m, "DamageStrategy",
+                                                                   base)
+        .def(py::init<>())
+        .def("setup", &DamageStrategy::setup)
+        .def("getAttackIndex", &DamageStrategy::getAttackIndex)
+        .def("getDefenseIndex", &DamageStrategy::getDefenseIndex);
 }
 
 void bind_player(pybind11::object &m)
@@ -165,11 +176,13 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, attack, player, enemy, combo, damage, g);
     }
-    void defend(const Player &player, const Combo &combo, const i32 damage, const GameState &g) override
+    void defend(const Player &player, const Combo &combo, const i32 damage,
+                const GameState &g) override
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, defend, player, combo, damage, g);
     }
-    void failBlock(const Player &player, const i32 damage, const i32 maxblock, const GameState &g) override
+    void failBlock(const Player &player, const i32 damage, const i32 maxblock,
+                   const GameState &g) override
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, failBlock, player, damage, maxblock, g);
     }
