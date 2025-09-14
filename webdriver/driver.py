@@ -79,6 +79,7 @@ class WebPlayerStrategy(BaseStrategy):
         self.websocket = websocket
         self.portal_provider = BlockingPortalProvider()
         self.response = None
+        self.ready = False
 
     @staticmethod
     async def comms_twoway(self, websocket, obj):
@@ -94,6 +95,8 @@ class WebPlayerStrategy(BaseStrategy):
         return resp
 
     def setup(self, player, game):
+        if self.ready:
+            return 0
         msg = {"type": "ready", "player": player, "game": game}
         with self.portal_provider as portal:
             response = portal.call(
@@ -322,7 +325,11 @@ async def process_data(data, websocket):
     if pkg["type"] == "player-join":
         player_join(pkg["userid"], websocket)
         await CTX.manager.send_dict({"type": "loading", "remain": 1}, websocket)
-    elif pkg["type"] in ["player-ready", "player-move"]:
+    elif pkg["type"] in ["player-ready"]:
+        playerid = CTX.manager.active_connections.index(websocket)
+        CTX.strats[playerid].response = pkg
+        CTX.strats[playerid].ready = True
+    elif pkg["type"] in ["player-move"]:
         playerid = CTX.manager.active_connections.index(websocket)
         CTX.strats[playerid].response = pkg
     elif pkg["type"] in ["player-reset"]:
