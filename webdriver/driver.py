@@ -37,7 +37,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py import BaseStrategy, RandomStrategy, GameStatus
+from regi_py import BaseStrategy, DamageStrategy, GameStatus
 from regi_py import RegiEncoder, JSONBaseLog, GameState
 
 
@@ -241,7 +241,7 @@ class Context:
         for i in range(self.n_players):
             self.game.add_player(self.strats[i])
 
-        self.strats.append(RandomStrategy())
+        self.strats.append(DamageStrategy())
         self.game.add_player(self.strats[-1])
 
         self.game.initialize()
