@@ -206,9 +206,13 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, debug, g);
     }
-    void endTurn(const GameState &g) override
+    void startPlayerTurn(const GameState &g) override
     {
-        PYBIND11_OVERRIDE_PURE(void, BaseLog, endTurn, g);
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, startPlayerTurn, g);
+    }
+    void endPlayerTurn(const GameState &g) override
+    {
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, endPlayerTurn, g);
     }
     void startgame(const GameState &g) override
     {
@@ -241,7 +245,8 @@ void bind_log(pybind11::object &m)
         .def("enemyKill", &BaseLog::enemyKill)
         .def("state", &BaseLog::state)
         .def("debug", &BaseLog::debug)
-        .def("endTurn", &BaseLog::endTurn)
+        .def("startPlayerTurn", &BaseLog::startPlayerTurn)
+        .def("endPlayerTurn", &BaseLog::endPlayerTurn)
         .def("startgame", &BaseLog::startgame)
         .def("endgame", &BaseLog::endgame)
         .def("postgame", &BaseLog::postgame);

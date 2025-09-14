@@ -7,8 +7,10 @@ __all__ = ("JSONBaseLog", "JSONLog", "RegiEncoder")
 def dump_game(game):
     result = dict()
     result["num_players"] = game.num_players
+    result["active_player_id"] = None
     result["active_player"] = None
     if game.active_player >= 0 and game.active_player < len(game.players):
+        result["active_player_id"] = game.active_player
         result["active_player"] = dump_player(game.players[game.active_player])
     result["hand_size"] = game.hand_size
     result["players"] = [dump_player_limited(player) for player in game.players]
@@ -162,13 +164,16 @@ class JSONBaseLog(BaseLog):
     ####
 
     def state(self, game):
-        self.log({"event": "TURNSTART", "game": dump_game(game)})
+        self.log({"event": "STATE", "game": dump_game(game)})
 
     def debug(self, game):
         self.log({"event": "DEBUG", "game": dump_debug(game)})
 
-    def endTurn(self, game):
-        self.log({"event": "TURNEND", "game": dump_game(game)})
+    def startPlayerTurn(self, game):
+        self.log({"event": "TURNSTART", "game": dump_debug(game)})
+
+    def endPlayerTurn(self, game):
+        self.log({"event": "TURNEND", "game": dump_debug(game)})
 
 
 class JSONLog(JSONBaseLog):

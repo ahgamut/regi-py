@@ -104,7 +104,13 @@ namespace regi
         std::cout << "\n";
     }
 
-    void ConsoleLog::endTurn(const GameState &g)
+    void ConsoleLog::startPlayerTurn(const GameState &g)
+    {
+        (void)g;
+        std::cout << "\n\n";
+    }
+
+    void ConsoleLog::endPlayerTurn(const GameState &g)
     {
         (void)g;
         std::cout << "\n\n";

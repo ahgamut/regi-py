@@ -203,7 +203,6 @@ namespace regi
                 if (!gameRunning()) break;
             }
             currentRound += 1;
-            log.endTurn(*this);
         }
         status = GameStatus::ENDED;
         postGameResult();
@@ -211,6 +210,7 @@ namespace regi
 
     void GameState::oneTurn(Player &player)
     {
+        log.startPlayerTurn(*this);
         if (!player.alive)
         {
             gameOver(PLAYER_DEAD);
@@ -238,5 +238,6 @@ namespace regi
             return;
         }
         defensePhase(player, enemyPile.front());
+        log.endPlayerTurn(*this);
     }
 } /* namespace regi */

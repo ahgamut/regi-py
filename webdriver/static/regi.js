@@ -234,7 +234,7 @@ function updateBoard(game) {
     let g = Alpine.store('gamestate');
     let enemy_view = document.getElementById('enemy-view');
     let game_view = document.getElementById('game-view');
-    // console.log(game);
+    console.log(game);
     game_view.replaceChildren();
     game_view.appendChild(makeContextInfo(game));
     game_view.appendChild(makeOtherPlayerInfo(game));
@@ -349,15 +349,23 @@ function processLog(data) {
             break;
         case 'TURNSTART':
             g.statusz = "RUNNING";
-            logMessage("Start of Round");
+            if (data.active_player_id === g.playerid) {
+                updateCards(data.game[g.playerid]);
+            }
             break;
         case 'TURNEND':
             g.statusz = "RUNNING";
-            logMessage("End of Round");
+            if (data.active_player_id === g.playerid) {
+                updateCards(data.game[g.playerid]);
+            }
             break;
         case 'FAILBLOCK':
             logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage}`, 'is-danger');
             logMessage(`Player ${data.player.id} can block at most ${data.maxblock}!`, 'is-danger');
+            break;
+        case 'STATE':
+        case 'DEBUG':
+            // can I send something here?
             break;
         // default:
             // console.log(data.event);
