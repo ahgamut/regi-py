@@ -81,6 +81,7 @@ void bind_cards(pybind11::object &m)
         .def(
             "__eq__", [](const Card &c1, const Card &c2) { return c1 == c2; },
             py::is_operator())
+        .def("__hash__", [](const Card &c) { return std::hash<std::string>{}(stringify<Card>(c)); })
         .def("__repr__", &stringify<Card>)
         .def("__str__", &stringify<Card>);
 
@@ -290,6 +291,9 @@ void bind_gamestate(pybind11::object &m)
                  g.setup();
                  return g.status;
              })
+        .def("get_current_block", [](GameState &g, Enemy &e) { return g.calcBlock(e); })
+        .def("get_combo_damage", &GameState::calcDamageOfCombo)
+        .def("get_combo_block", &GameState::calcBlockOfCombo)
         .def("start_loop", &GameState::startLoop);
 }
 

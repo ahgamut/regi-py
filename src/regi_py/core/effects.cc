@@ -65,6 +65,27 @@ namespace regi
     }
 
     /* defense */
+    i32 GameState::calcBlockOfCombo(Enemy &enemy, Combo &curcombo)
+    {
+        u32 epow = getPower(enemy) & SPADES_BLOCK;
+        for (auto &combo : usedPile)
+        {
+            if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
+        }
+        if (epow != 0)
+        {
+            /* STAB: enemy is a spade, and combo does not nerf */
+            return 0;
+        }
+
+        i32 blk = 0;
+        if ((curcombo.getPowers() & SPADES_BLOCK) != 0)
+        {
+            blk += curcombo.getBaseDamage();
+        }
+        return blk;
+    }
+
     i32 GameState::calcBlock(Enemy &enemy)
     {
         u32 epow = getPower(enemy) & SPADES_BLOCK;
@@ -109,7 +130,7 @@ namespace regi
 
     /* attack */
 
-    i32 GameState::calcDamage(Enemy &enemy)
+    i32 GameState::calcDamageOfCombo(Enemy &enemy, Combo &curcombo)
     {
         u32 epow = getPower(enemy) & CLUBS_DOUBLE;
         for (auto &combo : usedPile)
@@ -118,17 +139,22 @@ namespace regi
         }
 
         i32 dmg = 0;
-        Combo curcombo = usedPile.back();
+        dmg += curcombo.getBaseDamage();
+        bool dbl = ((curcombo.getPowers() & CLUBS_DOUBLE) & (~epow)) != 0;
+        if (dbl) { dmg += curcombo.getBaseDamage(); }
+        return dmg;
+    }
+
+    i32 GameState::calcDamage(Enemy &enemy)
+    {
+        Combo &curcombo = usedPile.back();
         if (curcombo.parts.size() == 0)
         {
             // yielding
             pastYieldsInARow += 1;
         }
         else { pastYieldsInARow = 0; }
-        dmg += curcombo.getBaseDamage();
-        bool dbl = ((curcombo.getPowers() & CLUBS_DOUBLE) & (~epow)) != 0;
-        if (dbl) { dmg += curcombo.getBaseDamage(); }
-        return dmg;
+        return calcDamageOfCombo(enemy, curcombo);
     }
 
     void GameState::preAttackEffects(Player &player, Enemy &enemy)

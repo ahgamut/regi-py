@@ -74,11 +74,13 @@ namespace regi
         void refreshDiscards(int);
 
         void selectAttack(Player &, bool);
+        i32 calcDamageOfCombo(Enemy &, Combo &);
         i32 calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
         void preAttackEffects(Player &, Enemy &);
         i32 enemyDead();
 
+        i32 calcBlockOfCombo(Enemy &, Combo &);
         i32 calcBlock(Enemy &);
         void selectDefense(Player &, int);
         void defensePhase(Player &, Enemy &);
