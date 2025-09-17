@@ -37,7 +37,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py.strats import BaseStrategy, DamageStrategy
+from regi_py.strats import BaseStrategy, STRATEGY_MAP
 from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
 
 
@@ -235,10 +235,14 @@ class Context:
         self.game = GameState(self.playerlog)
         self.n_players = 1
         self.strats = []
+        self.bots = []
         self.userids = []
         self.ALT_STARTED = False
         self.FUG_RESPONSE = None
         self.GLOB_THREAD = None
+
+    def load_bots(self, bots):
+        self.bots = bots
 
     def load_game(self):
         # assert len(self.userids) == self.n_players
@@ -246,9 +250,14 @@ class Context:
         for i in range(self.n_players):
             self.game.add_player(self.strats[i])
 
-        self.strats.append(DamageStrategy())
-        self.game.add_player(self.strats[-1])
+        for b in self.bots:
+            strat = STRATEGY_MAP[b]()
+            self.strats.append(strat)
+            self.game.add_player(self.strats[-1])
 
+        print("starting with", [x.__strat_name__ for x in self.strats])
+        assert len(self.strats) >= 2
+        assert len(self.strats) <= 4
         self.game.initialize()
         self.game.start_loop()
 
@@ -367,9 +376,31 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="host for uvicorn server")
     parser.add_argument("--port", default=8888, help="port for uvicorn server")
     parser.add_argument(
-        "-n", "--num-players", type=int, default=2, help="number of players"
+        "-n", "--num-players", type=int, default=1, help="number of players"
+    )
+    parser.add_argument(
+        "-b",
+        "--add-bot",
+        dest="bots",
+        action="append",
+        default=[],
+        help="bot options: " + ",".join(STRATEGY_MAP),
     )
     d = parser.parse_args()
+    CTX.bots = d.bots
+
+    total_players = d.num_players + len(CTX.bots)
+
+    if total_players < 2:
+        print("ERROR: need to have at least 2 players, have only", total_players)
+        print("Use --add-bot to add a bot\n\n")
+        parser.print_help()
+        sys.exit(1)
+    if total_players > 4:
+        print("ERROR can't have more than 4 players!\n\n")
+        parser.print_help()
+        sys.exit(1)
+    #
     print(
         f"\n\n\nTemporary files ignored\n",
         f"Go to http://{d.host}:{d.port} on your browser to view webserver\n\n\n",
@@ -377,7 +408,7 @@ def main() -> None:
     )
     #
     uvicorn.run(
-        "driver:app",
+        "__main__:app",
         host=d.host,
         port=int(d.port),
         log_level="info",
