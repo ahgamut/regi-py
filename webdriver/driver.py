@@ -173,6 +173,9 @@ class WebPlayerLog(JSONBaseLog):
         await manager.broadcast_dict(result)
 
     def log(self, obj):
+        if obj.get("event", "") in ["STARTGAME", "ENDGAME", "POSTGAME"]:
+            for p in obj["game"]["players"]:
+                p["strategy"] = CTX.strats[p["id"]].__strat_name__
         with self.portal_provider as portal:
             portal.call(WebPlayerLog.log_actual, self.manager, obj)
         self.count += 1
