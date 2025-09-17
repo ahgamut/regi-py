@@ -26,6 +26,14 @@ each player randomly selects a valid move to play.
 python driver.py
 ```
 
+To use custom strategies available in the package, specify them with
+`--add-bot`:
+
+```sh
+python driver.py --help # view options for bots
+python driver.py --add-bot damage --add-bot preserve
+```
+
 ## Playing with a bot
 
 Run `webdriver/driver.py` to play a 2-player game with a bot that picks random

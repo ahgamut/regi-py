@@ -2,19 +2,20 @@ import argparse
 
 #
 from regi_py import JSONLog, CXXConsoleLog, GameState
-from regi_py.strats import DummyStrategy
+from regi_py.strats import STRATEGY_MAP
 
 
-def basic_game(n_players=2, log=None) -> GameState:
+def basic_game(strats, log=None) -> GameState:
+    n_players = len(strats)
     assert n_players in [2, 3, 4], "only 2, 3, or 4 players"
+    print("starting game with bots using", strats)
 
-    strat = DummyStrategy()
     if log is None:
         log = CXXConsoleLog()
     game = GameState(log)
 
     for i in range(n_players):
-        game.add_player(strat)
+        game.add_player(STRATEGY_MAP[strats[i]]())
     game.initialize()
     return game
 
@@ -22,7 +23,12 @@ def basic_game(n_players=2, log=None) -> GameState:
 def main():
     parser = argparse.ArgumentParser("basic-regi")
     parser.add_argument(
-        "-n", "--num-players", default=2, type=int, help="number of players"
+        "-b",
+        "--add-bot",
+        dest="bots",
+        action="append",
+        default=[],
+        help="bot options: " + ",".join(STRATEGY_MAP),
     )
     parser.add_argument("-o", "--output-json", default=None, help="Log Output to JSON")
     d = parser.parse_args()
@@ -32,7 +38,10 @@ def main():
     else:
         log = CXXConsoleLog()
 
-    game = basic_game(d.num_players, log=log)
+    while len(d.bots) < 2:
+        d.bots.append("dummy")
+
+    game = basic_game(d.bots, log=log)
     game.start_loop()
 
 
