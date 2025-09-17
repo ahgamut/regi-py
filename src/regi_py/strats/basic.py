@@ -1,8 +1,10 @@
-from regi_py.core import *
+from regi_py.core import BaseStrategy
 import random
 
 
 class DummyStrategy(BaseStrategy):
+    __strat_name__ = "dummy"
+
     def setup(self, player, game):
         return 0
 
@@ -17,17 +19,3 @@ class DummyStrategy(BaseStrategy):
             return -1
         print("available defenses: ", combos)
         return random.randint(0, len(combos) - 1)
-
-
-def start_game(n_players=2, log=None) -> GameState:
-    assert n_players in [2, 3, 4], "only 2, 3, or 4 players"
-
-    strat = DummyStrategy()
-    if log is None:
-        log = CXXConsoleLog()
-    game = GameState(log)
-
-    for i in range(n_players):
-        game.add_player(strat)
-    game.initialize()
-    return game

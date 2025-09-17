@@ -145,12 +145,24 @@ void bind_strat(pybind11::object &m)
     py::class_<RandomStrategy, PyRandomStrategy, py::smart_holder>(m, "RandomStrategy",
                                                                    base)
         .def(py::init<>())
+        .def_property_readonly_static("__strat_name__",
+                                      [](py::object self)
+                                      {
+                                          (void)self;
+                                          return "random";
+                                      })
         .def("setup", &RandomStrategy::setup)
         .def("getAttackIndex", &RandomStrategy::getAttackIndex)
         .def("getDefenseIndex", &RandomStrategy::getDefenseIndex);
     py::class_<DamageStrategy, PyDamageStrategy, py::smart_holder>(m, "DamageStrategy",
                                                                    base)
         .def(py::init<>())
+        .def_property_readonly_static("__strat_name__",
+                                      [](py::object self)
+                                      {
+                                          (void)self;
+                                          return "damage";
+                                      })
         .def("setup", &DamageStrategy::setup)
         .def("getAttackIndex", &DamageStrategy::getAttackIndex)
         .def("getDefenseIndex", &DamageStrategy::getDefenseIndex);

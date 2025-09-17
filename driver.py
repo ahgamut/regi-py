@@ -1,7 +1,22 @@
 import argparse
 
 #
-from regi_py import basic_game, JSONLog, CXXConsoleLog
+from regi_py import JSONLog, CXXConsoleLog, GameState
+from regi_py.strats import DummyStrategy
+
+
+def basic_game(n_players=2, log=None) -> GameState:
+    assert n_players in [2, 3, 4], "only 2, 3, or 4 players"
+
+    strat = DummyStrategy()
+    if log is None:
+        log = CXXConsoleLog()
+    game = GameState(log)
+
+    for i in range(n_players):
+        game.add_player(strat)
+    game.initialize()
+    return game
 
 
 def main():

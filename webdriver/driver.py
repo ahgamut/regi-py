@@ -37,8 +37,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py import BaseStrategy, DamageStrategy, GameStatus
-from regi_py import RegiEncoder, JSONBaseLog, GameState
+from regi_py.strats import BaseStrategy, DamageStrategy
+from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
 
 
 ###
@@ -73,6 +73,8 @@ class ConnectionManager:
 
 
 class WebPlayerStrategy(BaseStrategy):
+    __strat_name__ = "player-webui"
+
     def __init__(self, userid, websocket):
         super().__init__()
         self.userid = userid
