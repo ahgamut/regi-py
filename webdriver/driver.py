@@ -11,6 +11,7 @@ import traceback
 from logging import FileHandler
 from typing import Optional
 from uuid import uuid4
+import contextlib
 
 #
 import anyio
@@ -43,8 +44,10 @@ from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
 
 ###
 class ConnectionManager:
-    def __init__(self):
+    def __init__(self, num_players, num_bots):
         self.active_connections: list[WebSocket] = []
+        self.num_players = num_players
+        self.num_bots = num_bots
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -86,7 +89,7 @@ class WebPlayerStrategy(BaseStrategy):
     @staticmethod
     async def comms_twoway(self, websocket, obj):
         print("sending", obj)
-        await CTX.manager.send_dict(obj, websocket)
+        await app.state.CTX.manager.send_dict(obj, websocket)
 
         while self.response is None:
             print(self.userid, "waiting", obj["type"])
@@ -175,7 +178,7 @@ class WebPlayerLog(JSONBaseLog):
     def log(self, obj):
         if obj.get("event", "") in ["STARTGAME", "ENDGAME", "POSTGAME"]:
             for p in obj["game"]["players"]:
-                p["strategy"] = CTX.strats[p["id"]].__strat_name__
+                p["strategy"] = app.state.CTX.strats[p["id"]].__strat_name__
         with self.portal_provider as portal:
             portal.call(WebPlayerLog.log_actual, self.manager, obj)
         self.count += 1
@@ -229,25 +232,22 @@ async def catchall_exception_handler(request: Request, exc: Exception):
 
 
 class Context:
-    def __init__(self):
-        self.manager = ConnectionManager()
+    def __init__(self, num_players, bots):
+        self.manager = ConnectionManager(num_players, len(bots))
         self.playerlog = WebPlayerLog(self.manager)
         self.game = GameState(self.playerlog)
-        self.n_players = 1
+        self.num_players = num_players
         self.strats = []
-        self.bots = []
+        self.bots = bots
         self.userids = []
         self.ALT_STARTED = False
         self.FUG_RESPONSE = None
         self.GLOB_THREAD = None
 
-    def load_bots(self, bots):
-        self.bots = bots
-
     def load_game(self):
-        # assert len(self.userids) == self.n_players
-        assert CTX.ALT_STARTED
-        for i in range(self.n_players):
+        # assert len(self.userids) == self.num_players
+        assert app.state.CTX.ALT_STARTED
+        for i in range(self.num_players):
             self.game.add_player(self.strats[i])
 
         for b in self.bots:
@@ -259,6 +259,11 @@ class Context:
         assert len(self.strats) >= 2
         assert len(self.strats) <= 4
         self.game.initialize()
+        t = 0
+        while t != self.num_players:
+            time.sleep(1)
+            t = sum(p.ready for p in self.strats[:self.num_players])
+            print(t, "players ready")
         self.game.start_loop()
 
     def end_game(self):
@@ -271,15 +276,13 @@ class Context:
         self.game = GameState(self.playerlog)
 
 
-CTX = Context()
-
-
 def game_loop():
+    CTX = app.state.CTX
     CTX.ALT_STARTED = True
     while True:
-        while CTX.n_players > len(CTX.strats):
+        while CTX.num_players > len(CTX.strats):
             # print("hello")
-            # print(CTX.n_players, CTX.strats)
+            # print(CTX.num_players, CTX.strats)
             time.sleep(1)
 
         print("OMG! Game loop can start???")
@@ -292,13 +295,13 @@ def game_loop():
 
 
 def player_join(userid, websocket):
-    if len(CTX.strats) == len(CTX.userids):
+    if len(app.state.CTX.strats) == len(app.state.CTX.userids):
         return
     strat = WebPlayerStrategy(
         userid,
         websocket,
     )
-    CTX.strats.append(strat)
+    app.state.CTX.strats.append(strat)
 
 
 ###
@@ -309,10 +312,14 @@ def player_join(userid, websocket):
 def enter_custom(request: Request):
     client = request.client
     userid = str(uuid4())
-    CTX.userids.append(userid)
+    app.state.CTX.userids.append(userid)
     response = templates.TemplateResponse(
         "pages/index.html",
-        {"request": request, "userid": userid, "playerid": CTX.userids.index(userid)},
+        {
+            "request": request,
+            "userid": userid,
+            "playerid": app.state.CTX.userids.index(userid),
+        },
     )
     return response
 
@@ -323,6 +330,7 @@ async def get_favicon():
 
 
 async def process_data(data, websocket):
+    CTX = app.state.CTX
     #
     if not CTX.ALT_STARTED:
         CTX.GLOB_THREAD = threading.Thread(group=None, target=game_loop, args=[])
@@ -356,18 +364,37 @@ async def process_data(data, websocket):
 @app.websocket("/ws/{userid}")
 async def websocket_endpoint(websocket: WebSocket, userid: str):
     print("got message from ", userid)
-    await CTX.manager.connect(websocket)
+    await app.state.CTX.manager.connect(websocket)
     try:
         while True:
             raw = await websocket.receive_text()
             await process_data(raw, websocket)
     except WebSocketDisconnect:
         # FUG
-        await CTX.manager.disconnect(websocket)
-        await CTX.manager.broadcast_string(f"Client {userid} left the chat")
+        await app.state.CTX.manager.disconnect(websocket)
+        await app.state.CTX.manager.broadcast_string(f"Client {userid} left the chat")
 
 
-def main() -> None:
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    args = load_args()
+    make_CTX(app, args)
+
+
+def make_CTX(app, d):
+    if app.state.CTX is not None:
+        return
+    #
+    app.state.CTX = Context(d.num_players, d.bots)
+    #
+    print(
+        f"\n\n\nTemporary files ignored\n",
+        f"Go to http://{d.host}:{d.port} on your browser to view webserver\n\n\n",
+        sep="",
+    )
+
+
+def load_args():
     parser = argparse.ArgumentParser(
         prog="regi-webserver",
         description="FastAPI websockets server for regi-py",
@@ -387,9 +414,7 @@ def main() -> None:
         help="bot options: " + ",".join(STRATEGY_MAP),
     )
     d = parser.parse_args()
-    CTX.bots = d.bots
-
-    total_players = d.num_players + len(CTX.bots)
+    total_players = d.num_players + len(d.bots)
 
     if total_players < 2:
         print("ERROR: need to have at least 2 players, have only", total_players)
@@ -400,13 +425,14 @@ def main() -> None:
         print("ERROR can't have more than 4 players!\n\n")
         parser.print_help()
         sys.exit(1)
-    #
-    print(
-        f"\n\n\nTemporary files ignored\n",
-        f"Go to http://{d.host}:{d.port} on your browser to view webserver\n\n\n",
-        sep="",
-    )
-    #
+    return d
+
+
+def main() -> None:
+    app.state.CTX = None
+    d = load_args()
+    make_CTX(app, d)
+
     uvicorn.run(
         "__main__:app",
         host=d.host,

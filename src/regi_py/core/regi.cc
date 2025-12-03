@@ -133,7 +133,6 @@ namespace regi
         initDraw();
         initHandSize();
         initPlayers();
-        status = GameStatus::RUNNING;
         log.startgame(*this);
     }
 
@@ -148,6 +147,7 @@ namespace regi
                 log.endgame(INVALID_START, *this);
             }
         }
+        status = GameStatus::RUNNING;
     }
 
     i32 GameState::addPlayer(Strategy &s)

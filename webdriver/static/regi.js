@@ -315,8 +315,10 @@ function processLog(data) {
     }
     switch (data.event) {
         case 'STARTGAME':
-            g.statusz = "RUNNING";
-            logMessage("Game has started", 'is-primary');
+            if (data.game != null && data.game.active_player_id !== null) {
+                g.statusz = "RUNNING";
+                logMessage("Game has started", 'is-primary');
+            }
             break;
         case 'ATTACK':
             let combo1 = data.combo.map(x => x.value);
@@ -349,14 +351,27 @@ function processLog(data) {
             break;
         case 'TURNSTART':
             g.statusz = "RUNNING";
-            if (data.active_player_id === g.playerid) {
-                updateCards(data.game[g.playerid]);
+            if (data.game.active_player_id !== null) {
+                updateCards(data.game.players[g.playerid]);
+                if (data.game.active_player_id != g.playerid) {
+                    let submitter = document.getElementById('main-button');
+                    let yielder = document.getElementById('side-button');
+                    setButtonActivity(submitter, false);
+                    setButtonActivity(yielder, false);
+                    logMessage(`Wait for Player ${data.game.active_player_id} to play..`);
+                }
             }
             break;
         case 'TURNEND':
             g.statusz = "RUNNING";
-            if (data.active_player_id === g.playerid) {
-                updateCards(data.game[g.playerid]);
+            if (data.game.active_player_id !== null) {
+                updateCards(data.game.players[g.playerid]);
+                if (data.game.active_player_id != g.playerid) {
+                    let submitter = document.getElementById('main-button');
+                    let yielder = document.getElementById('side-button');
+                    setButtonActivity(submitter, false);
+                    setButtonActivity(yielder, false);
+                }
             }
             break;
         case 'FAILBLOCK':
@@ -391,11 +406,11 @@ function addNotification(content, subtype) {
     res.appendChild(document.createTextNode(content));
 
     tray.appendChild(res);
-    let removeDelay = tray.children.length * 1000 + 2 * duration + 2000;
+    let removeDelay = tray.children.length * 1000 + 2 * duration + 1400;
     setTimeout(() => { 
         res.style.animation = `fadeOut 2000ms ease-in 1 forwards`;
     }, removeDelay);
-    setTimeout(() => { res.remove(); }, removeDelay + 2100);
+    setTimeout(() => { res.remove(); }, removeDelay + 1400);
 }
 
 function logMessage(content, subtype=null) {
