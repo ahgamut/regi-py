@@ -55,9 +55,6 @@ function reset_game() {
     document.getElementById('messages').replaceChildren();
     let message = {userid: g.userid, type:'player-reset', choice:0};
     send_ws(message);
-    g.statusz = "LOADING";
-    g.turnMessage = "Press the button to connect to server.";
-    g.history = [];
 }
 
 function download_json() {

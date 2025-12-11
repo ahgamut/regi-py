@@ -247,13 +247,19 @@ class Context:
     def load_game(self):
         # assert len(self.userids) == self.num_players
         assert app.state.CTX.ALT_STARTED
-        for i in range(self.num_players):
-            self.game.add_player(self.strats[i])
+        if len(self.strats) != self.num_players + len(self.bots):
+            # print("this is non-reset game")
+            for i in range(self.num_players):
+                self.game.add_player(self.strats[i])
 
-        for b in self.bots:
-            strat = STRATEGY_MAP[b]()
-            self.strats.append(strat)
-            self.game.add_player(self.strats[-1])
+            for b in self.bots:
+                strat = STRATEGY_MAP[b]()
+                self.strats.append(strat)
+                self.game.add_player(self.strats[-1])
+        else:
+            # print("we already have strats, in a reset game")
+            for s in self.strats:
+                self.game.add_player(s)
 
         print("starting with", [x.__strat_name__ for x in self.strats])
         assert len(self.strats) >= 2
@@ -270,7 +276,7 @@ class Context:
         assert self.game is not None
         del self.game
         self.game = None
-        self.strats.clear()
+        # self.strats.clear()
 
     def reset_game(self):
         self.game = GameState(self.playerlog)
@@ -281,18 +287,18 @@ def game_loop():
     CTX.ALT_STARTED = True
     while True:
         while CTX.num_players > len(CTX.strats):
-            # print("hello")
+            print("we are waiting for players")
             # print(CTX.num_players, CTX.strats)
             time.sleep(1)
 
-        print("OMG! Game loop can start???")
+        # print("OMG! Game loop can start???")
         CTX.load_game()
         CTX.end_game()
 
         # game should have ended
         while CTX.game is None:
+            # print("we have no game")
             time.sleep(1)
-
 
 def player_join(userid, websocket):
     if len(app.state.CTX.strats) == len(app.state.CTX.userids):
