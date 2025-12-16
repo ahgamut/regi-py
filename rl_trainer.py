@@ -57,11 +57,14 @@ def main():
     )
     d = parser.parse_args()
 
-    log = MemoryLog(N=100)
+    log = MemoryLog(N=1)
     model = RL1Model()
     while len(log.memories) <= log.N:
         print(len(log.memories), "memories")
         basic_game(d.bots, log=log, model=model)
+
+    batch = model.tensorify(log.memories, 2)
+    print(batch)
 
 if __name__ == "__main__":
     main()

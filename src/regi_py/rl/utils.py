@@ -8,16 +8,24 @@ class Numberizer:
     MAX_CARD_STRENGTH = 20.0
     MAX_RAW_DAMAGE = 40.0
     MAX_ENEMY_HP = 40.0
-    MAX_ENEMIES = 12.0
-    MAX_HAND_SIZE = 8
     MAX_DECK_SIZE = 52.0
     MAX_COMBO_SIZE = 4.0
+    #
+    MAX_HAND_SIZE = 8
+    MAX_ATTACK_SIZE = 4
+    ENEMY_INFO_SIZE = 5
+    BLOCK_INFO_SIZE = 6
+    AUXDA_INFO_SIZE = 6
+    CARD_INFO_SIZE = 4
+    OTHERP_INFO_SIZE = 3
+    MAX_ENEMIES = 12
+    MAX_PLAYERS = 4
 
     def __init__(self):
         pass
 
     def numberize_card(self, card):
-        res = np.zeros(4, dtype=np.float32)
+        res = np.zeros(self.CARD_INFO_SIZE, dtype=np.float32)
         res[0] = 1.0  # indicates valid card
         res[1] = card.suit.value / self.MAX_SUIT_VALUE
         res[2] = card.entry.value / self.MAX_ENTRY_VALUE
@@ -25,7 +33,7 @@ class Numberizer:
         return res
 
     def numberize_enemy(self, enemy):
-        res = np.zeros(5, dtype=np.float32)
+        res = np.zeros(self.ENEMY_INFO_SIZE, dtype=np.float32)
         res[0] = enemy.hp > 0  # indicates alive
         res[1] = enemy.suit.value / self.MAX_SUIT_VALUE
         res[2] = enemy.entry.value / self.MAX_ENTRY_VALUE
@@ -35,24 +43,22 @@ class Numberizer:
 
     def numberize_attack(self, combo):
         # combo can at most be 4 cards(2, 2, 2, 2)
-        res = np.zeros((4, 4), dtype=np.float32)
+        res = np.zeros((self.MAX_ATTACK_SIZE, self.CARD_INFO_SIZE), dtype=np.float32)
         for i, part in enumerate(combo.parts):
             res[i, :] = self.numberize_card(part)
         return res
 
     def numberize_other_player(self, player):
-        res = np.zeros(3, dtype=np.float32)
-        res[0] = player.alive
+        res = np.zeros(self.OTHERP_INFO_SIZE, dtype=np.float32)
+        res[0] = 1 if player.alive else -1
         res[1] = 0  # how far is this player from current state ?
         res[2] = len(player.cards) / self.MAX_HAND_SIZE
         return res
 
     def numberize_other_players(self, player, game):
-        res = np.zeros((4, 3), dtype=np.float32)
+        res = np.zeros((self.MAX_PLAYERS, self.OTHERP_INFO_SIZE), dtype=np.float32)
         j = 0
         for op in game.players:
-            if op.id == player.id:
-                continue
             res[j, :] = self.numberize_other_player(op)
             d = op.id - player.id
             while d < 0:
@@ -62,7 +68,7 @@ class Numberizer:
         return res
 
     def numberize_current_enemy(self, game):
-        res = np.zeros(6, dtype=np.float32)
+        res = np.zeros(self.BLOCK_INFO_SIZE, dtype=np.float32)
         e = None
         if len(game.enemy_pile) > 0:
             e = game.enemy_pile[0]
@@ -71,9 +77,9 @@ class Numberizer:
         return e, res
 
     def numberize_remaining_enemies(self, game):
-        res = np.zeros(12, dtype=np.float32)
+        res = np.zeros(self.MAX_ENEMIES, dtype=np.float32)
         for i, e in enumerate(game.enemy_pile):
-            res[i] = max(e.hp, 0)
+            res[i] = max(e.hp, 0) / self.MAX_ENEMY_HP
         return np.sum(res)
 
     def numberize_used_pile(self, game):
@@ -84,7 +90,7 @@ class Numberizer:
 
     def numberize_aux_data(self, player, game, attacking=False):
         # auxiliary game info that may be useful?
-        res = np.zeros(6, dtype=np.float32)
+        res = np.zeros(self.AUXDA_INFO_SIZE, dtype=np.float32)
         res[0] = attacking
         res[1] = len(game.enemy_pile) / self.MAX_ENEMIES
         res[2] = len(game.draw_pile) / self.MAX_DECK_SIZE
@@ -121,7 +127,7 @@ class Numberizer:
         return f_combo_inds, f_cblks
 
     def numberize_hand(self, player):
-        res = np.zeros((self.MAX_HAND_SIZE, 4), dtype=np.float32)
+        res = np.zeros((self.MAX_HAND_SIZE, self.CARD_INFO_SIZE), dtype=np.float32)
         for i, c in enumerate(player.cards):
             res[i, :] = self.numberize_card(c)
         return res
