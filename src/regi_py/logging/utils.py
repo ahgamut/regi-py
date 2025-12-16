@@ -9,6 +9,7 @@ def dump_game(game):
     if game.active_player >= 0 and game.active_player < len(game.players):
         result["active_player_id"] = game.active_player
         result["active_player"] = dump_player(game.players[game.active_player])
+    result["phase_count"] = game.phase_count
     result["hand_size"] = game.hand_size
     result["players"] = [dump_player_limited(player) for player in game.players]
     result["past_yields"] = game.past_yields
