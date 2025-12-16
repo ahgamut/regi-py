@@ -38,7 +38,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py.strats import BaseStrategy, STRATEGY_MAP
+from regi_py.strats import BaseStrategy
+from regi.py import STRATEGY_MAP
 from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
 
 
