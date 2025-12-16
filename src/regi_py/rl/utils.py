@@ -70,6 +70,12 @@ class Numberizer:
             res[1:] = self.numberize_enemy(e)
         return e, res
 
+    def numberize_remaining_enemies(self, game):
+        res = np.zeros(12, dtype=np.float32)
+        for i, e in enumerate(game.enemy_pile):
+            res[i] = max(e.hp, 0)
+        return np.sum(res)
+
     def numberize_used_pile(self, game):
         res = np.zeros((len(game.used_combos), 4, 4))
         for i, c in enumerate(game.used_combos):
@@ -141,8 +147,10 @@ class Numberizer:
         #
         f_auxda = self.numberize_aux_data(player, game, attacking)
         #
+        f_remy = self.numberize_remaining_enemies(game)
+        #
         state = {
-            "status" : str(game.status.name),
+            "status": str(game.status.name),
             "phase": game.phase_count,
             "player": player.id,
             "attacking": attacking,
@@ -153,6 +161,7 @@ class Numberizer:
             "values": f_values,
             "usedp": f_usedp,
             "auxda": f_auxda,
+            "remaining": f_remy,
         }
         return state
 
@@ -194,8 +203,8 @@ class MemoryLog(BaseLog):
         pass
 
     def postgame(self, game):
-        for p in game.players:
-            self.numberizer.numberize_state(combos, p, game, False)
+        active_player = max(0, game.active_player)
+        self.numberizer.numberize_state([], game.players[active_player], game, True)
 
     ####
 
