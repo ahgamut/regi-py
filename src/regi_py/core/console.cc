@@ -64,7 +64,7 @@ namespace regi
 
     void ConsoleLog::state(const GameState &g)
     {
-        std::cout << "Round: " << g.currentRound << "\n";
+        std::cout << "Phase #" << g.phaseCount << "\n";
         for (i32 i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
@@ -84,7 +84,7 @@ namespace regi
 
     void ConsoleLog::debug(const GameState &g)
     {
-        std::cout << "Round: " << g.currentRound << "\n";
+        std::cout << "Phase #" << g.phaseCount << "\n";
         for (i32 i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
@@ -166,7 +166,7 @@ namespace regi
             std::cout << "Someone didn't make it\n";
         }
 
-        std::cout << "Game lasted " << g.currentRound << " rounds\n";
+        std::cout << "Game lasted " << g.phaseCount << " phases\n";
         if (g.enemyPile.size() != 0)
         {
             std::cout << "Died to " << g.enemyPile.front() << "\n";

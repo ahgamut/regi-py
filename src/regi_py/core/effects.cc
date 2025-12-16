@@ -112,6 +112,7 @@ namespace regi
 
     void GameState::defensePhase(Player &player, Enemy &enemy)
     {
+        phaseCount += 1;
         i32 block = calcBlock(enemy);
         i32 damage = enemy.strength() - block;
         if (damage <= 0) { return; }
@@ -201,6 +202,7 @@ namespace regi
 
     void GameState::attackPhase(Player &player, Enemy &enemy)
     {
+        phaseCount += 1;
         selectAttack(player, pastYieldsInARow < (totalPlayers() - 1));
         preAttackEffects(player, enemy);
         i32 damage = calcDamage(enemy);
@@ -228,7 +230,6 @@ namespace regi
                 oneTurn(players[activePlayerID]);
                 if (!gameRunning()) break;
             }
-            currentRound += 1;
         }
         status = GameStatus::ENDED;
         postGameResult();

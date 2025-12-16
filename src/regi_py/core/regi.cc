@@ -128,7 +128,7 @@ namespace regi
     void GameState::init()
     {
         pastYieldsInARow = 0;
-        currentRound = 0;
+        phaseCount = 0;
         initEnemy();
         initDraw();
         initHandSize();

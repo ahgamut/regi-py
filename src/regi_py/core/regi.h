@@ -40,7 +40,7 @@ namespace regi
        public:
         GameStatus status;
         i32 pastYieldsInARow;
-        i32 currentRound;
+        i32 phaseCount;
         std::vector<Player> players;
         std::vector<Card> drawPile;    /* cards that can be drawn */
         std::vector<Enemy> enemyPile;  /* enemies still left to KO */
