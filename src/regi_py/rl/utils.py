@@ -142,6 +142,7 @@ class Numberizer:
         f_auxda = self.numberize_aux_data(player, game, attacking)
         #
         state = {
+            "status" : str(game.status.name),
             "phase": game.phase_count,
             "player": player.id,
             "attacking": attacking,
@@ -156,8 +157,9 @@ class Numberizer:
         return state
 
 
-class MemoryCollector:
+class MemoryLog(BaseLog):
     def __init__(self, N=100):
+        super().__init__()
         self.N = N
         self.numberizer = Numberizer()
         self.memories = []
@@ -183,3 +185,48 @@ class MemoryCollector:
         cls.getAttackIndex = rec_getAttackIndex
         cls.getDefenseIndex = rec_getDefenseIndex
         return cls
+
+    ####
+    def startgame(self, game):
+        pass
+
+    def endgame(self, reason, game):
+        pass
+
+    def postgame(self, game):
+        for p in game.players:
+            self.numberizer.numberize_state(combos, p, game, False)
+
+    ####
+
+    def attack(self, player, enemy, combo, damage, game):
+        pass
+
+    def defend(self, player, combo, damage, game):
+        pass
+
+    def failBlock(self, player, damage, maxblock, game):
+        pass
+
+    def drawOne(self, player):
+        pass
+
+    def replenish(self, n_cards):
+        pass
+
+    def enemyKill(self, enemy, game):
+        pass
+
+    ####
+
+    def state(self, game):
+        pass
+
+    def debug(self, game):
+        pass
+
+    def startPlayerTurn(self, game):
+        pass
+
+    def endPlayerTurn(self, game):
+        pass
