@@ -11,11 +11,11 @@ class DummyStrategy(BaseStrategy):
     def getAttackIndex(self, combos, player, yield_allowed, game):
         if len(combos) == 0:
             return -1
-        print("available attacks: ", combos)
+        # print("available attacks: ", combos)
         return random.randint(0, len(combos) - 1)
 
     def getDefenseIndex(self, combos, player, damage, game):
         if len(combos) == 0:
             return -1
-        print("available defenses: ", combos)
+        # print("available defenses: ", combos)
         return random.randint(0, len(combos) - 1)
