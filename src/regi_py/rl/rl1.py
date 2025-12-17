@@ -89,20 +89,19 @@ class RL1Model(torch.nn.Module):
     def predict(self, state):
         num_options = state["values"].shape[0]
         if num_options == 0:
-            return torch.Tensor([0.0], device=self.device)
-        q_values = torch.zeros(num_options)
+            return torch.tensor([0.0]).to(self.device)
         s_common = self.tensorify([state])
-        option_tens = torch.tensor(
-            np.matmul(state["indices"], state["curphd"]), device=self.device
-        )
+        option_tens = np.zeros((num_options, 8, 4), dtype=np.float32)
+        for i in range(num_options):
+            option_tens[i, :] = np.matmul(
+                np.diag(state["indices"][i, :]), state["curphd"]
+            )
         value_tens = torch.tensor(state["values"], device=self.device)
 
-        # TODO: can this be batched without making N copies?
-        for i in range(num_options):
-            s_common["combos"][0] = option_tens[i, :]
-            s_common["values"][0] = value_tens[i]
-            q_values[i] = self.forward(s_common)
-        return q_values
+        s_common["combos"] = torch.tensor(option_tens).to(self.device)
+        s_common["values"] = value_tens.unsqueeze(1)
+        res = self.forward_part1(s_common, num_options)
+        return self.forward_part2(res, num_options)
 
     def tensorify(self, states0, batch_size=1):
         with torch.no_grad():
@@ -149,7 +148,7 @@ class RL1Model(torch.nn.Module):
             if option is not None:
                 t_values[i, :] = torch.tensor(s["values"][option])
                 t_combos[i, :] = torch.tensor(
-                    np.matmul(s["indices"][option], s["curphd"])
+                    np.matmul(np.diag(s["indices"][option, :]), s["curphd"])
                 )
             #
             usedp_sizes.append(s["usedp"].shape[0])
@@ -188,7 +187,9 @@ class RL1Strategy(BaseStrategy):
         self.backup = PreserveStrategy()
         if weights_path is not None:
             self.model.load_state_dict(
-                torch.load(weights_path, weights_only=True, map_location=self.model.device)
+                torch.load(
+                    weights_path, weights_only=True, map_location=self.model.device
+                )
             )
 
     def setup(self, player, game):
