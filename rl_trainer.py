@@ -34,15 +34,16 @@ def set_rewards(log, start, end, model):
     last_state = log.memories[end - 1]
     last_state["best_future"] = model.predict(last_state).max().item()
     global BEST_REMAIN
-    if last_state["remaining"] <= BEST_REMAIN:
-        BEST_REMAIN = last_state["remaining"]
-        print("new best!", BEST_REMAIN)
-        torch.save(model.state_dict(), "./best_model.pt")
+    if last_state["remaining"] <= 1.1 * BEST_REMAIN:
+        if last_state["remaining"] <= BEST_REMAIN:
+            BEST_REMAIN = last_state["remaining"]
+            print("new best!", BEST_REMAIN)
+            torch.save(model.state_dict(), f"./weights/model_{BEST_REMAIN}.pt")
         last_state["reward"] = 500
         last_state["best_from_here"] = 500
-        last_state["best_future"] = 0
+        last_state["best_future"] = 500
     else:
-        last_state["reward"] = -last_state["remaining"]
+        last_state["reward"] = -base_rewards(last_state["remaining"])
         bonus = 0
         if last_state["remaining"] <= 160:
             bonus = 100
@@ -108,16 +109,25 @@ def main():
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
-    parser.add_argument("--weights-path", default="./best_model.pt", help="weights")
+    parser.add_argument("--weights-path", default="./weights/best_model.pt", help="weights")
     d = parser.parse_args()
 
     log = MemoryLog(N=d.memory_size)
-    model = RL1Model()
-    if os.path.isfile(d.weights_path):
-        model.load_state_dict(torch.load(d.weights_path, weights_only=True))
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters())
-    epsilon = 1.0
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+
+    with torch.device(device):
+        model = RL1Model()
+        model.device = device
+        if os.path.isfile(d.weights_path):
+            model.load_state_dict(
+                torch.load(d.weights_path, weights_only=True, map_location=device)
+            )
+        loss_fn = nn.MSELoss()
+        optimizer = torch.optim.Adam(model.parameters())
+    epsilon = 0.2
     gamma = 0.99
 
     for ep in range(d.num_episodes):

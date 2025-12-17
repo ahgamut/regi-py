@@ -168,6 +168,10 @@ class Numberizer:
             "usedp": f_usedp,
             "auxda": f_auxda,
             "remaining": f_remy,
+            "option": None,
+            "reward": 0,
+            "best_future": 0,
+            "best_from_here": 0,
         }
         return state
 

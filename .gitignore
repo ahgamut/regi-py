@@ -1,4 +1,6 @@
 
+*.pt
+weights
 *.json
 main
 # valgrind

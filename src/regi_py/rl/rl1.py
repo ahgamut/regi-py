@@ -3,6 +3,7 @@ from regi_py.rl.utils import *
 from regi_py.rl.subnets import LinearBlock, Conv1dBlock
 from regi_py.strats import PreserveStrategy
 import random
+import time
 
 #
 import numpy as np
@@ -14,6 +15,7 @@ from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 class RL1Model(torch.nn.Module):
     def __init__(self):
         super(RL1Model, self).__init__()
+        self.device = "cpu"
         self.m_enemy = LinearBlock([6, 8, 16, 16])
         self.m_remy = LinearBlock([12, 16, 16])
         self.m_values = LinearBlock([1, 8, 8, 16])
@@ -21,7 +23,9 @@ class RL1Model(torch.nn.Module):
         self.m_otherp = Conv1dBlock(channels=[4, 8, 8, 16], shapes=[2, 1, 1])
         self.m_combos = Conv1dBlock(channels=[8, 8, 16, 16], shapes=[2, 2, 1])
         self.m_curphd = Conv1dBlock(channels=[8, 8, 16, 16], shapes=[2, 2, 1])
-        self.m_usedp = nn.RNN(input_size=16, hidden_size=16, batch_first=True, num_layers=2)
+        self.m_usedp = nn.RNN(
+            input_size=16, hidden_size=16, batch_first=True, num_layers=2
+        )
         self.nets = {
             "curphd": self.m_curphd,
             "otherp": self.m_otherp,
@@ -33,55 +37,79 @@ class RL1Model(torch.nn.Module):
             "remaining": self.m_remy,
         }
 
-        self.bignet = Conv1dBlock(channels=[12, 16, 16, 16, 32, 32, 32], shapes=[1, 1, 4, 4, 2, 2])
-        self.make_q = nn.Sequential(nn.Linear(in_features=256, out_features=1), nn.ReLU())
+        self.bignet = Conv1dBlock(
+            channels=[12, 16, 16, 16, 32, 32, 32], shapes=[1, 1, 4, 4, 2, 2]
+        )
+        self.make_q = nn.Sequential(
+            nn.Linear(in_features=256, out_features=1), nn.ReLU()
+        )
+
+    def forward_part1(self, state, batch_size):
+        res = []
+        for k in self.nets.keys():
+            v0 = state[k]
+            if k == "usedp":
+                out, v1 = self.nets[k](v0)
+                v2 = v1.reshape(v1.shape[1], -1, 16)
+                # print(k, v1.shape, v2.shape)
+            else:
+                v1 = self.nets[k](v0)
+                v2 = v1.reshape(v1.shape[0], -1, 16)
+                # print(k, state[k].shape, v1.shape, v2.shape)
+            if v2.shape[0] != batch_size:
+                v3 = v2.expand(batch_size, *v2.shape[1:])
+            else:
+                v3 = v2
+            res.append(v3)
+        return res
+
+    def forward_part2(self, res, batch_size):
+        big = torch.cat(res, dim=1)
+        big2 = self.bignet(big).reshape(batch_size, -1)
+        q_values = self.make_q(big2)
+        return q_values
 
     def forward(self, state):
         batch_size = state["curphd"].shape[0]
         res = []
         for k in self.nets.keys():
+            v0 = state[k]
             if k == "usedp":
-                out, v1 = self.nets[k](state[k])
+                out, v1 = self.nets[k](v0)
                 v2 = v1.reshape(v1.shape[1], -1, 16)
                 # print(k, v1.shape, v2.shape)
             else:
-                v1 = self.nets[k](state[k])
+                v1 = self.nets[k](v0)
                 v2 = v1.reshape(v1.shape[0], -1, 16)
                 # print(k, state[k].shape, v1.shape, v2.shape)
             res.append(v2)
 
-        big = torch.cat(res, dim=1)
-        big2 = self.bignet(big).reshape(batch_size, -1)
-        q_values = self.make_q(big2)
-        # print("q_values", q_values.shape)
-        # print(state)
-        return q_values
+        return self.forward_part2(res, batch_size)
 
     def predict(self, state):
         num_options = state["values"].shape[0]
         if num_options == 0:
-            return torch.Tensor([0.0])
+            return torch.Tensor([0.0], device=self.device)
         q_values = torch.zeros(num_options)
+        s_common = self.tensorify([state])
+        option_tens = torch.tensor(
+            np.matmul(state["indices"], state["curphd"]), device=self.device
+        )
+        value_tens = torch.tensor(state["values"], device=self.device)
+
+        # TODO: can this be batched without making N copies?
         for i in range(num_options):
-            q_values[i] = self.rate_combo(state, i)[0]
+            s_common["combos"][0] = option_tens[i, :]
+            s_common["values"][0] = value_tens[i]
+            q_values[i] = self.forward(s_common)
         return q_values
 
-    def rate_combo(self, state, ind):
-        s2 = [dict(**state)]
-        s2[0]["option"] = ind
-        s2[0]["reward"] = state.get("reward", 0)
-        s2[0]["best_future"] = state.get("best_future", 0)
-        s2[0]["best_from_here"] = state.get("best_from_here", 0)
-        tens = self.tensorify(s2)
-        return self.forward(tens)
-
-    @classmethod
-    def tensorify(cls, states0, batch_size=1):
+    def tensorify(self, states0, batch_size=1):
         with torch.no_grad():
-            return cls._tensorify(states0, batch_size)
+            return self._tensorify(states0, batch_size, self.device)
 
     @classmethod
-    def _tensorify(cls, states0, batch_size=1):
+    def _tensorify(cls, states0, batch_size=1, device="cpu"):
         if isinstance(states0, dict):
             states = [states0]
         else:
@@ -120,7 +148,9 @@ class RL1Model(torch.nn.Module):
             option = s.get("option")
             if option is not None:
                 t_values[i, :] = torch.tensor(s["values"][option])
-                t_combos[i, :] = torch.tensor(np.matmul(s["indices"][option], s["curphd"]))
+                t_combos[i, :] = torch.tensor(
+                    np.matmul(s["indices"][option], s["curphd"])
+                )
             #
             usedp_sizes.append(s["usedp"].shape[0])
             usedp_pieces.append(torch.tensor(s["usedp"], dtype=torch.float32))
@@ -132,16 +162,16 @@ class RL1Model(torch.nn.Module):
         )
 
         state_batch = {
-            "curphd": t_curphd,
-            "otherp": t_otherp,
-            "enemy": t_enemy,
-            "combos": t_combos,
-            "values": t_values,
-            "usedp": t_usedp_packed,
-            "auxda": t_auxdata,
-            "remaining": t_remy,
-            "rewards": t_cur_rewards,
-            "best_future": t_best_futures,
+            "curphd": t_curphd.to(device),
+            "otherp": t_otherp.to(device),
+            "enemy": t_enemy.to(device),
+            "combos": t_combos.to(device),
+            "values": t_values.to(device),
+            "usedp": t_usedp_packed.to(device),
+            "auxda": t_auxdata.to(device),
+            "remaining": t_remy.to(device),
+            "rewards": t_cur_rewards.to(device),
+            "best_future": t_best_futures.to(device),
         }
         return state_batch
 
