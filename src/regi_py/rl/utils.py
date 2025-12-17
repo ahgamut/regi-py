@@ -114,7 +114,7 @@ class Numberizer:
         for i, c in enumerate(combos):
             f_combo_inds[i, :] = self.one_hot_combo_index(c, player)
             if enemy is not None:
-                f_cdmgs[i] = game.get_combo_damage(enemy, c)
+                f_cdmgs[i] = game.get_combo_damage(enemy, c) / self.MAX_ENEMY_HP
         return f_combo_inds, f_cdmgs
 
     def numberize_defend_combos(self, combos, player, game, enemy):
@@ -123,7 +123,7 @@ class Numberizer:
         for i, c in enumerate(combos):
             f_combo_inds[i, :] = self.one_hot_combo_index(c, player)
             if enemy is not None:
-                f_cblks[i] = game.get_combo_block(enemy, c)
+                f_cblks[i] = c.base_defense / self.MAX_ENEMY_HP
         return f_combo_inds, f_cblks
 
     def numberize_hand(self, player):
@@ -155,6 +155,12 @@ class Numberizer:
         #
         f_remy = self.numberize_remaining_enemies(game)
         #
+        proxy = 0
+        if len(game.enemy_pile) > 0:
+            e0 = game.enemy_pile[0]
+            if attacking:
+                proxy = enemy.hp
+        #
         state = {
             "status": str(game.status.name),
             "phase": game.phase_count,
@@ -172,6 +178,7 @@ class Numberizer:
             "reward": 0,
             "best_future": 0,
             "best_from_here": 0,
+            "proxy": proxy
         }
         return state
 
@@ -221,6 +228,7 @@ class MemoryLog(BaseLog):
             print("game ends at ", game.enemy_pile[0], end=" ")
             print("remaining: ", remaining, end = "\n")
         end_state = self.numberizer.numberize_state([], game.players[active_player], game, True)
+        end_state["option"] = None
         self.memories.append(end_state)
 
     ####

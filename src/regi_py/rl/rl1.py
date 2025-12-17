@@ -1,7 +1,7 @@
 from regi_py.core import *
 from regi_py.rl.utils import *
 from regi_py.rl.subnets import LinearBlock, Conv1dBlock
-from regi_py.strats import PreserveStrategy
+from regi_py.strats import DamageStrategy, PreserveStrategy
 import random
 import time
 
@@ -184,7 +184,7 @@ class RL1Strategy(BaseStrategy):
         self.epsilon = epsilon
         self.numberizer = Numberizer()
         self.model = RL1Model()
-        self.backup = PreserveStrategy()
+        self.backup = DamageStrategy()
         if weights_path is not None:
             self.model.load_state_dict(
                 torch.load(

@@ -15,50 +15,38 @@ from regi_py.rl import MemoryLog, RL1Model
 BEST_REMAIN = 350
 
 
-def bonus_rewards(remaining):
-    hps = np.arange(340, -1, 20)
-    res = 0
-    for i, hp in hps:
-        if remaining <= hp:
-            res += 1.4**i
-    return res
-
-
-def base_rewards(remaining):
-    nr = 360 - remaining
-    dr = 360 - BEST_REMAIN
-    return 360 * nr / dr
-
-
-def set_rewards(log, start, end, model):
+def set_rewards(log, start, end, model, epsilon):
     last_state = log.memories[end - 1]
-    last_state["best_future"] = model.predict(last_state).max().item()
     global BEST_REMAIN
-    if last_state["remaining"] <= 1.1 * BEST_REMAIN:
+    last_state["reward"] = (360 - last_state["remaining"])
+    last_state["best_future"] = (360 - last_state["remaining"])
+    if last_state["remaining"] <= 1.1 * BEST_REMAIN and epsilon <= 0.2:
         if last_state["remaining"] <= BEST_REMAIN:
             BEST_REMAIN = last_state["remaining"]
             print("new best!", BEST_REMAIN)
             torch.save(model.state_dict(), f"./weights/model_{BEST_REMAIN}.pt")
-        last_state["reward"] = 500
-        last_state["best_from_here"] = 500
-        last_state["best_future"] = 500
-    else:
-        last_state["reward"] = -base_rewards(last_state["remaining"])
-        bonus = 0
-        if last_state["remaining"] <= 160:
-            bonus = 100
-        if last_state["remaining"] <= 280:
-            bonus = 50
-        last_state["best_from_here"] = -150 + bonus
+            BEST_REMAIN *= 0.95
+        last_state["best_future"] *= 2
 
     for i in range((end - 2), (start - 1), -1):
         cur_state = log.memories[i]
         next_state = log.memories[i + 1]
-        cur_state["reward"] = base_rewards(cur_state["remaining"]) + bonus_rewards(
-            cur_state["remaining"]
+        if cur_state["attacking"]:
+            diff = cur_state["remaining"] - next_state["remaining"]
+            if diff == cur_state["proxy"]:
+                diff += 20  # reward exact kills
+            if diff == 0: # avoid yields
+                diff = -30
+            cur_state["reward"] = diff
+        cur_state["best_future"] = (
+            cur_state["reward"] + 0.99 * next_state["best_future"]
         )
-        cur_state["best_future"] = next_state["best_from_here"]
-        cur_state["best_from_here"] = model.predict(cur_state).max().item()
+        cur_state["best_future"] = max(-360, cur_state["best_future"])
+
+    for j in range(start, end):
+        jj = j - start
+        state = log.memories[j]
+        # print(jj, state["attacking"], state["reward"], state["best_future"])
 
 
 def basic_game(strats, log, model, epsilon, collect=True):
@@ -80,12 +68,12 @@ def basic_game(strats, log, model, epsilon, collect=True):
     game.initialize()
     game.start_loop()
     end = len(log.memories)
-    set_rewards(log, start, end, model)
+    set_rewards(log, start, end, model, epsilon)
 
 
 def run_epoch(model, batch, optimizer, loss_fn, gamma=0.99):
     q_values = model(batch)
-    target_q_values = (batch["rewards"] + gamma * batch["best_future"]) / 36
+    target_q_values = batch["best_future"] / 36
     loss = loss_fn(q_values, target_q_values)
     optimizer.zero_grad()
     loss.backward()
@@ -109,7 +97,9 @@ def main():
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
-    parser.add_argument("--weights-path", default="./weights/best_model.pt", help="weights")
+    parser.add_argument(
+        "--weights-path", default="./weights/best_model.pt", help="weights"
+    )
     d = parser.parse_args()
 
     log = MemoryLog(N=d.memory_size)
@@ -125,9 +115,12 @@ def main():
             model.load_state_dict(
                 torch.load(d.weights_path, weights_only=True, map_location=device)
             )
+        else:
+            for p in model.parameters():
+                nn.init.normal_(p)
         loss_fn = nn.MSELoss()
         optimizer = torch.optim.Adam(model.parameters())
-    epsilon = 0.2
+    epsilon = 1.0
     gamma = 0.99
 
     for ep in range(d.num_episodes):
@@ -141,12 +134,12 @@ def main():
             loss = run_epoch(model, batch, optimizer, loss_fn, gamma)
             losses.append(loss)
         print("training in episode", ep, "loss =", np.mean(loss))
-        epsilon = max(0.2, epsilon * 0.5)
+        epsilon = max(0.2, epsilon * 0.75)
 
     log.memories.clear()
     model.eval()
     run_episode(log, model, 0.01, collect=False)
-    # torch.save(model.state_dict(), "./weights.pt")
+    torch.save(model.state_dict(), "./weights/model_end.pt")
 
 
 if __name__ == "__main__":
