@@ -179,7 +179,7 @@ class RL1Model(torch.nn.Module):
 class RL1Strategy(BaseStrategy):
     __strat_name__ = "rl1"
 
-    def __init__(self, gamma=0.9, epsilon=1.0, weights_path=None):
+    def __init__(self, gamma=0.9, epsilon=0.01, weights_path=None):
         super(RL1Strategy, self).__init__()
         self.gamma = gamma
         self.epsilon = epsilon
@@ -187,7 +187,9 @@ class RL1Strategy(BaseStrategy):
         self.model = RL1Model()
         self.backup = PreserveStrategy()
         if weights_path is not None:
-            self.model.load_state_dict(torch.load(weights_path, weights_only=True))
+            self.model.load_state_dict(
+                torch.load(weights_path, weights_only=True, map_location=self.model.device)
+            )
 
     def setup(self, player, game):
         self.model.eval()
@@ -198,6 +200,8 @@ class RL1Strategy(BaseStrategy):
         if random.random() < self.epsilon:
             return self.backup.getAttackIndex(combos, player, yield_allowed, game)
         q_values = self.model.predict(state)
+        # for i, c in enumerate(combos):
+        #    print(i, c, q_values[i].item())
         option = torch.argmax(q_values).item()
         return option
 
@@ -206,5 +210,7 @@ class RL1Strategy(BaseStrategy):
         if random.random() < self.epsilon:
             return self.backup.getDefenseIndex(combos, player, damage, game)
         q_values = self.model.predict(state)
+        # for i, c in enumerate(combos):
+        #    print(i, c, q_values[i].item())
         option = torch.argmax(q_values).item()
         return option

@@ -93,7 +93,7 @@ class WebPlayerStrategy(BaseStrategy):
         await app.state.CTX.manager.send_dict(obj, websocket)
 
         while self.response is None:
-            print(self.userid, "waiting", obj["type"])
+            # print(self.userid, "waiting", obj["type"])
             await anyio.sleep(1)
 
         resp = self.response
@@ -114,7 +114,7 @@ class WebPlayerStrategy(BaseStrategy):
         return option
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
-        print("player: ", player.id, "available attacks: ", combos)
+        # print("player: ", player.id, "available attacks: ", combos)
         if len(combos) == 0:
             return -1
 
@@ -138,7 +138,7 @@ class WebPlayerStrategy(BaseStrategy):
         return option
 
     def getDefenseIndex(self, combos, player, damage, game):
-        print("player: ", player.id, "available defenses: ", combos)
+        # print("player: ", player.id, "available defenses: ", combos)
         if len(combos) == 0:
             return -1
 
@@ -254,7 +254,11 @@ class Context:
                 self.game.add_player(self.strats[i])
 
             for b in self.bots:
-                strat = STRATEGY_MAP[b]()
+                if b == "rl1" and os.getenv("RL1_WEIGHTS") is not None:
+                    # print("mike truk")
+                    strat = STRATEGY_MAP[b](weights_path=os.getenv("RL1_WEIGHTS"))
+                else:
+                    strat = STRATEGY_MAP[b]()
                 self.strats.append(strat)
                 self.game.add_player(self.strats[-1])
         else:
