@@ -79,13 +79,13 @@ class Numberizer:
     def numberize_remaining_enemies(self, game):
         res = np.zeros(self.MAX_ENEMIES, dtype=np.float32)
         for i, e in enumerate(game.enemy_pile):
-            res[i] = max(e.hp, 0) / self.MAX_ENEMY_HP
+            res[i] = max(e.hp, 0)
         return np.sum(res)
 
     def numberize_used_pile(self, game):
-        res = np.zeros((len(game.used_combos), 4, 4))
+        res = np.zeros((1 + len(game.used_combos), 16))
         for i, c in enumerate(game.used_combos):
-            res[i, :] = self.numberize_attack(c)
+            res[i, :] = self.numberize_attack(c).ravel()
         return res
 
     def numberize_aux_data(self, player, game, attacking=False):
@@ -210,6 +210,12 @@ class MemoryLog(BaseLog):
 
     def postgame(self, game):
         active_player = max(0, game.active_player)
+        if len(game.enemy_pile) == 0:
+            print("game ends with a WIN!")
+        else:
+            remaining = sum(e.hp for e in game.enemy_pile)
+            print("game ends at ", game.enemy_pile[0], end=" ")
+            print("remaining: ", remaining, end = "\n")
         self.numberizer.numberize_state([], game.players[active_player], game, True)
 
     ####

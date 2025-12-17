@@ -1,32 +1,86 @@
 from regi_py.core import *
 from regi_py.rl.utils import *
+from regi_py.rl.subnets import LinearBlock, Conv1dBlock
 import random
 
 #
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
 
 class RL1Model(torch.nn.Module):
     def __init__(self):
         super(RL1Model, self).__init__()
+        self.m_enemy = LinearBlock([6, 8, 16, 16])
+        self.m_remy = LinearBlock([12, 16, 16])
+        self.m_values = LinearBlock([1, 8, 8, 16])
+        self.m_auxda = LinearBlock([6, 8, 8, 16])
+        self.m_otherp = Conv1dBlock(channels=[4, 8, 8, 16], shapes=[2, 1, 1])
+        self.m_combos = Conv1dBlock(channels=[8, 8, 16, 16], shapes=[2, 2, 1])
+        self.m_curphd = Conv1dBlock(channels=[8, 8, 16, 16], shapes=[2, 2, 1])
+        self.m_usedp = nn.RNN(input_size=16, hidden_size=16, batch_first=True, num_layers=2)
+        self.nets = {
+            "curphd": self.m_curphd,
+            "otherp": self.m_otherp,
+            "enemy": self.m_enemy,
+            "combos": self.m_combos,
+            "values": self.m_values,
+            "usedp": self.m_usedp,
+            "auxda": self.m_auxda,
+            "remaining": self.m_remy,
+        }
+
+        self.bignet = Conv1dBlock(channels=[12, 16, 16, 16, 32, 32, 32], shapes=[1, 1, 4, 4, 2, 2])
+        self.make_q = nn.Sequential(nn.Linear(in_features=256, out_features=1), nn.ReLU())
 
     def forward(self, state):
-        return torch.Tensor([0.0])
+        batch_size = state["curphd"].shape[0]
+        res = []
+        for k in self.nets.keys():
+            if k == "usedp":
+                out, v1 = self.nets[k](state[k])
+                v2 = v1.reshape(v1.shape[1], -1, 16)
+                # print(k, v1.shape, v2.shape)
+            else:
+                v1 = self.nets[k](state[k])
+                v2 = v1.reshape(v1.shape[0], -1, 16)
+                # print(k, state[k].shape, v1.shape, v2.shape)
+            res.append(v2)
+
+        big = torch.cat(res, dim=1)
+        big2 = self.bignet(big).reshape(batch_size, -1)
+        q_values = self.make_q(big2)
+        # print("q_values", q_values.shape)
+        # print(state)
+        return q_values
 
     def predict(self, state):
-        print(state["status"], state["values"].shape)
-        return torch.Tensor([0.0])
+        num_options = state["values"].shape[0]
+        if num_options == 0:
+            return torch.Tensor([0.0])
+        q_values = torch.zeros(num_options)
+        for i in range(num_options):
+            q_values[i] = self.rate_combo(state, i)[0]
+        return q_values
 
-    def rate_attacks(self, state):
-        pass
-
-    def rate_defends(self, state):
-        pass
+    def rate_combo(self, state, ind):
+        s2 = [dict(**state)]
+        s2[0]["option"] = ind
+        s2[0]["reward"] = state.get("reward", 0)
+        s2[0]["best_future"] = state.get("best_future", 0)
+        s2[0]["best_from_here"] = state.get("best_from_here", 0)
+        tens = self.tensorify(s2)
+        return self.forward(tens)
 
     @classmethod
     def tensorify(cls, states0, batch_size=1):
+        with torch.no_grad():
+            return cls._tensorify(states0, batch_size)
+
+    @classmethod
+    def _tensorify(cls, states0, batch_size=1):
         if isinstance(states0, dict):
             states = [states0]
         else:
@@ -64,16 +118,15 @@ class RL1Model(torch.nn.Module):
             #
             option = s["option"]
             t_values[i, :] = torch.tensor(s["values"][option])
-            print(s["curphd"].shape, s["indices"].shape)
-            t_combos[i, :] = torch.tensor(np.matmul(s["curphd"], s["indices"][option]))
+            t_combos[i, :] = torch.tensor(np.matmul(s["indices"][option], s["curphd"]))
             #
-            usedp_sizes.append(len(s["usedp"]))
-            usedp_pieces.append(torch.tensor(s["usedp"]))
+            usedp_sizes.append(s["usedp"].shape[0])
+            usedp_pieces.append(torch.tensor(s["usedp"], dtype=torch.float32))
 
         t_usedp_sizes = torch.tensor(usedp_sizes)
         t_usedp_padded = pad_sequence(usedp_pieces, batch_first=True, padding_value=0.0)
         t_usedp_packed = pack_padded_sequence(
-            t_usedp_packed, t_usedp_sizes, batch_first=True, enforce_sorted=False
+            t_usedp_padded, t_usedp_sizes, batch_first=True, enforce_sorted=False
         )
 
         state_batch = {
@@ -83,10 +136,10 @@ class RL1Model(torch.nn.Module):
             "combos": t_combos,
             "values": t_values,
             "usedp": t_usedp_packed,
-            "auxda": t_auxda,
+            "auxda": t_auxdata,
             "remaining": t_remy,
             "rewards": t_cur_rewards,
-            "best_futures": t_best_futures,
+            "best_future": t_best_futures,
         }
         return state_batch
 
@@ -94,11 +147,10 @@ class RL1Model(torch.nn.Module):
 class RL1Strategy(BaseStrategy):
     __strat_name__ = "rl1"
 
-    def __init__(self, gamma=0.9, eps_max=1.0, eps_min=0.1, weights_path=None):
+    def __init__(self, gamma=0.9, epsilon=1.0, weights_path=None):
         super(RL1Strategy, self).__init__()
         self.gamma = gamma
-        self.eps_max = eps_max
-        self.eps_min = eps_min
+        self.epsilon = epsilon
         self.numberizer = Numberizer()
         self.model = RL1Model()
         if weights_path is not None:
@@ -112,11 +164,11 @@ class RL1Strategy(BaseStrategy):
         if len(combos) == 0:
             return -1
         state = self.numberizer.numberize_state(combos, player, game, is_attacking)
-        if True or random.random() > self.epsilon:
+        if random.random() < self.epsilon:
             return random.randint(0, len(combos) - 1)
         q_values = self.model.predict(state)
         option = torch.argmax(q_values).item()
-        return random.randint(0, len(combos) - 1)
+        return option
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
         return self.select_action(combos, player, game, True)
