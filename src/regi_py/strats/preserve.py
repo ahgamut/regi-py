@@ -53,7 +53,7 @@ class PreserveStrategy(BaseStrategy):
         good_indices = list(
             sorted(
                 (n for n in range(len(combos))),
-                key=lambda i: game.get_combo_block(e, combos[i])
+                key=lambda i: combos[i].base_defense
             )
         )
         return good_indices[0]

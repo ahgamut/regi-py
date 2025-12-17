@@ -67,8 +67,8 @@ class SuitPrefStrategy(BaseStrategy):
         return pref
 
     def get_best_combo(self, player, combos, game, is_attacking):
-        hello = "attack" if is_attacking else "defend"
-        print("sorting combos for", hello, "via", self.__suit_order__)
+        # hello = "attack" if is_attacking else "defend"
+        # print("sorting combos for", hello, "via", self.__suit_order__)
         e = game.enemy_pile[0]
         scores = dict()
 
@@ -95,8 +95,8 @@ class SuitPrefStrategy(BaseStrategy):
         for k in faraways:
             scores.pop(k)
 
-        for k,v in scores.items():
-            print(combos[k], f"{hello}: {v.score}", f"preference: {v.pref}")
+        # for k,v in scores.items():
+        #    print(combos[k], f"{hello}: {v.score}", f"preference: {v.pref}")
 
         scores2 = list(scores.keys())
         best_ind = 0
@@ -108,7 +108,7 @@ class SuitPrefStrategy(BaseStrategy):
             elif scores[b2i] == scores[b2b]:
                 if random.random() > 0.5:
                     best_ind = i
-        print("best combo for", hello, "is", combos[scores2[best_ind]])
+        # print("best combo for", hello, "is", combos[scores2[best_ind]])
         return scores2[best_ind]
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
