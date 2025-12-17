@@ -1,6 +1,7 @@
 from regi_py.core import *
 from regi_py.rl.utils import *
 from regi_py.rl.subnets import LinearBlock, Conv1dBlock
+from regi_py.strats import PreserveStrategy
 import random
 
 #
@@ -154,6 +155,7 @@ class RL1Strategy(BaseStrategy):
         self.epsilon = epsilon
         self.numberizer = Numberizer()
         self.model = RL1Model()
+        self.backup = PreserveStrategy()
         if weights_path is not None:
             self.model.load_state_dict(torch.load(weights_path, weights_only=True))
 
@@ -161,18 +163,18 @@ class RL1Strategy(BaseStrategy):
         self.model.eval()
         return 0
 
-    def select_action(self, combos, player, game, is_attacking):
-        if len(combos) == 0:
-            return -1
-        state = self.numberizer.numberize_state(combos, player, game, is_attacking)
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        state = self.numberizer.numberize_state(combos, player, game, True)
         if random.random() < self.epsilon:
-            return random.randint(0, len(combos) - 1)
+            return self.backup.getAttackIndex(combos, player, yield_allowed, game)
         q_values = self.model.predict(state)
         option = torch.argmax(q_values).item()
         return option
 
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        return self.select_action(combos, player, game, True)
-
     def getDefenseIndex(self, combos, player, damage, game):
-        return self.select_action(combos, player, game, False)
+        state = self.numberizer.numberize_state(combos, player, game, False)
+        if random.random() < self.epsilon:
+            return self.backup.getDefenseIndex(combos, player, damage, game)
+        q_values = self.model.predict(state)
+        option = torch.argmax(q_values).item()
+        return option

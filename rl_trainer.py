@@ -131,7 +131,7 @@ def main():
             loss = run_epoch(model, batch, optimizer, loss_fn, gamma)
             losses.append(loss)
         print("training in episode", ep, "loss =", np.mean(loss))
-        epsilon *= 0.5
+        epsilon = max(0.2, epsilon * 0.5)
 
     log.memories.clear()
     model.eval()

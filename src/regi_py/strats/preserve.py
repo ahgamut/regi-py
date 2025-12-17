@@ -49,10 +49,11 @@ class PreserveStrategy(BaseStrategy):
     def getDefenseIndex(self, combos, player, damage, game):
         if len(combos) == 0:
             return -1
+        e = game.enemy_pile[0]
         good_indices = list(
             sorted(
                 (n for n in range(len(combos))),
-                key=lambda i: sum(c.strength for c in combos[i].parts),
+                key=lambda i: game.get_combo_block(e, combos[i])
             )
         )
         return good_indices[0]
