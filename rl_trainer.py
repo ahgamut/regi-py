@@ -1,4 +1,5 @@
 import argparse
+import os
 import random
 
 #
@@ -23,13 +24,20 @@ def bonus_rewards(remaining):
     return res
 
 
+def base_rewards(remaining):
+    nr = 360 - remaining
+    dr = 360 - BEST_REMAIN
+    return 360 * nr / dr
+
+
 def set_rewards(log, start, end, model):
     last_state = log.memories[end - 1]
     last_state["best_future"] = model.predict(last_state).max().item()
     global BEST_REMAIN
-    if last_state["remaining"] < BEST_REMAIN:
+    if last_state["remaining"] <= BEST_REMAIN:
         BEST_REMAIN = last_state["remaining"]
         print("new best!", BEST_REMAIN)
+        torch.save(model.state_dict(), "./best_model.pt")
         last_state["reward"] = 500
         last_state["best_from_here"] = 500
         last_state["best_future"] = 0
@@ -45,7 +53,7 @@ def set_rewards(log, start, end, model):
     for i in range((end - 2), (start - 1), -1):
         cur_state = log.memories[i]
         next_state = log.memories[i + 1]
-        cur_state["reward"] = (BEST_REMAIN - cur_state["remaining"]) + bonus_rewards(
+        cur_state["reward"] = base_rewards(cur_state["remaining"]) + bonus_rewards(
             cur_state["remaining"]
         )
         cur_state["best_future"] = next_state["best_from_here"]
@@ -87,8 +95,8 @@ def run_epoch(model, batch, optimizer, loss_fn, gamma=0.99):
 def run_episode(log, model, epsilon, collect=True):
     num_teammates = random.randint(1, 2)
     while len(log.memories) <= log.N:
-        # bots = ["rl1"] * (num_teammates + 1)
-        bots = ["rl1"] + random.sample(list(STRATEGY_MAP.keys()), num_teammates)
+        bots = ["rl1"] * (num_teammates + 1)
+        # bots = ["rl1"] + random.sample(list(STRATEGY_MAP.keys()), num_teammates)
         basic_game(bots, log=log, model=model, epsilon=epsilon, collect=collect)
 
 
@@ -100,10 +108,13 @@ def main():
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
+    parser.add_argument("--weights-path", default="./best_model.pt", help="weights")
     d = parser.parse_args()
 
     log = MemoryLog(N=d.memory_size)
     model = RL1Model()
+    if os.path.isfile(d.weights_path):
+        model.load_state_dict(torch.load(d.weights_path, weights_only=True))
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters())
     epsilon = 1.0

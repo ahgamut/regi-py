@@ -216,7 +216,8 @@ class MemoryLog(BaseLog):
             remaining = sum(e.hp for e in game.enemy_pile)
             print("game ends at ", game.enemy_pile[0], end=" ")
             print("remaining: ", remaining, end = "\n")
-        self.numberizer.numberize_state([], game.players[active_player], game, True)
+        end_state = self.numberizer.numberize_state([], game.players[active_player], game, True)
+        self.memories.append(end_state)
 
     ####
 

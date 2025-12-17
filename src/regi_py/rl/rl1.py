@@ -116,9 +116,10 @@ class RL1Model(torch.nn.Module):
             t_cur_rewards[i, :] = torch.tensor(s["reward"])
             t_best_futures[i, :] = torch.tensor(s["best_future"])
             #
-            option = s["option"]
-            t_values[i, :] = torch.tensor(s["values"][option])
-            t_combos[i, :] = torch.tensor(np.matmul(s["indices"][option], s["curphd"]))
+            option = s.get("option")
+            if option is not None:
+                t_values[i, :] = torch.tensor(s["values"][option])
+                t_combos[i, :] = torch.tensor(np.matmul(s["indices"][option], s["curphd"]))
             #
             usedp_sizes.append(s["usedp"].shape[0])
             usedp_pieces.append(torch.tensor(s["usedp"], dtype=torch.float32))
