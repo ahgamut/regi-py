@@ -1,6 +1,7 @@
 import argparse
 import os
 import random
+import sys
 
 #
 import torch
@@ -53,7 +54,7 @@ def basic_game(strats, log, model, epsilon, collect=True):
     n_players = len(strats)
     assert n_players in [2, 3, 4], "only 2, 3, or 4 players"
 
-    print(strats, end=" ")
+    print(strats, end=" ", file=sys.stderr)
     start = len(log.memories)
     game = GameState(log)
     for i in range(n_players):

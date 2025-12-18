@@ -1,4 +1,5 @@
 from regi_py.core import *
+import sys
 import numpy as np
 
 
@@ -233,8 +234,8 @@ class MemoryLog(BaseLog):
             print("game ends with a WIN!")
         else:
             remaining = sum(e.hp for e in game.enemy_pile)
-            print("game ends at ", game.enemy_pile[0], end=" ")
-            print("remaining: ", remaining, end = "\n")
+            print(f"end {game.phase_count} ", game.enemy_pile[0], end=" ", file=sys.stderr)
+            print("remaining: ", remaining, end = "\n", file=sys.stderr)
         end_state = self.numberizer.numberize_state([], game.players[active_player], game, True)
         end_state["option"] = None
         self.memories.append(end_state)
