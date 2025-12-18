@@ -198,6 +198,8 @@ class MemoryLog(BaseLog):
             state = self.numberizer.numberize_state(combos, player, game, True)
             option = old_getAttackIndex(obj, combos, player, yield_allowed, game)
             state["option"] = option
+            if len(self.memories) >= self.N:
+                self.memories.pop(0)
             self.memories.append(state)
             return option
 
@@ -205,6 +207,8 @@ class MemoryLog(BaseLog):
             state = self.numberizer.numberize_state(combos, player, game, False)
             option = old_getDefenseIndex(obj, combos, player, damage, game)
             state["option"] = option
+            if len(self.memories) >= self.N:
+                self.memories.pop(0)
             self.memories.append(state)
             return option
 
