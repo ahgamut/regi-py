@@ -189,8 +189,12 @@ class MemoryLog(BaseLog):
         self.N = N
         self.numberizer = Numberizer()
         self.memories = []
+        self.marked = set()
 
     def record(self, cls):
+        if cls.__strat_name__ in self.marked:
+            return cls
+        self.marked.add(cls.__strat_name__)
         old_getAttackIndex = cls.getAttackIndex
         old_getDefenseIndex = cls.getDefenseIndex
 
