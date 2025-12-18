@@ -28,7 +28,7 @@ def set_rewards(log, start, end, model, epsilon):
             torch.save(model.state_dict(), f"./weights/model_{BEST_REMAIN}.pt")
             BEST_REMAIN *= 0.95
         last_state["best_future"] *= 2
-    last_state["best_future"] = min(20, last_state["best_future"]
+    last_state["best_future"] = min(20, last_state["best_future"])
 
     for i in range((end - 2), (start - 1), -1):
         cur_state = log.memories[i]
