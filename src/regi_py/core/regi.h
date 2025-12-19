@@ -55,6 +55,7 @@ namespace regi
         };
         i32 addPlayer(Strategy &);
         void init();
+        void initRandom();
         void setup();
         bool gameRunning() { return this->status == GameStatus::RUNNING; }
 

@@ -291,6 +291,13 @@ void bind_gamestate(pybind11::object &m)
                  g.setup();
                  return g.status;
              })
+        .def("_init_random",
+             [](GameState &g)
+             {
+                 g.initRandom();
+                 g.setup();
+                 return g.status;
+             })
         .def("get_current_block", [](GameState &g, Enemy &e) { return g.calcBlock(e); })
         .def("get_combo_damage", &GameState::calcDamageOfCombo)
         .def("get_combo_block", &GameState::calcBlockOfCombo)
