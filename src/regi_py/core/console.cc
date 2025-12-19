@@ -19,8 +19,9 @@ namespace regi
     {
         if (enemy.hp > 0)
             return;
-        else if (enemy.hp == 0) { std::cout << enemy << " killed exact!\n"; }
-        else { std::cout << enemy << " killed!\n"; }
+        else if (enemy.hp == 0) { std::cout << enemy << " killed exact! "; }
+        else { std::cout << enemy << " killed! "; }
+        std::cout << g.enemyPile.size() - 1 << " enemies left.\n";
         std::cout << "adding to discard pile: ";
         for (const auto &comb : g.usedPile)
         {

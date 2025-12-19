@@ -175,7 +175,7 @@ namespace regi
         // else do nothing
     }
 
-    i32 GameState::enemyDead()
+    i32 GameState::currentEnemyDead()
     {
         Enemy &enemy = enemyPile.front();
         if (enemy.hp > 0) return 0;
@@ -249,10 +249,13 @@ namespace regi
             return;
         }
 
-        do {
+        while (enemyPile.size() > 0) {
             Enemy &enemy = enemyPile.front();
             attackPhase(player, enemy);
-        } while (enemyDead());
+            if (!currentEnemyDead()) {
+                break;
+            }
+        }
 
         if (!player.alive)
         {

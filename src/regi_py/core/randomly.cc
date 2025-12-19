@@ -36,10 +36,6 @@ namespace regi
             players[i].cards.clear();
             i32 psize = engine() % (handSize + 1);
             playerDraws(players[i], psize);
-            if (psize != 0)
-            {
-                drawPile.erase(drawPile.begin(), drawPile.begin() + psize);
-            }
         }
 
         // some cards are in the discard pile
@@ -55,6 +51,8 @@ namespace regi
         }
 
         // no cards are in the used pile
+        usedPile.clear();
+        //
         log.startgame(*this);
     }
 } /* namespace regi */

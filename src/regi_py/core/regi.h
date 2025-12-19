@@ -79,7 +79,7 @@ namespace regi
         i32 calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
         void preAttackEffects(Player &, Enemy &);
-        i32 enemyDead();
+        i32 currentEnemyDead();
 
         i32 calcBlockOfCombo(Enemy &, Combo &);
         i32 calcBlock(Enemy &);
