@@ -179,7 +179,7 @@ class Numberizer:
             "reward": 0,
             "best_future": 0,
             "best_from_here": 0,
-            "proxy": proxy
+            "proxy": proxy,
         }
         return state
 
@@ -231,12 +231,16 @@ class MemoryLog(BaseLog):
     def postgame(self, game):
         active_player = max(0, game.active_player)
         if len(game.enemy_pile) == 0:
-            print("game ends with a WIN!")
+            print("game ends with a WIN!", end="\n", file=sys.stderr)
         else:
             remaining = sum(e.hp for e in game.enemy_pile)
-            print(f"end {game.phase_count} ", game.enemy_pile[0], end=" ", file=sys.stderr)
-            print("remaining: ", remaining, end = "\n", file=sys.stderr)
-        end_state = self.numberizer.numberize_state([], game.players[active_player], game, True)
+            print(
+                f"end {game.phase_count} ", game.enemy_pile[0], end=" ", file=sys.stderr
+            )
+            print("remaining: ", remaining, end="\n", file=sys.stderr)
+        end_state = self.numberizer.numberize_state(
+            [], game.players[active_player], game, True
+        )
         end_state["option"] = None
         self.memories.append(end_state)
 
