@@ -39,7 +39,7 @@ from fastapi.templating import Jinja2Templates
 
 ###
 from regi_py.strats import BaseStrategy
-from regi_py import STRATEGY_MAP
+from regi_py import get_strategy_map
 from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
 
 
@@ -248,17 +248,14 @@ class Context:
     def load_game(self):
         # assert len(self.userids) == self.num_players
         assert app.state.CTX.ALT_STARTED
+        strategy_map = get_strategy_map(rl_mods=False)
         if len(self.strats) != self.num_players + len(self.bots):
             # print("this is non-reset game")
             for i in range(self.num_players):
                 self.game.add_player(self.strats[i])
 
             for b in self.bots:
-                if b == "rl1" and os.getenv("RL1_WEIGHTS") is not None:
-                    # print("mike truk")
-                    strat = STRATEGY_MAP[b](weights_path=os.getenv("RL1_WEIGHTS"))
-                else:
-                    strat = STRATEGY_MAP[b]()
+                strat = strategy_map[b]()
                 self.strats.append(strat)
                 self.game.add_player(self.strats[-1])
         else:
@@ -406,6 +403,8 @@ def make_CTX(app, d):
 
 
 def load_args():
+    # TODO: nested flag so rl_mods can be shown in help
+    strategy_map = get_strategy_map(rl_mods=False)
     parser = argparse.ArgumentParser(
         prog="regi-webserver",
         description="FastAPI websockets server for regi-py",
@@ -422,7 +421,7 @@ def load_args():
         dest="bots",
         action="append",
         default=[],
-        help="bot options: " + ",".join(STRATEGY_MAP),
+        help="bot options: " + ",".join(strategy_map),
     )
     d = parser.parse_args()
     total_players = d.num_players + len(d.bots)

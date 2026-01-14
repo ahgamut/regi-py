@@ -2,7 +2,9 @@ import argparse
 
 #
 from regi_py import JSONLog, CXXConsoleLog, GameState
-from regi_py import STRATEGY_MAP
+from regi_py import get_strategy_map
+
+STRATEGY_MAP = get_strategy_map()
 
 
 def basic_game(strats, log=None) -> GameState:

@@ -10,10 +10,11 @@ import numpy as np
 
 #
 from regi_py import GameState
-from regi_py import STRATEGY_MAP
+from regi_py import get_strategy_map
 from regi_py.rl import MemoryLog, RL1Model
 
 BEST_REMAIN = 350
+STRATEGY_MAP = get_strategy_map()
 
 
 def set_rewards(log, start, end, model, epsilon):
