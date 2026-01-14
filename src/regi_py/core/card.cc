@@ -1,5 +1,11 @@
 #include <card.h>
 
+constexpr i32 TOTAL_SUIT_OPTIONS = 5;
+constexpr i32 TOTAL_ENTRY_OPTIONS = 14;
+
+static_assert(TOTAL_SUIT_OPTIONS == static_cast<i32>(SPADES) + 1);
+static_assert(TOTAL_ENTRY_OPTIONS == static_cast<i32>(KING) + 1);
+
 Card::Card(Entry ee, Suit ss) : e(ee), s(ss) {};
 
 Entry Card::entry() const { return this->e; }
@@ -26,6 +32,28 @@ i32 Card::strength() const
     return st;
 }
 
+i32 Card::toIndex() const
+{
+    return static_cast<i32>(this->e) +
+           (TOTAL_ENTRY_OPTIONS * static_cast<i32>(this->s));
+}
+
+bool Card::operator<(const Card& other) const
+{
+    if (this->s == other.s) { return this->e < other.e; }
+    return this->s < other.s;
+}
+
+bool Card::operator>(const Card& other) const
+{
+    if (this->s == other.s) { return this->e > other.e; }
+    return this->s > other.s;
+}
+
+bool Card::operator==(const Card& other) const
+{
+    return (this->s == other.s) && (this->e == other.e);
+}
 #ifdef USE_UNICODE
 
 std::ostream& operator<<(std::ostream& os, const Suit s)

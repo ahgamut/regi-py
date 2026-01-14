@@ -3,11 +3,13 @@
 #include <cstdint>
 #include <iostream>
 
+typedef std::uint8_t u8;
+typedef std::uint16_t u16;
 typedef std::int32_t i32;
 typedef std::uint32_t u32;
 typedef std::size_t u64;
 
-enum Suit : i32
+enum Suit : u16
 {
     GLITCH = 0,
     CLUBS = 1,
@@ -17,7 +19,7 @@ enum Suit : i32
 };
 std::ostream& operator<<(std::ostream& os, const Suit s);
 
-enum Entry : i32
+enum Entry : u16
 {
     JOKER = 0,
     ACE = 1,
@@ -43,14 +45,15 @@ struct Card
     Suit s;
 
    public:
+    Card() : e(KING), s(GLITCH) {};
+    Card(Entry ee, Suit ss);
     i32 strength() const;
     Entry entry() const;
     Suit suit() const;
-    Card(Entry ee, Suit ss);
-    bool operator==(const Card& other) const
-    {
-        return (this->e == other.e) && (this->s == other.s);
-    }
+    i32 toIndex() const;
+    bool operator<(const Card&) const;
+    bool operator>(const Card&) const;
+    bool operator==(const Card&) const;
     friend std::ostream& operator<<(std::ostream& os, const Card& c);
 };
 

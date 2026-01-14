@@ -5,29 +5,29 @@ namespace regi
 
     Combo::Combo() : baseDmg(0), powers(0) {};
 
-    i32 Combo::valid(bool yieldAllowed)
+    bool Combo::valid(bool yieldAllowed)
     {
         if (parts.size() == 0)
         {
             // yielding depends on context
-            return static_cast<int>(yieldAllowed);
+            return yieldAllowed;
         }
         if (parts.size() == 1)
         {
-            return 1;
             /* playing any single card is fine */
+            return true;
         }
 
         /* if playing multiple parts, cannot play JOKER */
         for (auto c : parts)
         {
-            if (c.entry() == JOKER) return 0;
+            if (c.entry() == JOKER) return false;
         }
 
         if (parts.size() == 2 && (parts[0].entry() == ACE || parts[1].entry() == ACE))
         {
             /* ACE + Card combo */
-            return 1;
+            return true;
         }
 
         /* numeric combo: all entries are same, but different suits
@@ -37,11 +37,10 @@ namespace regi
         for (i32 i = 1; i < parts.size(); ++i)
         {
             sum += static_cast<i32>(parts[i].entry());
-            if (parts[i].entry() == ACE) return 0;
-            if (parts[i].entry() != parts[0].entry()) return 0;
+            if (parts[i].entry() == ACE) return false;
+            if (parts[i].entry() != parts[0].entry()) return false;
         }
-        if (sum > 10) { return 0; }
-        return 1;
+        return sum <= 10;
     }
 
     void Combo::loadDetails()

@@ -59,16 +59,19 @@ namespace regi
         void init();
         void initRandom();
         void setup();
-        bool gameRunning() { return this->status == GameStatus::RUNNING; }
 
+        //
+        bool gameRunning() { return this->status == GameStatus::RUNNING; }
         i32 getHandSize() { return handSize; }
         i32 totalPlayers() { return static_cast<i32>(players.size()); }
 
+        //
         void startLoop();
         void onePhase();
         void gameOver(EndGameReason);
         void postGameResult();
 
+        //
         bool canDraw(Player &);
         bool cannotDrawBecauseDeckEmpty(Player &);
         void playerDraws(Player &, int);
@@ -76,6 +79,7 @@ namespace regi
         void refreshDraws(int, int);
         void refreshDiscards(int);
 
+        //
         void selectAttack(Player &, bool);
         i32 calcDamageOfCombo(Enemy &, Combo &);
         i32 calcDamage(Enemy &);
@@ -83,10 +87,12 @@ namespace regi
         void preAttackEffects(Player &, Enemy &);
         i32 currentEnemyDead();
 
+        //
         i32 calcBlockOfCombo(Enemy &, Combo &);
         i32 calcBlock(Enemy &);
         void selectDefense(Player &, int);
         void defensePhase(Player &, Enemy &);
+
         //
         friend struct BaseLog;
         friend struct Strategy;
@@ -122,13 +128,7 @@ namespace regi
                                     const GameState &) = 0;
         virtual i32 getAttackIndex(const std::vector<Combo> &, const Player &, bool,
                                    const GameState &) = 0;
-        //
-        void calcAttackMoves(const std::vector<Card> &, std::vector<Combo> &, bool,
-                             Combo &, i32);
         i32 provideAttack(Combo &, const Player &, bool, const GameState &);
-        //
-        void calcDefenseMoves(const std::vector<Card> &, std::vector<Combo> &, i32,
-                              Combo &, i32);
         i32 provideDefense(Combo &, const Player &, i32, const GameState &);
     };
 

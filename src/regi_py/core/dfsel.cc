@@ -1,12 +1,13 @@
 #include <dfsel.h>
 #include <random>
+#include <algorithm>
 
 namespace regi
 {
-    void Strategy::calcAttackMoves(const std::vector<Card> &cards,
-                                   std::vector<Combo> &combos, bool yieldAllowed,
-                                   Combo &cur, i32 i)
+    void calcAttackMoves(const std::vector<Card> &cards, std::vector<Combo> &combos,
+                         bool yieldAllowed, Combo &cur, i32 i)
     {
+        // cards are assumed ordered
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
         cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
@@ -27,6 +28,7 @@ namespace regi
                                 const GameState &g)
     {
         (void)g;
+        std::vector<Card> orderedCards;
         std::vector<Combo> combos;
         Combo base;
         if (yieldAllowed && base.parts.size() == 0)
@@ -36,7 +38,13 @@ namespace regi
         }
         for (i32 i = 0; i < player.cards.size(); ++i)
         {
-            calcAttackMoves(player.cards, combos, yieldAllowed, base, i);
+            orderedCards.push_back(player.cards[i]);
+        }
+        //
+        std::sort(orderedCards.begin(), orderedCards.end());
+        for (i32 i = 0; i < player.cards.size(); ++i)
+        {
+            calcAttackMoves(orderedCards, combos, yieldAllowed, base, i);
         }
         if (combos.size() == 0) { return -1; }
         if (g.enemyPile.empty()) { return -1; }
@@ -51,10 +59,10 @@ namespace regi
         }
     }
 
-    void Strategy::calcDefenseMoves(const std::vector<Card> &cards,
-                                    std::vector<Combo> &combos, i32 damage, Combo &cur,
-                                    i32 i)
+    void calcDefenseMoves(const std::vector<Card> &cards, std::vector<Combo> &combos,
+                          i32 damage, Combo &cur, i32 i)
     {
+        // cards are assumed ordered
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
         cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
@@ -77,10 +85,17 @@ namespace regi
         (void)g;
         // we only enter this if it is actually possible to block
         std::vector<Combo> combos;
+        std::vector<Card> orderedCards;
         Combo base;
         for (i32 i = 0; i < player.cards.size(); ++i)
         {
-            calcDefenseMoves(player.cards, combos, damage, base, i);
+            orderedCards.push_back(player.cards[i]);
+        }
+        //
+        std::sort(orderedCards.begin(), orderedCards.end());
+        for (i32 i = 0; i < player.cards.size(); ++i)
+        {
+            calcDefenseMoves(orderedCards, combos, damage, base, i);
         }
         if (combos.size() == 0) { return -1; }
 

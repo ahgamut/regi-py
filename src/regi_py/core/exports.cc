@@ -78,8 +78,15 @@ void bind_cards(pybind11::object &m)
         .def_property_readonly("entry", &Card::entry)
         .def_property_readonly("suit", &Card::suit)
         .def_property_readonly("strength", &Card::strength)
+        .def_property_readonly("index", &Card::toIndex)
         .def(
             "__eq__", [](const Card &c1, const Card &c2) { return c1 == c2; },
+            py::is_operator())
+        .def(
+            "__lt__", [](const Card &c1, const Card &c2) { return c1 < c2; },
+            py::is_operator())
+        .def(
+            "__gt__", [](const Card &c1, const Card &c2) { return c1 > c2; },
             py::is_operator())
         .def("__hash__", [](const Card &c) { return std::hash<std::string>{}(stringify<Card>(c)); })
         .def("__repr__", &stringify<Card>)

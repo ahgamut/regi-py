@@ -24,7 +24,6 @@ namespace regi
     struct DamageStrategy : public Strategy
     {
        private:
-
        public:
         i32 setup(const Player &, const GameState &);
         i32 getAttackIndex(const std::vector<Combo> &, const Player &, bool,
@@ -35,7 +34,10 @@ namespace regi
 
     i32 selectRandomCombo(const std::vector<Combo> &);
     i32 calcDamage(const Combo &, const Enemy &, const GameState &);
-
+    void calcAttackMoves(const std::vector<Card> &, std::vector<Combo> &, bool, Combo &,
+                         i32);
+    void calcDefenseMoves(const std::vector<Card> &, std::vector<Combo> &, i32, Combo &,
+                          i32);
 } /* namespace regi */
 
 #endif
