@@ -118,12 +118,6 @@ class JSONBaseLog(BaseLog):
     def debug(self, game):
         self.log({"event": "DEBUG", "game": dump_debug(game)})
 
-    def startPlayerTurn(self, game):
-        self.log({"event": "TURNSTART", "game": dump_debug(game)})
-
-    def endPlayerTurn(self, game):
-        self.log({"event": "TURNEND", "game": dump_debug(game)})
-
 
 class JSONLog(JSONBaseLog):
     def __init__(self, fname):

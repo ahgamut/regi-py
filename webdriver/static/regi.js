@@ -349,7 +349,14 @@ function processLog(data) {
             logMessage("Game over!", 'is-primary');
             // logMessage("Postgame: " + JSON.stringify(data.game));
             break;
-        case 'TURNSTART':
+        case 'FAILBLOCK':
+            logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage}`, 'is-danger');
+            logMessage(`Player ${data.player.id} can block at most ${data.maxblock}!`, 'is-danger');
+            break;
+        case 'FULLBLOCK':
+            logMessage(`${data.enemy.value} is blocked by Player ${data.player.id}`, 'is-info');
+            break;
+        case 'STATE':
             g.statusz = "RUNNING";
             if (data.game.active_player_id !== null) {
                 updateCards(data.game.players[g.playerid]);
@@ -361,27 +368,6 @@ function processLog(data) {
                     logMessage(`Wait for Player ${data.game.active_player_id} to play..`);
                 }
             }
-            break;
-        case 'TURNEND':
-            g.statusz = "RUNNING";
-            if (data.game.active_player_id !== null) {
-                updateCards(data.game.players[g.playerid]);
-                if (data.game.active_player_id != g.playerid) {
-                    let submitter = document.getElementById('main-button');
-                    let yielder = document.getElementById('side-button');
-                    setButtonActivity(submitter, false);
-                    setButtonActivity(yielder, false);
-                }
-            }
-            break;
-        case 'FAILBLOCK':
-            logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage}`, 'is-danger');
-            logMessage(`Player ${data.player.id} can block at most ${data.maxblock}!`, 'is-danger');
-            break;
-        case 'FULLBLOCK':
-            logMessage(`${data.enemy.value} is blocked by Player ${data.player.id}`, 'is-info');
-            break;
-        case 'STATE':
         case 'DEBUG':
             // can I send something here?
             break;

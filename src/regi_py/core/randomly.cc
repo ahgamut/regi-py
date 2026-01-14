@@ -53,6 +53,9 @@ namespace regi
         // no cards are in the used pile
         usedPile.clear();
         //
+        activePlayerID = engine() % totalPlayers();
+        currentPhaseIsAttack = true;
+        //
         log.startgame(*this);
     }
 } /* namespace regi */

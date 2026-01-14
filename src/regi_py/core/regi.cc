@@ -133,6 +133,8 @@ namespace regi
         initDraw();
         initHandSize();
         initPlayers();
+        activePlayerID = 0;
+        currentPhaseIsAttack = true;
         log.startgame(*this);
     }
 

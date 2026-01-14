@@ -82,7 +82,8 @@ namespace regi
 
     void ConsoleLog::state(const GameState &g)
     {
-        std::cout << "Phase #" << g.phaseCount << "\n";
+        std::cout << "\nPhase #" << g.phaseCount;
+        std::cout << " " << (g.currentPhaseIsAttack ? "(attack)" : "(defense)") << "\n";
         for (i32 i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
@@ -97,12 +98,12 @@ namespace regi
             const Enemy &e = g.enemyPile.front();
             std::cout << "current enemy: " << e << " with " << e.hp << "HP\n";
         }
-        std::cout << "\n";
     }
 
     void ConsoleLog::debug(const GameState &g)
     {
-        std::cout << "Phase #" << g.phaseCount << "\n";
+        std::cout << "\nPhase #" << g.phaseCount << "\n";
+        std::cout << " " << (g.currentPhaseIsAttack ? "(attack)" : "(defense)") << "\n";
         for (i32 i = 0; i < g.players.size(); ++i)
         {
             std::cout << "Player " << i << ": " << g.players[i];
@@ -119,19 +120,6 @@ namespace regi
             const Enemy &e = g.enemyPile.front();
             std::cout << "current enemy: " << e << " with " << e.hp << "HP\n";
         }
-        std::cout << "\n";
-    }
-
-    void ConsoleLog::startPlayerTurn(const GameState &g)
-    {
-        (void)g;
-        std::cout << "\n\n";
-    }
-
-    void ConsoleLog::endPlayerTurn(const GameState &g)
-    {
-        (void)g;
-        std::cout << "\n\n";
     }
 
     void ConsoleLog::startgame(const GameState &g)

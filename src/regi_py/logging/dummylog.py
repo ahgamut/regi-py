@@ -48,9 +48,3 @@ class DummyLog(BaseLog):
 
     def debug(self, game):
         pass
-
-    def startPlayerTurn(self, game):
-        pass
-
-    def endPlayerTurn(self, game):
-        pass

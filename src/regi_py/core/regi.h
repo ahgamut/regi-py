@@ -31,7 +31,6 @@ namespace regi
        private:
         BaseLog &log;
         i32 handSize;
-        i32 activePlayerID;
         void initHandSize();
         void initPlayers();
         void initDraw();
@@ -39,6 +38,8 @@ namespace regi
 
        public:
         GameStatus status;
+        bool currentPhaseIsAttack;
+        i32 activePlayerID;
         i32 pastYieldsInARow;
         i32 phaseCount;
         std::vector<Player> players;
@@ -51,7 +52,8 @@ namespace regi
         GameState(BaseLog &l) : log(l)
         {
             status = GameStatus::LOADING;
-            activePlayerID = -1;
+            activePlayerID = 0;
+            currentPhaseIsAttack = false;
         };
         i32 addPlayer(Strategy &);
         void init();
@@ -59,12 +61,11 @@ namespace regi
         void setup();
         bool gameRunning() { return this->status == GameStatus::RUNNING; }
 
-        i32 getActivePlayer() { return activePlayerID; }
         i32 getHandSize() { return handSize; }
         i32 totalPlayers() { return static_cast<i32>(players.size()); }
 
         void startLoop();
-        void oneTurn(Player &);
+        void onePhase();
         void gameOver(EndGameReason);
         void postGameResult();
 
@@ -108,8 +109,6 @@ namespace regi
         virtual void enemyKill(const Enemy &, const GameState &) = 0;
         virtual void state(const GameState &) = 0;
         virtual void debug(const GameState &) = 0;
-        virtual void startPlayerTurn(const GameState &) = 0;
-        virtual void endPlayerTurn(const GameState &) = 0;
         virtual void startgame(const GameState &) = 0;
         virtual void endgame(EndGameReason, const GameState &) = 0;
         virtual void postgame(const GameState &) = 0;

@@ -228,14 +228,6 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, debug, g);
     }
-    void startPlayerTurn(const GameState &g) override
-    {
-        PYBIND11_OVERRIDE_PURE(void, BaseLog, startPlayerTurn, g);
-    }
-    void endPlayerTurn(const GameState &g) override
-    {
-        PYBIND11_OVERRIDE_PURE(void, BaseLog, endPlayerTurn, g);
-    }
     void startgame(const GameState &g) override
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, startgame, g);
@@ -269,8 +261,6 @@ void bind_log(pybind11::object &m)
         .def("enemyKill", &BaseLog::enemyKill)
         .def("state", &BaseLog::state)
         .def("debug", &BaseLog::debug)
-        .def("startPlayerTurn", &BaseLog::startPlayerTurn)
-        .def("endPlayerTurn", &BaseLog::endPlayerTurn)
         .def("startgame", &BaseLog::startgame)
         .def("endgame", &BaseLog::endgame)
         .def("postgame", &BaseLog::postgame);
@@ -286,7 +276,8 @@ void bind_gamestate(pybind11::object &m)
         .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>())
         .def_property_readonly("num_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
-        .def_property_readonly("active_player", &GameState::getActivePlayer)
+        .def_readonly("active_player", &GameState::activePlayerID)
+        .def_readonly("phase_attacking", &GameState::currentPhaseIsAttack)
         .def_readonly("phase_count", &GameState::phaseCount)
         .def_readonly("past_yields", &GameState::pastYieldsInARow)
         .def_readonly("status", &GameState::status)

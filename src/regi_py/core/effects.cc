@@ -231,24 +231,20 @@ namespace regi
 
     void GameState::startLoop()
     {
-        i32 tp;
-        tp = totalPlayers();
         while (gameRunning())
         {
             log.state(*this);
-            for (activePlayerID = 0; activePlayerID < tp; ++activePlayerID)
-            {
-                oneTurn(players[activePlayerID]);
-                if (!gameRunning()) break;
-            }
+            onePhase();
         }
         status = GameStatus::ENDED;
         postGameResult();
     }
 
-    void GameState::oneTurn(Player &player)
+    void GameState::onePhase()
     {
-        log.startPlayerTurn(*this);
+        i32 tp = totalPlayers();
+        if (activePlayerID < 0 || activePlayerID >= tp) { gameOver(INVALID_START); }
+        Player &player = players[activePlayerID];
         if (!player.alive)
         {
             gameOver(PLAYER_DEAD);
@@ -259,25 +255,23 @@ namespace regi
             gameOver(NO_ENEMIES);
             return;
         }
-
-        while (enemyPile.size() > 0)
+        Enemy &enemy = enemyPile.front();
+        if (currentPhaseIsAttack)
         {
-            Enemy &enemy = enemyPile.front();
             attackPhase(player, enemy);
-            if (!currentEnemyDead()) { break; }
+            // attack ended, defend if enemy still alive
+            currentPhaseIsAttack = currentEnemyDead();
         }
-
-        if (!player.alive)
+        else
         {
-            gameOver(PLAYER_DEAD);
-            return;
+            defensePhase(player, enemyPile.front());
+            // next player attack iff game is still running
+            if (gameRunning()) {
+                activePlayerID += 1;
+                activePlayerID %= tp;
+                currentPhaseIsAttack = true;
+            }
         }
-        if (enemyPile.size() == 0)
-        {
-            gameOver(NO_ENEMIES);
-            return;
-        }
-        defensePhase(player, enemyPile.front());
-        log.endPlayerTurn(*this);
     }
+
 } /* namespace regi */
