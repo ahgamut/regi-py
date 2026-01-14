@@ -199,9 +199,18 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, failBlock, player, damage, maxblock, g);
     }
+    void fullBlock(const Player &player, const i32 damage, const i32 fblock,
+                   const GameState &g) override
+    {
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, fullBlock, player, damage, fblock, g);
+    }
     void drawOne(const Player &player) override
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, drawOne, player);
+    }
+    void cannotDrawDeckEmpty(const Player &player, const GameState &g) override
+    {
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, cannotDrawDeckEmpty, player, g);
     }
     void replenish(const i32 n) override
     {
@@ -253,7 +262,9 @@ void bind_log(pybind11::object &m)
         .def("attack", &BaseLog::attack)
         .def("defend", &BaseLog::defend)
         .def("failBlock", &BaseLog::failBlock)
+        .def("fullBlock", &BaseLog::fullBlock)
         .def("drawOne", &BaseLog::drawOne)
+        .def("cannotDrawDeckEmpty", &BaseLog::cannotDrawDeckEmpty)
         .def("replenish", &BaseLog::replenish)
         .def("enemyKill", &BaseLog::enemyKill)
         .def("state", &BaseLog::state)

@@ -69,6 +69,7 @@ namespace regi
         void postGameResult();
 
         bool canDraw(Player &);
+        bool cannotDrawBecauseDeckEmpty(Player &);
         void playerDraws(Player &, int);
         i32 playerDrawsOne(Player &);
         void refreshDraws(int, int);
@@ -99,7 +100,10 @@ namespace regi
                             const GameState &) = 0;
         virtual void failBlock(const Player &, const i32, const i32,
                                const GameState &) = 0;
+        virtual void fullBlock(const Player &, const i32, const i32,
+                               const GameState &) = 0;
         virtual void drawOne(const Player &) = 0;
+        virtual void cannotDrawDeckEmpty(const Player &, const GameState &) = 0;
         virtual void replenish(const i32) = 0;
         virtual void enemyKill(const Enemy &, const GameState &) = 0;
         virtual void state(const GameState &) = 0;

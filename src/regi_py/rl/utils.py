@@ -255,7 +255,13 @@ class MemoryLog(BaseLog):
     def failBlock(self, player, damage, maxblock, game):
         pass
 
+    def fullBlock(self, player, damage, block, game):
+        pass
+
     def drawOne(self, player):
+        pass
+
+    def cannotDrawDeckEmpty(self, player, game):
         pass
 
     def replenish(self, n_cards):

@@ -86,8 +86,23 @@ class JSONBaseLog(BaseLog):
             }
         )
 
+    def fullBlock(self, player, damage, fullblock, game):
+        self.log(
+            {
+                "event": "FULLBLOCK",
+                "player": player,
+                "enemy": game.enemy_pile[0],
+                "fullblock": fullblock,
+                "damage": damage,
+                "game": game,
+            }
+        )
+
     def drawOne(self, player):
         self.log({"event": "DRAWONE", "player": player})
+
+    def cannotDrawDeckEmpty(self, player, game):
+        self.log({"event": "DECKEMPTY", "player": player})
 
     def replenish(self, n_cards):
         self.log({"event": "REPLENISH", "n_cards": n_cards})

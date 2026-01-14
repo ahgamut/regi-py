@@ -30,8 +30,8 @@ namespace regi
         std::cout << "\n";
     }
 
-    void ConsoleLog::defend(const Player &player, const Combo &cur,
-                            const i32 damage, const GameState &g)
+    void ConsoleLog::defend(const Player &player, const Combo &cur, const i32 damage,
+                            const GameState &g)
     {
         (void)g;
         std::cout << "Player " << player.id;
@@ -50,9 +50,26 @@ namespace regi
         std::cout << "\n";
     }
 
+    void ConsoleLog::fullBlock(const Player &player, const i32 damage, const i32 fblock,
+                               const GameState &g)
+    {
+        (void)g;
+        std::cout << "Player " << player.id;
+        std::cout << " blocks " << damage;
+        std::cout << " with existing block " << fblock;
+        std::cout << "\n";
+    }
+
     void ConsoleLog::drawOne(const Player &player)
     {
         std::cout << "Player " << player.id << " drew a card\n";
+    }
+
+    void ConsoleLog::cannotDrawDeckEmpty(const Player &player, const GameState &g)
+    {
+        (void)g;
+        std::cout << "Player " << player.id
+                  << " cannot draw because the deck is empty\n";
     }
 
     void ConsoleLog::replenish(const i32 n)
@@ -129,7 +146,8 @@ namespace regi
         switch (reason)
         {
             case INVALID_START:
-                std::cout << "endgame: only 2, 3, or 4 players allowed, but there are " <<  g.players.size() <<"\n";
+                std::cout << "endgame: only 2, 3, or 4 players allowed, but there are "
+                          << g.players.size() << "\n";
                 break;
             case BLOCK_FAILED:
                 std::cout << "endgame: someone was unable to block\n";
@@ -163,9 +181,7 @@ namespace regi
             return;
         }
         if (g.enemyPile.size() == 0) { std::cout << "WIN!\n"; }
-        if (!allAlive) {
-            std::cout << "Someone didn't make it\n";
-        }
+        if (!allAlive) { std::cout << "Someone didn't make it\n"; }
 
         std::cout << "Game lasted " << g.phaseCount << " phases\n";
         if (g.enemyPile.size() != 0)

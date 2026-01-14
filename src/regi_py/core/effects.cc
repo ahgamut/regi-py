@@ -8,13 +8,14 @@ namespace regi
         return (drawPile.size() != 0) && player.cards.size() < handSize;
     }
 
+    bool GameState::cannotDrawBecauseDeckEmpty(Player &player)
+    {
+        return (drawPile.size() == 0 && player.cards.size() < handSize);
+    }
+
     void GameState::playerDraws(Player &player, i32 n)
     {
-        for (; n > 0 && canDraw(player); n--)
-        {
-            player.cards.push_back(drawPile.front());
-            drawPile.erase(drawPile.begin());
-        }
+        for (; n > 0; n--) { playerDrawsOne(player); }
     }
 
     i32 GameState::playerDrawsOne(Player &player)
@@ -26,7 +27,12 @@ namespace regi
             drawPile.erase(drawPile.begin());
             return 1;
         }
-        return 0;
+        else if (cannotDrawBecauseDeckEmpty(player))
+        {
+            log.cannotDrawDeckEmpty(player, *this);
+            return 0;
+        }
+        else { return 0; }
     }
 
     void GameState::refreshDiscards(i32 n)
@@ -54,7 +60,8 @@ namespace regi
         ip %= tp;
         for (i = ip; n > 0; n--)
         {
-            if (playerDrawsOne(players[i]) == 0) { full[i] = 1; }
+            playerDrawsOne(players[i]);
+            if (players[i].cards.size() == handSize) { full[i] = 1; }
             i += 1;
             i %= tp;
             // if all players are full, stop draw
@@ -115,7 +122,11 @@ namespace regi
         phaseCount += 1;
         i32 block = calcBlock(enemy);
         i32 damage = enemy.strength() - block;
-        if (damage <= 0) { return; }
+        if (damage <= 0)
+        {
+            log.fullBlock(player, damage, block, *this);
+            return;
+        }
         i32 tblock = 0;
         for (auto c : player.cards) { tblock += c.strength(); }
         if (damage > tblock)
@@ -249,12 +260,11 @@ namespace regi
             return;
         }
 
-        while (enemyPile.size() > 0) {
+        while (enemyPile.size() > 0)
+        {
             Enemy &enemy = enemyPile.front();
             attackPhase(player, enemy);
-            if (!currentEnemyDead()) {
-                break;
-            }
+            if (!currentEnemyDead()) { break; }
         }
 
         if (!player.alive)

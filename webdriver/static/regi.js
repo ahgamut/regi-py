@@ -337,6 +337,9 @@ function processLog(data) {
         case 'DRAWONE':
             logMessage(`Player ${data.player.id} drew a card`);
             break;
+        case 'DECKEMPTY':
+            logMessage(`Player ${data.player.id} cannot draw`);
+            break;
         case 'ENDGAME':
             endGameStatusUpdate();
             logMessage("Game has ended", 'is-primary');
@@ -374,6 +377,9 @@ function processLog(data) {
         case 'FAILBLOCK':
             logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage}`, 'is-danger');
             logMessage(`Player ${data.player.id} can block at most ${data.maxblock}!`, 'is-danger');
+            break;
+        case 'FULLBLOCK':
+            logMessage(`${data.enemy.value} is blocked by Player ${data.player.id}`, 'is-info');
             break;
         case 'STATE':
         case 'DEBUG':
