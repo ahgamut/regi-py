@@ -1,4 +1,5 @@
 from regi_py.core import *
+from regi_py.logging import DummyLog
 import sys
 import numpy as np
 
@@ -184,7 +185,7 @@ class Numberizer:
         return state
 
 
-class MemoryLog(BaseLog):
+class MemoryLog(DummyLog):
     def __init__(self, N=100):
         super().__init__()
         self.N = N
@@ -222,12 +223,6 @@ class MemoryLog(BaseLog):
         return cls
 
     ####
-    def startgame(self, game):
-        pass
-
-    def endgame(self, reason, game):
-        pass
-
     def postgame(self, game):
         active_player = max(0, game.active_player)
         if len(game.enemy_pile) == 0:
@@ -243,43 +238,3 @@ class MemoryLog(BaseLog):
         )
         end_state["option"] = None
         self.memories.append(end_state)
-
-    ####
-
-    def attack(self, player, enemy, combo, damage, game):
-        pass
-
-    def defend(self, player, combo, damage, game):
-        pass
-
-    def failBlock(self, player, damage, maxblock, game):
-        pass
-
-    def fullBlock(self, player, damage, block, game):
-        pass
-
-    def drawOne(self, player):
-        pass
-
-    def cannotDrawDeckEmpty(self, player, game):
-        pass
-
-    def replenish(self, n_cards):
-        pass
-
-    def enemyKill(self, enemy, game):
-        pass
-
-    ####
-
-    def state(self, game):
-        pass
-
-    def debug(self, game):
-        pass
-
-    def startPlayerTurn(self, game):
-        pass
-
-    def endPlayerTurn(self, game):
-        pass

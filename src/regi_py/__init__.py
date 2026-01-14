@@ -3,7 +3,7 @@ from .core import Card, Enemy
 from .core import Player
 from .core import BaseLog, CXXConsoleLog
 from .core import GameState
-from .logging import JSONBaseLog, JSONLog, RegiEncoder
+from .logging import JSONBaseLog, JSONLog, RegiEncoder, DummyLog
 
 #
 from .strats import STRATEGY_LIST as strat1
