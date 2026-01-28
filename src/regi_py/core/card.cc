@@ -38,6 +38,20 @@ i32 Card::toIndex() const
            (TOTAL_ENTRY_OPTIONS * static_cast<i32>(this->s));
 }
 
+bool Card::fromIndex(i32 ind) {
+    i32 e0 = ind % TOTAL_ENTRY_OPTIONS;
+    i32 s0 = ind / TOTAL_ENTRY_OPTIONS;
+    // valid entry?
+    if (e0 < 0 || e0 >= TOTAL_ENTRY_OPTIONS) return false;
+    // valid suit?
+    if (s0 < 0 || s0 >= TOTAL_SUIT_OPTIONS) return false;
+    // valid joker?
+    if (e0 == 0 && s0 != 0) return false;
+    this->e = static_cast<Entry>(e0);
+    this->s = static_cast<Suit>(s0);
+    return true;
+}
+
 bool Card::operator<(const Card& other) const
 {
     if (this->s == other.s) { return this->e < other.e; }

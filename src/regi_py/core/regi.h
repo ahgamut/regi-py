@@ -17,7 +17,8 @@ namespace regi
 
     enum EndGameReason
     {
-        INVALID_START,
+        INVALID_START_PLAYER_COUNT,
+        INVALID_START_PLAYER_SETUP,
         NO_ENEMIES,
         BLOCK_FAILED,
         ATTACK_FAILED,
@@ -25,6 +26,7 @@ namespace regi
     };
 
     struct BaseLog;
+    struct PhaseInfo;
     //
     struct GameState
     {
@@ -58,6 +60,8 @@ namespace regi
         i32 addPlayer(Strategy &);
         void init();
         void initRandom();
+        void initPhaseInfo(const PhaseInfo &);
+        void loadPhaseInfoForExport(PhaseInfo &);
         void setup();
 
         //

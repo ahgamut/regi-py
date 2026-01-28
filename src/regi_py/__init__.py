@@ -3,6 +3,7 @@ from .core import Card, Enemy
 from .core import Player
 from .core import BaseLog, CXXConsoleLog
 from .core import GameState
+from .core import PhaseInfo
 from .logging import JSONBaseLog, JSONLog, RegiEncoder, DummyLog
 
 #

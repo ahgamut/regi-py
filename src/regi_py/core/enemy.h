@@ -8,6 +8,7 @@ namespace regi
     {
        public:
         i32 hp;
+        Enemy() : Card(), hp(-1) {};
         Enemy(Entry ee, Suit ss);
     };
 } /* namespace regi */

@@ -243,7 +243,7 @@ namespace regi
     void GameState::onePhase()
     {
         i32 tp = totalPlayers();
-        if (activePlayerID < 0 || activePlayerID >= tp) { gameOver(INVALID_START); }
+        if (activePlayerID < 0 || activePlayerID >= tp) { gameOver(INVALID_START_PLAYER_COUNT); }
         Player &player = players[activePlayerID];
         if (!player.alive)
         {

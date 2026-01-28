@@ -51,6 +51,7 @@ struct Card
     Entry entry() const;
     Suit suit() const;
     i32 toIndex() const;
+    bool fromIndex(i32);
     bool operator<(const Card&) const;
     bool operator>(const Card&) const;
     bool operator==(const Card&) const;

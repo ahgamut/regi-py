@@ -1,6 +1,7 @@
 #include <regi.h>
 #include <console.h>
 #include <dfsel.h>
+#include <phaseinfo.h>
 //
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -12,7 +13,7 @@ using namespace regi;
 template <typename T>
 std::string stringify(const T &t)
 {
-    std::stringstream ss;
+    std::ostringstream ss;
     ss << t;
     return ss.str();
 }
@@ -63,7 +64,8 @@ void bind_enums(pybind11::object &m)
         .finalize();
 
     py::native_enum<EndGameReason>(m, "EndGameReason", "enum.IntEnum")
-        .value("INVALID_START", EndGameReason::INVALID_START)
+        .value("INVALID_START_PLAYER_COUNT", EndGameReason::INVALID_START_PLAYER_COUNT)
+        .value("INVALID_START_PLAYER_SETUP", EndGameReason::INVALID_START_PLAYER_SETUP)
         .value("NO_ENEMIES", EndGameReason::NO_ENEMIES)
         .value("BLOCK_FAILED", EndGameReason::BLOCK_FAILED)
         .value("ATTACK_FAILED", EndGameReason::ATTACK_FAILED)
@@ -88,7 +90,8 @@ void bind_cards(pybind11::object &m)
         .def(
             "__gt__", [](const Card &c1, const Card &c2) { return c1 > c2; },
             py::is_operator())
-        .def("__hash__", [](const Card &c) { return std::hash<std::string>{}(stringify<Card>(c)); })
+        .def("__hash__",
+             [](const Card &c) { return std::hash<std::string>{}(stringify<Card>(c)); })
         .def("__repr__", &stringify<Card>)
         .def("__str__", &stringify<Card>);
 
@@ -275,6 +278,41 @@ void bind_log(pybind11::object &m)
         .def(py::init<>());
 }
 
+void loadPhaseInfoOrFail(PhaseInfo &info, std::string s)
+{
+    if (!info.loadFromString(s))
+    {
+        throw std::runtime_error("unable to load info from string");
+    }
+}
+
+void bind_phaseinfo(pybind11::object &m)
+{
+    py::class_<PhaseInfo>(m, "PhaseInfo")
+        .def_static("from_string",
+                    [](std::string s)
+                    {
+                        PhaseInfo info;
+                        loadPhaseInfoOrFail(info, s);
+                        return info;
+                    })
+        .def_readonly("num_players", &PhaseInfo::numPlayers)
+        .def_readonly("game_endvalue", &PhaseInfo::gameHasEnded)
+        .def_readonly("active_player", &PhaseInfo::activePlayerID)
+        .def_readonly("phase_attacking", &PhaseInfo::currentPhaseIsAttack)
+        .def_readonly("past_yields", &PhaseInfo::pastYieldsInARow)
+        .def_readonly("player_cards", &PhaseInfo::player_cards)
+        .def_readonly("draw_pile", &PhaseInfo::drawPile)
+        .def_readonly("discard_pile", &PhaseInfo::discardPile)
+        .def_readonly("enemy_pile", &PhaseInfo::enemyPile)
+        .def_readonly("used_combos", &PhaseInfo::usedPile)
+        .def("__hash__",
+             [](const PhaseInfo &info) { return std::hash<std::string>{}(info.toString()); })
+        .def("to_string", &PhaseInfo::toString)
+        .def("__str__", &PhaseInfo::toString)
+        .def("__repr__", &PhaseInfo::toString);
+}
+
 void bind_gamestate(pybind11::object &m)
 {
     py::class_<GameState>(m, "GameState")
@@ -293,6 +331,10 @@ void bind_gamestate(pybind11::object &m)
         .def_readonly("discard_pile", &GameState::discardPile)
         .def_readonly("enemy_pile", &GameState::enemyPile)
         .def_readonly("used_combos", &GameState::usedPile)
+        .def("get_current_block", [](GameState &g, Enemy &e) { return g.calcBlock(e); })
+        .def("get_combo_damage", &GameState::calcDamageOfCombo)
+        .def("get_combo_block", &GameState::calcBlockOfCombo)
+        .def("start_loop", &GameState::startLoop)
         .def("initialize",
              [](GameState &g)
              {
@@ -307,10 +349,36 @@ void bind_gamestate(pybind11::object &m)
                  g.setup();
                  return g.status;
              })
-        .def("get_current_block", [](GameState &g, Enemy &e) { return g.calcBlock(e); })
-        .def("get_combo_damage", &GameState::calcDamageOfCombo)
-        .def("get_combo_block", &GameState::calcBlockOfCombo)
-        .def("start_loop", &GameState::startLoop);
+        .def("_init_phaseinfo",
+             [](GameState &g, PhaseInfo &info)
+             {
+                 g.initPhaseInfo(info);
+                 g.setup();
+                 return g.status;
+             })
+        .def("export_phaseinfo",
+             [](GameState &g)
+             {
+                 PhaseInfo info;
+                 g.loadPhaseInfoForExport(info);
+                 return info;
+             })
+        .def("_init_string",
+             [](GameState &g, std::string s)
+             {
+                 PhaseInfo info;
+                 loadPhaseInfoOrFail(info, s);
+                 g.initPhaseInfo(info);
+                 g.setup();
+                 return g.status;
+             })
+        .def("export_string",
+             [](GameState &g)
+             {
+                 PhaseInfo info;
+                 g.loadPhaseInfoForExport(info);
+                 return info.toString();
+             });
 }
 
 PYBIND11_MODULE(core, m)
@@ -321,5 +389,6 @@ PYBIND11_MODULE(core, m)
     bind_strat(m);
     bind_player(m);
     bind_log(m);
+    bind_phaseinfo(m);
     bind_gamestate(m);
 }

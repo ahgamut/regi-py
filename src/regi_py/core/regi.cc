@@ -94,7 +94,7 @@ namespace regi
         else if (totalPlayers() > 4 || totalPlayers() < 2)
         {
             status = GameStatus::ENDED;
-            log.endgame(INVALID_START, *this);
+            log.endgame(INVALID_START_PLAYER_COUNT, *this);
             return;
         }
         shuffle(drawPile, 0, drawPile.size());
@@ -106,7 +106,7 @@ namespace regi
         if (tp > 4 || tp < 2)
         {
             status = GameStatus::ENDED;
-            log.endgame(INVALID_START, *this);
+            log.endgame(INVALID_START_PLAYER_COUNT, *this);
             return;
         }
         if (tp == 2) { handSize = 7; }
@@ -140,13 +140,21 @@ namespace regi
 
     void GameState::setup()
     {
+        if (status == GameStatus::ENDED) {
+            log.endgame(INVALID_START_PLAYER_SETUP, *this);
+            return;
+        }
         // in a server-style setup we'd initialize the connections here
         for (i32 i = 0; i < totalPlayers(); ++i)
         {
-            if (!players[i].alive || players[i].strat.setup(players[i], *this) != 0)
+            bool validPlayer = players[i].alive;
+            validPlayer = validPlayer && (players[i].strat.setup(players[i], *this) == 0);
+            validPlayer = validPlayer && (players[i].cards.size() <= handSize);
+            if (!validPlayer)
             {
                 status = GameStatus::ENDED;
-                log.endgame(INVALID_START, *this);
+                log.endgame(INVALID_START_PLAYER_SETUP, *this);
+                return;
             }
         }
         status = GameStatus::RUNNING;
