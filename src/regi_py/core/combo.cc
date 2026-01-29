@@ -3,7 +3,7 @@
 namespace regi
 {
 
-    Combo::Combo() : baseDmg(0), powers(0) {};
+    Combo::Combo() : baseDmg(0), powers(0), bitrep(0) {};
 
     bool Combo::valid(bool yieldAllowed)
     {
@@ -84,6 +84,11 @@ namespace regi
             os << ")";
         }
         return os;
+    }
+
+    u32 Combo::getBitrep() const { return this->bitrep; }
+    void Combo::setBitrep(u32 br) {
+        this->bitrep = br;
     }
 } /* namespace regi */
 

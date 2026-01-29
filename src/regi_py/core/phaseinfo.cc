@@ -18,7 +18,7 @@ namespace regi
         if (obtained != (expected)) return false; \
     }
 
-#define EXPECT_WITHIN(ss, target, lower, upper)                \
+#define EXPECT_WITHIN(ss, target, lower, upper)                     \
     {                                                               \
         (ss) >> (target);                                           \
         if ((target) < (lower) || (target) > (upper)) return false; \
@@ -40,13 +40,13 @@ namespace regi
         EXPECT_SEPARATOR(ss, SEP2);
         EXPECT_WITHIN(ss, numPlayers, 2, 4);
         EXPECT_SEPARATOR(ss, SEP2);
-        EXPECT_WITHIN(ss, activePlayerID, 0, numPlayers-1);
+        EXPECT_WITHIN(ss, activePlayerID, 0, numPlayers - 1);
         EXPECT_SEPARATOR(ss, SEP2);
-        EXPECT_WITHIN(ss, pastYieldsInARow, 0, numPlayers-1);
+        EXPECT_WITHIN(ss, pastYieldsInARow, 0, numPlayers - 1);
         EXPECT_SEPARATOR(ss, SEP1);
         // player cards
         player_cards.resize(numPlayers);
-        i32 maxHandSize = 9 - numPlayers; // 9 - 2 = 7
+        i32 maxHandSize = 9 - numPlayers;  // 9 - 2 = 7
         for (i32 i = 0; i < numPlayers; ++i)
         {
             EXPECT_WITHIN(ss, subSize, 0, maxHandSize);
@@ -119,6 +119,15 @@ namespace regi
             if ((i + 1) != usedPile.size()) { EXPECT_SEPARATOR(ss, SEP2); }
         }
         EXPECT_SEPARATOR(ss, SEP1);
+        //
+        for (const auto &hand : player_cards)
+        {
+            if (hand.size() > 8) return false;
+        }
+        if (drawPile.size() > 54) return false;
+        if (discardPile.size() > 54) return false;
+        if (usedPile.size() > 16) return false;
+        if (enemyPile.size() > 12) return false;
         // done
         return true;
     }

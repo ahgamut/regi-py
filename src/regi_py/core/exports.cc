@@ -109,6 +109,7 @@ void bind_cards(pybind11::object &m)
                                [](Combo &c) { return c.valid(true) != 0; })
         .def_property_readonly("base_damage", &Combo::getBaseDamage)
         .def_property_readonly("base_defense", &Combo::getBaseDefense)
+        .def_property_readonly("bitwise", &Combo::getBitrep)
         .def("__repr__", &stringify<Combo>)
         .def("__str__", &stringify<Combo>);
 }

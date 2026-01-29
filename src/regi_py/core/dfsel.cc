@@ -9,8 +9,11 @@ namespace regi
     {
         // cards are assumed ordered
         if (i >= cards.size()) { return; }
+        u32 tmp = cur.getBitrep();
         // try adding cards[i] to the combo
         cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
+        cur.setBitrep(tmp | (1 << i));
+        //
         if (cur.valid(yieldAllowed))
         {
             // if combo is valid, accumulate,
@@ -21,6 +24,8 @@ namespace regi
                 calcAttackMoves(cards, combos, yieldAllowed, cur, j);
             }
         }
+        //
+        cur.setBitrep(tmp);
         cur.parts.pop_back();
     }
 
@@ -65,7 +70,10 @@ namespace regi
         // cards are assumed ordered
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
+        u32 tmp = cur.getBitrep();
         cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
+        cur.setBitrep(tmp | (1 << i));
+        //
         if (cur.getBaseDefense() >= damage)
         {
             // if combo can defend, accumulate
@@ -76,6 +84,8 @@ namespace regi
         {
             calcDefenseMoves(cards, combos, damage, cur, j);
         }
+        //
+        cur.setBitrep(tmp);
         cur.parts.pop_back();
     }
 

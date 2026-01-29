@@ -11,6 +11,7 @@ namespace regi
        private:
         i32 baseDmg;
         u32 powers;
+        u32 bitrep;
 
        public:
         std::vector<Card> parts;
@@ -21,6 +22,9 @@ namespace regi
         i32 getBaseDamage() const;
         i32 getBaseDefense() const;
         friend std::ostream &operator<<(std::ostream &, const Combo &);
+        //
+        void setBitrep(u32);
+        u32 getBitrep() const;
     };
 
 } /* namespace regi */
