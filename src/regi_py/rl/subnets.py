@@ -24,7 +24,7 @@ class LinearBlock(nn.Module):
 
 
 class Conv1dBlock(nn.Module):
-    def __init__(self, shapes, channels):
+    def __init__(self, shapes, channels, paddings):
         super(Conv1dBlock, self).__init__()
         self.ac = nn.LeakyReLU(0.05)
         self.nets = []
@@ -36,7 +36,7 @@ class Conv1dBlock(nn.Module):
                         kernel_size=shapes[i],
                         in_channels=channels[i],
                         out_channels=channels[i + 1],
-                        padding=0,
+                        padding=paddings[i],
                         bias=True,
                     ),
                     nn.BatchNorm1d(num_features=channels[i + 1]),
@@ -55,7 +55,7 @@ class Conv1dBlock(nn.Module):
 
 
 class Conv2dBlock(nn.Module):
-    def __init__(self, shapes, channels):
+    def __init__(self, shapes, channels, paddings):
         super(Conv2dBlock, self).__init__()
         self.ac = nn.LeakyReLU(0.05)
         self.nets = []
@@ -67,6 +67,7 @@ class Conv2dBlock(nn.Module):
                         kernel_size=shapes[i],
                         in_channels=channels[i],
                         out_channels=channels[i + 1],
+                        padding=paddings[i],
                     ),
                     nn.BatchNorm2d(num_features=channels[i + 1]),
                 )
