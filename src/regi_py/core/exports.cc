@@ -100,6 +100,7 @@ void bind_cards(pybind11::object &m)
         .def_property_readonly("entry", &Enemy::entry)
         .def_property_readonly("suit", &Enemy::suit)
         .def_property_readonly("strength", &Enemy::strength)
+        .def_property_readonly("index", &Enemy::toIndex)
         .def("__repr__", &stringify<Enemy>)
         .def("__str__", &stringify<Enemy>);
 
