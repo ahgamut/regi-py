@@ -263,6 +263,7 @@ namespace regi
             info.player_cards[i].clear();
             std::copy(players[i].cards.begin(), players[i].cards.end(),
                       std::back_inserter(info.player_cards[i]));
+            std::sort(info.player_cards[i].begin(), info.player_cards[i].end());
         }
         // enemy pile
         info.enemyPile.clear();
