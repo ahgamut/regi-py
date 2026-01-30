@@ -18,6 +18,7 @@ namespace regi
 {
     void GameState::initEnemy()
     {
+        enemyPile.clear();
         enemyPile.push_back(Enemy(JACK, CLUBS));
         enemyPile.push_back(Enemy(JACK, DIAMONDS));
         enemyPile.push_back(Enemy(JACK, HEARTS));
@@ -37,6 +38,7 @@ namespace regi
 
     void GameState::initDraw()
     {
+        drawPile.clear();
         drawPile.push_back(Card(ACE, SPADES));      //
         drawPile.push_back(Card(TWO, SPADES));      //
         drawPile.push_back(Card(THREE, SPADES));    //

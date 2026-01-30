@@ -177,6 +177,7 @@ namespace regi
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
 
+
         Combo curcombo = usedPile.back();
         u32 cpow = (curcombo.getPowers() & (~epow));
         i32 cval = (curcombo.getBaseDamage());
@@ -215,6 +216,7 @@ namespace regi
     {
         phaseCount += 1;
         selectAttack(player, pastYieldsInARow < (totalPlayers() - 1));
+        if (!gameRunning()) return;
         preAttackEffects(player, enemy);
         i32 damage = calcDamage(enemy);
         enemy.hp -= damage;
@@ -259,6 +261,7 @@ namespace regi
         if (currentPhaseIsAttack)
         {
             attackPhase(player, enemy);
+            if (!gameRunning()) return;
             // attack ended, defend if enemy still alive
             currentPhaseIsAttack = currentEnemyDead();
         }
