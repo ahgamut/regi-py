@@ -236,6 +236,8 @@ namespace regi
                       std::back_inserter(players[i].cards));
         }
         status = GameStatus::LOADING;
+        //
+        log.startgame(*this);
     }
 
     void GameState::loadPhaseInfoForExport(PhaseInfo &info)

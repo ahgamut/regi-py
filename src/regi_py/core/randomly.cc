@@ -11,6 +11,8 @@ namespace regi
         initEnemy();
         initDraw();
         initHandSize();
+        discardPile.clear();
+        usedPile.clear();
         // starting at a random point in the game
         std::random_device dev;
         std::default_random_engine engine(dev());
@@ -50,11 +52,10 @@ namespace regi
             shuffle(discardPile, 0, discardPile.size());
         }
 
-        // no cards are in the used pile
-        usedPile.clear();
         //
         activePlayerID = engine() % totalPlayers();
         currentPhaseIsAttack = true;
+        status = GameStatus::LOADING;
         //
         log.startgame(*this);
     }
