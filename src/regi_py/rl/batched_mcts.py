@@ -56,6 +56,7 @@ class BatchedMCTSCollector:
         self.partials = dict()  # [s] -> enum indicating when net was called or not
         self.repeats = CounterDict()  # [s] -> number of times we called search(s)
         self.batch_size = batch_size
+        self.predicts = list()
         self.fanout_count = 0
         self.C = DupeFailDict()  # [s] -> combos
         self.vals = dict()  # [s] -> v (filled backwards?)
@@ -86,6 +87,7 @@ class BatchedMCTSCollector:
         self.repeats.clear()
         self.partials.clear()
         self.fanout_count = 0
+        self.predicts.clear()
         self.C.clear()
         self.vals.clear()
         #
@@ -129,6 +131,8 @@ class BatchedMCTSCollector:
                 self.vals[s] = v_hat[i]
                 self.repeats[s] = 0
                 self.partials[s] = StateValuation.PREDICTED
+                if np.sum(self.C[s]) > 1:
+                    self.predicts.append(s)
             #
             for i, smp in enumerate(subbatch):
                 s = self.phases[smp.phase]
@@ -259,23 +263,23 @@ class BatchedMCTSCollector:
         # print(f"policy for {s} is", arr)
         return arr
 
-    def get_explorable_phase(self, max_sims, mem_size, predicted=False):
-        crossed = 0
-        for s, val in self.E.items():
-            if val != 0:
-                continue
-            if crossed > mem_size:
-                break
-            val_pred = StateValuation.PREDICTED == self.partials[s]
-            if predicted and not val_pred:
-                continue
-            if self.repeats[s] < max_sims:
-                # print(f"{s}({self.partials[s].name} cross={crossed}")
-                phase = self.phases.inverse(s)
-                return phase
-            if val_pred:
-                crossed += 1
-        return None
+    def get_explorable_phase(self, max_sims):
+        if len(self.predicts) == 0:
+            return None
+
+        i = random.randint(0, len(self.predicts) - 1)
+        s = self.predicts[i]
+
+        while self.repeats[s] >= max_sims:
+            self.predicts.pop(i)
+            if len(self.predicts) == 0:
+                return None
+            i = random.randint(0, len(self.predicts) - 1)
+            s = self.predicts[i]
+
+        self.predicts.pop(i)
+        phase = self.phases.inverse(s)
+        return phase
 
     def get_end_phases(self):
         res = []
@@ -402,10 +406,10 @@ class BatchedMCTS:
             if self.count_examples() > self.N:
                 break
             self._sim_game_from(phase, sims)
-            phase = self.coll.get_explorable_phase(sims, self.N, predicted=True)
+            phase = self.coll.get_explorable_phase(sims)
             if phase is None:
                 self.coll._obtain_network_probs(forced=True)
-                phase = self.coll.get_explorable_phase(sims, self.N, predicted=True)
+                phase = self.coll.get_explorable_phase(sims)
 
-        # show_new_samples()
+        # self.show_new_samples()
         return self.count_examples() > self.N
