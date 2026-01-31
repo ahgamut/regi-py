@@ -231,18 +231,17 @@ class BatchedMCTSCollector:
                 if s is None:
                     return
                 # update Q only if we already have predictions
-                if self.partials[s] == StateValuation.FANOUT:
-                    return
-                if (s, a) in self.Q:
-                    q1 = self.N1[(s, a)] * self.Q[(s, a)] + v
-                    q2 = 1 + self.N1[(s, a)]
-                    self.Q[(s, a)] = q1 / q2
-                    self.N1[(s, a)] += 1
-                else:
-                    self.Q[(s, a)] = v
-                    self.N1[(s, a)] = 1
+                if self.partials[s] == StateValuation.PREDICTED:
+                    if (s, a) in self.Q:
+                        q1 = self.N1[(s, a)] * self.Q[(s, a)] + v
+                        q2 = 1 + self.N1[(s, a)]
+                        self.Q[(s, a)] = q1 / q2
+                        self.N1[(s, a)] += 1
+                    else:
+                        self.Q[(s, a)] = v
+                        self.N1[(s, a)] = 1
 
-                self.N0[s] += 1
+                    self.N0[s] += 1
                 set_qn(s)
 
         set_qn(next_s)
