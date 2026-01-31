@@ -184,6 +184,14 @@ class MC1Model(torch.nn.Module):
         v_hat = v_hat0.cpu().detach().numpy()[0]
         return prob_hat, v_hat
 
+    def batch_predict(self, batch):
+        # print("calling batch_predict for: ", len(batch))
+        states, _, _ = self.tensorify(batch, len(batch))
+        prob_hat0, v_hat0 = self.forward(states)
+        prob_hat = prob_hat0.cpu().detach().numpy()
+        v_hat = v_hat0.cpu().detach().numpy()
+        return prob_hat, v_hat
+
     def tensorify(self, examples, batch_size):
         return MC1Model._tensorify(examples, batch_size)
 
