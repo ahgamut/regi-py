@@ -73,17 +73,20 @@ def test_model(episode, model, num_simulations):
         e1 = total_enemy_hp(game)
         diffe.append(log.diffe())
     print("test games:", diffe)
-    torch.save(model.state_dict(), "./weights/best_model.pt")
+    torch.save(model.state_dict(), f"./weights/model_{episode}.pt")
 
 
 def trainer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to train")
     torch.set_num_threads(os.cpu_count() // params.num_processes)
-    train_model = shared_model.to(device)
-    train_model.load_state_dict(shared_model.state_dict())
-    train_model.train()
-    loss_fn = MCTSLoss
-    optimizer = torch.optim.Adam(train_model.parameters(), lr=0.01)
+    with torch.device(device):
+        train_model = MC1Model()
+        train_model.device = device
+        train_model.load_state_dict(shared_model.state_dict())
+        train_model = train_model.to(device)
+        train_model.train()
+        loss_fn = MCTSLoss
+        optimizer = torch.optim.Adam(train_model.parameters(), lr=0.01)
 
     ep = 0
     while ep < params.num_episodes:
@@ -107,6 +110,7 @@ def trainer(tid, shared_model, queue, device, params):
         print("training in episode", ep, "loss =", np.mean(loss))
         if ep % params.test_every == 0:
             shared_model.load_state_dict(train_model.state_dict())
+            shared_model.to(shared_model.device)
             test_model(ep, shared_model, params.num_simulations)
         ep += 1
 

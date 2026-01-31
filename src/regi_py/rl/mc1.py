@@ -193,10 +193,10 @@ class MC1Model(torch.nn.Module):
         return prob_hat, v_hat
 
     def tensorify(self, examples, batch_size):
-        return MC1Model._tensorify(examples, batch_size)
+        return MC1Model._tensorify(examples, batch_size, self.device)
 
     @classmethod
-    def _tensorify(cls, examples, batch_size):
+    def _tensorify(cls, examples, batch_size, device):
         sub = random.sample(examples, batch_size)
 
         player_cards = torch.full((batch_size, 4, 8), cls.NOT_A_CARD, dtype=torch.long)
@@ -257,12 +257,12 @@ class MC1Model(torch.nn.Module):
             values[b] = s.value
 
         res = dict(
-            player_cards=player_cards,
-            enemy_pile=enemy_pile,
-            enemy_hp=enemy_hp,
-            used_pile=used_pile,
-            draw_pile=draw_pile,
-            discard_pile=discard_pile,
-            player_atk=player_atk,
+            player_cards=player_cards.to(device),
+            enemy_pile=enemy_pile.to(device),
+            enemy_hp=enemy_hp.to(device),
+            used_pile=used_pile.to(device),
+            draw_pile=draw_pile.to(device),
+            discard_pile=discard_pile.to(device),
+            player_atk=player_atk.to(device),
         )
-        return res, probs, values
+        return res, probs.to(device), values.to(device)
