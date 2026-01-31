@@ -312,7 +312,18 @@ void bind_phaseinfo(pybind11::object &m)
              [](const PhaseInfo &info) { return std::hash<std::string>{}(info.toString()); })
         .def("to_string", &PhaseInfo::toString)
         .def("__str__", &PhaseInfo::toString)
-        .def("__repr__", &PhaseInfo::toString);
+        .def("__repr__", &PhaseInfo::toString)
+        .def(py::pickle(
+            [](const PhaseInfo& info) { // dump
+                return py::make_tuple(info.toString());
+            },
+            [](py::tuple t) { // load
+                std::string s0 = t[0].cast<std::string>();
+                PhaseInfo info;
+                loadPhaseInfoOrFail(info, s0);
+                return info;
+            }
+        ));
 }
 
 void bind_gamestate(pybind11::object &m)

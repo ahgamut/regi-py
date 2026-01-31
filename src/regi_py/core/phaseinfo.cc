@@ -107,7 +107,7 @@ namespace regi
         usedPile.resize(pileSize);
         for (i32 i = 0; i < pileSize; ++i)
         {
-            EXPECT_WITHIN(ss, subSize, 1, 4);
+            EXPECT_WITHIN(ss, subSize, 0, 4);
             EXPECT_SEPARATOR(ss, SEP2);
             usedPile[i].parts.resize(subSize);
             for (i32 j = 0; j < subSize; ++j)
