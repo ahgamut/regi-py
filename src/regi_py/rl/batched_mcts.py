@@ -48,7 +48,7 @@ class BatchedMCTSCollector:
         #
         self.Q = dict()  # [(s,a)] -> q
         self.N0 = CounterDict()  # [s] -> int
-        self.N1 = CounterDict()  # [(s,a)] -> int
+        self.N1 = dict()  # [s] -> array of ints
         self.P = dict()  # [s] -> probability vector
         self.E = DupeFailDict()  # [s] -> ??? (only for endgame?)
         #
@@ -106,6 +106,7 @@ class BatchedMCTSCollector:
         self.P[s] = np.ones((128,), dtype=np.float32) * self.C[s]
         self.P[s] = _normalize_probs(self.P[s])
         self.N0[s] = 0
+        self.N1[s] = np.zeros(128, dtype=np.int32)
         self.partials[s] = StateValuation.FANOUT
         self.fanout_count += 1
 
@@ -136,6 +137,8 @@ class BatchedMCTSCollector:
             self.vals[s] = v_hat[i]
             self.repeats[s] = 0
             self.partials[s] = StateValuation.PREDICTED
+            self.N0[s] = 1
+            self.N1[s] = np.zeros(128, dtype=np.int32)
             if np.sum(self.C[s]) > 1:
                 self.predicts.append(s)
         #
@@ -205,7 +208,7 @@ class BatchedMCTSCollector:
             prob_a = self.P[s][a]
             if (s, a) in self.Q:
                 u1 = self.Q[(s, a)]
-                u2 = self.puct * prob_a * np.sqrt(self.N0[s]) / (1 + self.N1[(s, a)])
+                u2 = self.puct * prob_a * np.sqrt(self.N0[s]) / (1 + self.N1[s][a])
                 u = u1 + u2
             else:  # Q = 0 ?
                 u = self.puct * prob_a * np.sqrt(self.N0[s] + self.epsilon)
@@ -237,13 +240,13 @@ class BatchedMCTSCollector:
                 if s is None:
                     return
                 if (s, a) in self.Q:
-                    q1 = self.N1[(s, a)] * self.Q[(s, a)] + v
-                    q2 = 1 + self.N1[(s, a)]
+                    q1 = self.N1[s][a] * self.Q[(s, a)] + v
+                    q2 = 1 + self.N1[s][a]
                     self.Q[(s, a)] = q1 / q2
-                    self.N1[(s, a)] += 1
+                    self.N1[s][a] += 1
                 else:
                     self.Q[(s, a)] = v
-                    self.N1[(s, a)] = 1
+                    self.N1[s][a] = 1
 
                 self.N0[s] += 1
                 set_qn(s)
@@ -255,8 +258,7 @@ class BatchedMCTSCollector:
         num_actions = len(self.C[s])
         arr = np.zeros(num_actions, dtype=np.float32)
         if len(arr) > 0:
-            for a in range(num_actions):
-                arr[a] = (self.N1[(s, a)] * self.C[s][a]) / den
+            arr = (self.N1[s] * self.C[s]) / den
             if self.depth[s] > self.bound:
                 best = np.argmax(arr)
                 arr *= 0
