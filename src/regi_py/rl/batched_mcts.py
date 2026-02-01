@@ -119,14 +119,12 @@ class BatchedMCTSCollector:
                     break
             if len(batch) == 0:
                 return
-            if len(batch) > self.batch_size:
-                subbatch = random.sample(batch, self.batch_size)
-            else:
-                subbatch = batch
             #
-            self._call_network_with_batch(subbatch)
+            self._call_network_with_batch(batch)
 
     def _call_network_with_batch(self, indbatch):
+        if len(indbatch) > self.batch_size:
+            indbatch = random.sample(indbatch, self.batch_size)
         batch = []
         for s in indbatch:
             spl = self.phases.inverse(s)
@@ -224,6 +222,7 @@ class BatchedMCTSCollector:
             self.depth[cur_s] = 0
             return
         # print("adding edge", (prev_s, prev_a), "->", cur_s)
+        self.repeats[cur_s] = self.repeats.get(cur_s, 0) + 1
         self.f_edges[(prev_s, prev_a)] = cur_s
         self.b_edges[cur_s] = (prev_s, prev_a)  # ouch
         self.depth[cur_s] = self.depth[prev_s] + 1
@@ -237,19 +236,17 @@ class BatchedMCTSCollector:
                 s, a = x
                 if s is None:
                     return
-                # update Q only if we already have predictions
-                if self.partials[s] == StateValuation.PREDICTED:
-                    if (s, a) in self.Q:
-                        q1 = self.N1[(s, a)] * self.Q[(s, a)] + v
-                        q2 = 1 + self.N1[(s, a)]
-                        self.Q[(s, a)] = q1 / q2
-                        self.N1[(s, a)] += 1
-                    else:
-                        self.Q[(s, a)] = v
-                        self.N1[(s, a)] = 1
+                if (s, a) in self.Q:
+                    q1 = self.N1[(s, a)] * self.Q[(s, a)] + v
+                    q2 = 1 + self.N1[(s, a)]
+                    self.Q[(s, a)] = q1 / q2
+                    self.N1[(s, a)] += 1
+                else:
+                    self.Q[(s, a)] = v
+                    self.N1[(s, a)] = 1
 
-                    self.N0[s] += 1
-                    set_qn(s)
+                self.N0[s] += 1
+                set_qn(s)
 
         set_qn(next_s)
 
@@ -412,7 +409,6 @@ class BatchedMCTS:
         for _ in range(sims):
             self.coll.reset_sim()
             self.game._init_phaseinfo(phase)
-            self.coll.repeats[cur_s] = self.coll.repeats[cur_s] + 1
             self.game.start_loop()
         self._collect_examples(sims)
 
