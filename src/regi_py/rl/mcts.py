@@ -1,6 +1,7 @@
 from regi_py.core import *
 from regi_py.rl.mcts_utils import *
 from regi_py.logging import DummyLog
+
 #
 import random
 import time
@@ -250,10 +251,31 @@ class MCTSTrainerStrategy(BaseStrategy):
         return -1
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
-        return self.process_phase(game.export_phaseinfo(), combos)
+        ind = self.process_phase(game.export_phaseinfo(), combos)
+        if ind == -1 or len(combos) < 4:
+            return ind
+        if ind == 0 and random.random() < 0.4:
+            # print("randomly fail yield")
+            return -1
+        return ind
 
     def getDefenseIndex(self, combos, player, damage, game):
-        return self.process_phase(game.export_phaseinfo(), combos)
+        ind = self.process_phase(game.export_phaseinfo(), combos)
+        if ind == -1 or len(combos) < 4:
+            return ind
+        # 
+        sel_blk = combos[ind].base_defense
+        num_discards = len(combos[ind].parts)
+        lower_poss = 0
+        for i, c in enumerate(combos):
+            c_blk = c.base_defense
+            c_dsc = len(c.parts)
+            if c_dsc < num_discards and c_blk <= sel_blk:
+                lower_poss += 1
+        if random.random() < (lower_poss / len(combos)):
+            # print("randomly fail blk:", combos[ind], lower_poss)
+            return -1
+        return ind
 
 
 class MCTSLog(DummyLog):
