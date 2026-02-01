@@ -84,8 +84,8 @@ class BatchedMCTSCollector:
         self.E.clear()
         #
         self.depth.clear()
-        self.repeats.clear()
         self.partials.clear()
+        self.repeats.clear()
         self.fanout_count = 0
         self.predicts.clear()
         self.C.clear()

@@ -115,8 +115,6 @@ def trainer(tid, shared_model, queue, device, params):
         ep += 1
 
     torch.save(shared_model.state_dict(), "./weights/model_end.pt")
-    while not queue.empty():
-        queue.get()
 
 
 def explorer(tid, shared_model, queue, device, params):

@@ -241,6 +241,8 @@ class MCTSTrainerStrategy(BaseStrategy):
 
     def process_phase(self, phase, combos):
         br = self.coll.search(phase, combos)
+        if br == -1:
+            return -1
         for i, x in enumerate(combos):
             if x.bitwise == br:
                 return i
