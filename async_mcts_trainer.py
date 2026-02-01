@@ -123,8 +123,8 @@ def explorer(tid, shared_model, queue, device, params):
     small_N = params.memory_size // (params.num_processes - 1)
     mcts = BatchedMCTS(net=shared_model, N=small_N, batch_size=params.batch_size)
     while True:
-        mcts.reset_game()
         mcts.clear_examples()
+        mcts.reset_game()
         while not mcts.sim_game_full(sims=params.num_simulations):
             mcts.reset_game()
         examples = mcts.get_examples()

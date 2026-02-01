@@ -355,6 +355,7 @@ class BatchedMCTS:
         self.coll.clear()
         self.older_samples += list(self._examples.values())
         self._examples.clear()
+        self.ended_games.clear()
         self.num_players = random.randint(2, 4)
         self.game = GameState(self.log)
         for i in range(self.num_players):
