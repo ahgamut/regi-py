@@ -95,7 +95,6 @@ class BatchedMCTSCollector:
 
     def search(self, phase, combos):
         cur_s = self.phases[phase]
-        self.repeats[cur_s] = self.repeats[cur_s] + 1
         self._connect(self.prev_s, self.prev_a, cur_s)
         a = self._search(cur_s, phase, combos)
         self.prev_s = cur_s
@@ -115,8 +114,9 @@ class BatchedMCTSCollector:
             batch = []
             for s, val in self.partials.items():
                 if val == StateValuation.FANOUT:
-                    spl = self.phases.inverse(s)
-                    batch.append(MCTSSample.eval(spl))
+                    batch.append(s)
+                if len(batch) > self.batch_size:
+                    break
             if len(batch) == 0:
                 return
             if len(batch) > self.batch_size:
@@ -124,20 +124,27 @@ class BatchedMCTSCollector:
             else:
                 subbatch = batch
             #
-            p_hat, v_hat = self.net.batch_predict(subbatch)
-            for i, smp in enumerate(subbatch):
-                s = self.phases[smp.phase]
-                self.P[s] = _normalize_probs(p_hat[i, :] * self.C[s])
-                self.vals[s] = v_hat[i]
-                self.repeats[s] = 0
-                self.partials[s] = StateValuation.PREDICTED
-                if np.sum(self.C[s]) > 1:
-                    self.predicts.append(s)
-            #
-            for i, smp in enumerate(subbatch):
-                s = self.phases[smp.phase]
-                self.update_backwards(s)
-            self.fanout_count -= len(subbatch)
+            self._call_network_with_batch(subbatch)
+
+    def _call_network_with_batch(self, indbatch):
+        batch = []
+        for s in indbatch:
+            spl = self.phases.inverse(s)
+            batch.append(MCTSSample.eval(spl))
+        p_hat, v_hat = self.net.batch_predict(batch)
+        for i, smp in enumerate(batch):
+            s = self.phases[smp.phase]
+            self.P[s] = _normalize_probs(p_hat[i, :] * self.C[s])
+            self.vals[s] = v_hat[i]
+            self.repeats[s] = 0
+            self.partials[s] = StateValuation.PREDICTED
+            if np.sum(self.C[s]) > 1:
+                self.predicts.append(s)
+        #
+        for i, smp in enumerate(batch):
+            s = self.phases[smp.phase]
+            self.update_backwards(s)
+        self.fanout_count -= len(batch)
 
     def _search(self, s, phase, combos):
         if s not in self.C:
@@ -242,7 +249,7 @@ class BatchedMCTSCollector:
                         self.N1[(s, a)] = 1
 
                     self.N0[s] += 1
-                set_qn(s)
+                    set_qn(s)
 
         set_qn(next_s)
 
@@ -262,6 +269,41 @@ class BatchedMCTSCollector:
         # print(f"policy for {s} is", arr)
         return arr
 
+    def fillout_phase_tree(self, cur_s):
+        res = []
+
+        # every descendant of s should have seen the net
+        def fwd_check(s):
+            oth = []
+            if len(res) >= self.batch_size:
+                return
+            for a in range(128):
+                for next_s in self.f_edges.get((s, a), []):
+                    if self.partials[next_s] != StateValuation.PREDICTED:
+                        res.append(next_s)
+                    oth.append(next_s)
+            for next_s in oth:
+                fwd_check(next_s)
+
+        # every ancestor of s should have seen the net
+        def bkd_check(s):
+            oth = []
+            if len(res) >= self.batch_size:
+                return
+            for prev_s, prev_a in self.b_edges.get(s, []):
+                if prev_s is None:
+                    continue
+                if self.partials[prev_s] != StateValuation.PREDICTED:
+                    res.append(prev_s)
+                oth.append(prev_s)
+            for prev_s in oth:
+                bkd_check(prev_s)
+
+        fwd_check(cur_s)
+        bkd_check(cur_s)
+        if len(res) > 0:
+            self._call_network_with_batch(res)
+
     def get_explorable_phase(self, max_sims):
         if len(self.predicts) == 0:
             return None
@@ -269,7 +311,7 @@ class BatchedMCTSCollector:
         i = random.randint(0, len(self.predicts) - 1)
         s = self.predicts[i]
 
-        while self.repeats[s] >= max_sims:
+        while self.repeats[s] >= max_sims or self.E[s] != 0:
             self.predicts.pop(i)
             if len(self.predicts) == 0:
                 return None
@@ -277,6 +319,7 @@ class BatchedMCTSCollector:
             s = self.predicts[i]
 
         self.predicts.pop(i)
+        self.fillout_phase_tree(s)
         phase = self.phases.inverse(s)
         return phase
 
@@ -364,11 +407,13 @@ class BatchedMCTS:
         self.start_phase = self.game.export_phaseinfo()
 
     def _sim_game_from(self, phase, sims):
+        cur_s = self.coll.phases[phase]
+        self.coll.repeats[cur_s] = 0
         for _ in range(sims):
             self.coll.reset_sim()
             self.game._init_phaseinfo(phase)
+            self.coll.repeats[cur_s] = self.coll.repeats[cur_s] + 1
             self.game.start_loop()
-        s = self.coll.phases[phase]
         self._collect_examples(sims)
 
     def _collect_examples(self, sims):
@@ -400,7 +445,13 @@ class BatchedMCTS:
                 f"{i} (phase #{s}) repeats={self.coll.repeats[s]}, value={x.value}, probs={nzp}"
             )
 
+    def sim_game_root(self, sims):
+        self._sim_game_from(self.start_phase, sims)
+        root_s = self.coll.phases[self.start_phase]
+        self.coll.fillout_phase_tree(root_s)
+
     def sim_game_full(self, sims=5):
+        self.sim_game_root(sims)
         phase = self.start_phase
         while phase is not None:
             if self.count_examples() > self.N:
