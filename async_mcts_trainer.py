@@ -72,7 +72,7 @@ def test_model(episode, model, num_simulations):
         game.start_loop()
         e1 = total_enemy_hp(game)
         diffe.append(log.diffe())
-    print("test games:", diffe)
+    print("test games:", diffe, file=sys.stderr)
     torch.save(model.state_dict(), f"./weights/model_{episode}.pt")
 
 
@@ -107,7 +107,7 @@ def trainer(tid, shared_model, queue, device, params):
             loss = run_epoch(train_model, batch, optimizer)
             losses.append(loss)
 
-        print("training in episode", ep, "loss =", np.mean(loss))
+        print("training in episode", ep, "loss =", np.mean(loss), file=sys.stderr)
         if ep % params.test_every == 0:
             shared_model.load_state_dict(train_model.state_dict())
             shared_model.to(shared_model.device)
