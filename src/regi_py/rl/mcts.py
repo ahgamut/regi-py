@@ -215,7 +215,7 @@ class MCTSTesterStrategy(BaseStrategy):
         br = random.choices(range(128), weights=probs, k=1)[0]
         if br in submap:
             return submap[br]
-        # print("sampled invalid move")
+        print("sampled invalid move")
         return -1
 
     def getAttackIndex(self, combos, player, yield_allowed, game):

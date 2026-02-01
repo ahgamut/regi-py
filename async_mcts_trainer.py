@@ -145,6 +145,10 @@ def submain(params):
 
     with torch.device(test_device):
         shared_model = MC1Model()
+        if os.path.isfile(params.weights_path):
+            shared_model.load_state_dict(
+                torch.load(params.weights_path, weights_only=True, map_location=test_device)
+            )
         shared_model.device = test_device
         shared_model.eval()
 
