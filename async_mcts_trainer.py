@@ -78,7 +78,7 @@ def test_model(episode, model, num_simulations):
 
 def trainer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to train")
-    torch.set_num_threads(os.cpu_count() // params.num_processes)
+    torch.set_num_threads(params.num_threads)
     with torch.device(device):
         train_model = MC1Model()
         train_model.device = device
@@ -120,7 +120,7 @@ def trainer(tid, shared_model, queue, device, params):
 
 def explorer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to explore")
-    torch.set_num_threads(os.cpu_count() // params.num_processes)
+    torch.set_num_threads(params.num_threads)
     small_N = params.memory_size // (params.num_processes - 1)
     mcts = MCTS(
         net=shared_model,
@@ -136,7 +136,10 @@ def explorer(tid, shared_model, queue, device, params):
         for x in examples:
             queue.put(x)
         if len(examples) > 0:
-            print(f"P{tid} +{len(examples)} q={queue.qsize()} ({examples[-1].value})", file=sys.stderr)
+            print(
+                f"P{tid} +{len(examples)} q={queue.qsize()} ({examples[-1].value})",
+                file=sys.stderr,
+            )
 
 
 def submain(params):
@@ -198,6 +201,9 @@ def main():
         type=int,
         help="number of processes (1 used to train)",
     )
+    parser.add_argument(
+        "--num-threads", default=1, type=int, help="threads per process"
+    )
     parser.add_argument("--test-every", default=1, type=int, help="test every k epochs")
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
@@ -207,6 +213,9 @@ def main():
     )
     params = parser.parse_args()
     assert params.num_processes >= 2
+    if params.num_threads == 0:
+        params.num_threads = os.cpu_count() // params.num_processes
+        print("setting threads to", params.num_threads)
     submain(params)
 
 
