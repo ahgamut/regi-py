@@ -88,17 +88,20 @@ def trainer(tid, shared_model, queue, device, params):
         loss_fn = MCTSLoss
         optimizer = torch.optim.Adam(train_model.parameters(), lr=0.01)
 
-    ep = 0
+    ep = -1
+    samples = []
     while ep < params.num_episodes:
-        if queue.qsize() < params.memory_size:
+        if queue.qsize() >= params.memory_size:
+            samples.clear()
+            ep += 1
+            try:
+                while len(samples) < params.memory_size:
+                    samples.append(queue.get())
+            except Exception as e:
+                print(f"P{tid} error loading sample:", e)
+                continue
+        elif len(samples) < params.memory_size:
             time.sleep(1)
-            continue
-        samples = []
-        try:
-            while len(samples) < params.memory_size:
-                samples.append(queue.get())
-        except Exception as e:
-            print(f"{tid}", e)
             continue
 
         losses = []
@@ -108,11 +111,9 @@ def trainer(tid, shared_model, queue, device, params):
             losses.append(loss)
 
         print("training in episode", ep, "loss =", np.mean(loss), file=sys.stderr)
+        shared_model.load_state_dict(train_model.state_dict())
         if ep % params.test_every == 0:
-            shared_model.load_state_dict(train_model.state_dict())
-            shared_model.to(shared_model.device)
             test_model(ep, shared_model, params.num_simulations)
-        ep += 1
 
     torch.save(shared_model.state_dict(), "./weights/model_end.pt")
 
@@ -125,11 +126,11 @@ def explorer(tid, shared_model, queue, device, params):
     while True:
         mcts.clear_examples()
         mcts.reset_game()
-        mcts.sim_game_full(sims=params.num_simulations):
+        mcts.sim_game_full(sims=params.num_simulations)
         examples = mcts.get_examples()
         for x in examples:
             queue.put(x)
-        print(f"P{tid} added {len(examples)} to queue", file=sys.stderr)
+        print(f"P{tid} added {len(examples)} qsize={queue.qsize()}", file=sys.stderr)
 
 
 def submain(params):
