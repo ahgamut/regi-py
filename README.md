@@ -42,7 +42,9 @@ moves
 ```sh
 # install the package first
 cd webdriver
-python driver.py
+python driver.py \
+    -n 1 \ # one human player needs to connect
+    --add-bot damage # add the 'damage' bot
 # go to http://localhost:8888 in your browser
 ```
 
