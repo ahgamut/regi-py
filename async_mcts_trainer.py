@@ -135,7 +135,8 @@ def explorer(tid, shared_model, queue, device, params):
         examples = mcts.get_examples()
         for x in examples:
             queue.put(x)
-        print(f"P{tid} added {len(examples)} qsize={queue.qsize()}", file=sys.stderr)
+        if len(examples) > 0:
+            print(f"P{tid} +{len(examples)} q={queue.qsize()} ({examples[-1].value})", file=sys.stderr)
 
 
 def submain(params):
