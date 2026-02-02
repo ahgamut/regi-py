@@ -122,7 +122,12 @@ def explorer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to explore")
     torch.set_num_threads(os.cpu_count() // params.num_processes)
     small_N = params.memory_size // (params.num_processes - 1)
-    mcts = MCTS(net=shared_model, N=small_N, batch_size=params.batch_size)
+    mcts = MCTS(
+        net=shared_model,
+        N=small_N,
+        batch_size=params.batch_size,
+        randomize=(tid % 2 == 0),
+    )
     while True:
         mcts.clear_examples()
         mcts.reset_game()
@@ -148,7 +153,9 @@ def submain(params):
         shared_model = MC1Model()
         if os.path.isfile(params.weights_path):
             shared_model.load_state_dict(
-                torch.load(params.weights_path, weights_only=True, map_location=test_device)
+                torch.load(
+                    params.weights_path, weights_only=True, map_location=test_device
+                )
             )
         shared_model.device = test_device
         shared_model.eval()

@@ -215,11 +215,12 @@ class MCTSCollector:
 
 
 class MCTS:
-    def __init__(self, net, puct=0.1, N=1000, batch_size=16):
+    def __init__(self, net, puct=0.1, N=1000, batch_size=16, randomize=False):
         self.N = N
         self._examples = dict()
         #
         self.net = net
+        self.randomize = randomize
         self.coll = MCTSCollector(net, puct)
         self.log = MCTSLog(self.coll)
         #
@@ -231,7 +232,10 @@ class MCTS:
         self.game = GameState(self.log)
         for i in range(self.num_players):
             self.game.add_player(MCTSTrainerStrategy(self.coll))
-        self.game._init_random()
+        if self.randomize:
+            self.game._init_random()
+        else:
+            self.game.initialize()
         self.coll.clear()
         self.start_phase = self.game.export_phaseinfo()
 
@@ -265,18 +269,7 @@ class MCTS:
     def _collect_examples(self, sims, end_phase):
         r1 = self.coll.rewardize(end_phase)
         for s, exp in r1.items():
-            if self.coll.repeats[s] < sims:
-                continue
-            v0 = self._examples.get(s)
-            if v0 is None:
-                self._examples[s] = exp
-            elif exp.value == v0.value:
-                # we already have this, so update policy only
-                self._examples[s].policy = exp.policy
-            else:  # different result
-                self._examples[-s] = exp
-            if len(self._examples) >= self.N:
-                return
+            self._examples[s] = exp
 
     def sim_game_full(self, sims=5):
         phase = self.start_phase
