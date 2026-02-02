@@ -125,11 +125,11 @@ def explorer(tid, shared_model, queue, device, params):
     while True:
         mcts.clear_examples()
         mcts.reset_game()
-        while not mcts.sim_game_full(sims=params.num_simulations):
-            mcts.reset_game()
+        mcts.sim_game_full(sims=params.num_simulations):
         examples = mcts.get_examples()
         for x in examples:
             queue.put(x)
+        print(f"P{tid} added {len(examples)} to queue", file=sys.stderr)
 
 
 def submain(params):

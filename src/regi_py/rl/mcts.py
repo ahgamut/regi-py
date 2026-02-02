@@ -40,6 +40,7 @@ class MCTSCollector:
         #
         self.prev_s = None
         self.prev_a = None
+        self.shortcut = None
 
     def __len__(self):
         return len(self.N0)
@@ -47,6 +48,7 @@ class MCTSCollector:
     def reset_sim(self):
         self.prev_s = None
         self.prev_a = None
+        self.shortcut = None
 
     def clear(self):
         self.phases.clear()
@@ -69,7 +71,11 @@ class MCTSCollector:
     def search(self, phase, combos):
         cur_s = self.phases[phase]
         self._connect(self.prev_s, self.prev_a, cur_s)
-        a = self._search(cur_s, phase, combos)
+        if self.shortcut is not None:
+            a = self.shortcut
+            self.shortcut = None
+        else:
+            a = self._search(cur_s, phase, combos)
         self.prev_s = cur_s
         self.prev_a = a
         # print(f"picked ({self.prev_s}, {self.prev_a})")
@@ -116,7 +122,7 @@ class MCTSCollector:
         best_act = 0
 
         # pick the action with the highest upper confidence bound
-        for a in range(len(combos)):
+        for a in range(len(self.C[s])):
             prob_a = self.P[s][a]
             if (s, a) in self.Q:
                 u1 = self.Q[(s, a)]
@@ -241,38 +247,44 @@ class MCTS:
             self.coll.reset_sim()
             self.game._init_phaseinfo(phase)
             self.game.start_loop()
-        self._collect_examples(sims)
 
-    def _collect_examples(self, sims):
-        end_list = self.coll.get_end_phases()
-        for end in end_list:
-            r1 = self.coll.rewardize(end)
-            for s, exp in r1.items():
-                if self.coll.repeats[s] < sims:
-                    continue
-                v0 = self._examples.get(s)
-                if v0 is None:
-                    self._examples[s] = exp
-                elif exp.value == v0.value:
-                    # we already have this, so update policy only
-                    self._examples[s].policy = exp.policy
-                else:  # different result
-                    self._examples[-s] = exp
-                if len(self._examples) >= self.N:
-                    return
+        # get best action according to ucb
+        best_a = self.coll.search(phase, None)
+        self.coll.reset_sim()
+        # set as shortcut and run sim once so edge exists
+        self.coll.shortcut = best_a
+        self.game._init_phaseinfo(phase)
+        self.game.start_loop()
+
+        next_s = int(self.coll.f_edges[(cur_s, best_a)][0])
+        if next_s not in self.coll.phases._inverse:
+            print(self.coll.phases._inverse)
+        phase = self.coll.phases.inverse(next_s)
+        return phase
+
+    def _collect_examples(self, sims, end_phase):
+        r1 = self.coll.rewardize(end_phase)
+        for s, exp in r1.items():
+            if self.coll.repeats[s] < sims:
+                continue
+            v0 = self._examples.get(s)
+            if v0 is None:
+                self._examples[s] = exp
+            elif exp.value == v0.value:
+                # we already have this, so update policy only
+                self._examples[s].policy = exp.policy
+            else:  # different result
+                self._examples[-s] = exp
+            if len(self._examples) >= self.N:
+                return
 
     def sim_game_full(self, sims=5):
-        sim_count = 0
-        if sim_count == 0:
-            self._sim_game_from(self.start_phase, sims)
+        phase = self.start_phase
+        cur_s = self.coll.phases[phase]
+        self._sim_game_from(phase, sims)
+        while self.coll.E[cur_s] == 0:
+            phase = self._sim_game_from(phase, sims)
+            cur_s = self.coll.phases[phase]
 
-        while sim_count != len(self._examples):
-            sim_count = len(self._examples)
-            phase = self.coll.get_explorable_phase(sims)
-            if phase is None:
-                break
-            self._sim_game_from(phase, sims)
-            if len(self._examples) >= self.N:
-                return True
-
+        self._collect_examples(sims, phase)
         return True
