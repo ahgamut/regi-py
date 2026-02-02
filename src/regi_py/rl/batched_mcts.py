@@ -1,8 +1,6 @@
 from regi_py.core import *
 from regi_py.rl.mcts_utils import *
 from regi_py.logging import DummyLog
-from regi_py.rl.mcts import MCTSTrainerStrategy
-from regi_py.rl.mcts import MCTSTesterStrategy
 
 #
 import random
@@ -23,16 +21,6 @@ class StateValuation(IntEnum):
     UNSEEN = 0
     FANOUT = 1
     PREDICTED = 2
-
-
-def _normalize_probs(arr):
-    t = np.sum(arr)
-    if t != 0:
-        arr /= t
-    else:
-        # this is probably for terminal cases
-        arr[0] = 1.0
-    return arr
 
 
 class BatchedMCTSCollector:
@@ -104,7 +92,7 @@ class BatchedMCTSCollector:
 
     def _obtain_fanout_probs(self, s):
         self.P[s] = np.ones((128,), dtype=np.float32) * self.C[s]
-        self.P[s] = _normalize_probs(self.P[s])
+        self.P[s] = normalize_probs(self.P[s])
         self.N0[s] = 0
         self.N1[s] = np.zeros(128, dtype=np.int32)
         self.partials[s] = StateValuation.FANOUT
@@ -133,7 +121,7 @@ class BatchedMCTSCollector:
         p_hat, v_hat = self.net.batch_predict(batch)
         for i, smp in enumerate(batch):
             s = self.phases[smp.phase]
-            self.P[s] = _normalize_probs(p_hat[i, :] * self.C[s])
+            self.P[s] = normalize_probs(p_hat[i, :] * self.C[s])
             self.vals[s] = v_hat[i]
             self.repeats[s] = 0
             self.partials[s] = StateValuation.PREDICTED
@@ -257,14 +245,8 @@ class BatchedMCTSCollector:
         den = self.N0[s] + self.epsilon
         num_actions = len(self.C[s])
         arr = np.zeros(num_actions, dtype=np.float32)
-        if len(arr) > 0:
-            arr = (self.N1[s] * self.C[s]) / den
-            if self.depth[s] > self.bound:
-                best = np.argmax(arr)
-                arr *= 0
-                arr[best] = 1.0
-
-        arr = _normalize_probs(arr)
+        arr = (self.N1[s] * self.C[s]) / den
+        arr = normalize_probs(arr)
         # print(f"policy for {s} is", arr)
         return arr
 
@@ -353,18 +335,6 @@ class BatchedMCTSCollector:
         return r1
 
 
-class BatchedMCTSLog(DummyLog):
-    def __init__(self, coll):
-        super().__init__()
-        self.coll = coll
-
-    ####
-    def endgame(self, reason, game):
-        end_phase = game.export_phaseinfo()
-        self.coll.search(end_phase, [])
-        self.coll.reset_sim()
-
-
 class BatchedMCTS:
     def __init__(self, net, batch_size, puct=0.1, N=1000):
         self.N = N
@@ -375,7 +345,7 @@ class BatchedMCTS:
         self.num_players = random.randint(2, 4)
         self.net = net
         self.coll = BatchedMCTSCollector(net=net, puct=puct, batch_size=batch_size)
-        self.log = BatchedMCTSLog(self.coll)
+        self.log = MCTSLog(self.coll)
         #
         self.start_phase = None
         self.reset_game()

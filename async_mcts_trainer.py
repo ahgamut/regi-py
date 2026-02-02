@@ -13,7 +13,7 @@ import numpy as np
 #
 from regi_py import GameState, DummyLog, CXXConsoleLog
 from regi_py import get_strategy_map
-from regi_py.rl import BatchedMCTS, MC1Model, MCTSTesterStrategy
+from regi_py.rl import MCTS, MC1Model, MCTSTesterStrategy
 
 
 def MCTSLoss(prob, v, prob_hat, v_hat):
@@ -121,7 +121,7 @@ def explorer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to explore")
     torch.set_num_threads(os.cpu_count() // params.num_processes)
     small_N = params.memory_size // (params.num_processes - 1)
-    mcts = BatchedMCTS(net=shared_model, N=small_N, batch_size=params.batch_size)
+    mcts = MCTS(net=shared_model, N=small_N, batch_size=params.batch_size)
     while True:
         mcts.clear_examples()
         mcts.reset_game()

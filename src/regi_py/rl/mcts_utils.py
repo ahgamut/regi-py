@@ -11,6 +11,16 @@ from numpy.typing import ArrayLike
 import numpy as np
 
 
+def normalize_probs(arr):
+    t = np.sum(arr)
+    if t != 0:
+        arr /= t
+    else:
+        # this is probably for terminal cases
+        arr[0] = 1.0
+    return arr
+
+
 @dataclass(repr=True, eq=False, slots=True)
 class MCTSSample:
     phase: PhaseInfo
@@ -70,3 +80,104 @@ class DupeListDict(UserDict):
 class CounterDict(defaultdict):
     def __missing__(self, key):
         return 0
+
+
+class MCTSTesterStrategy(BaseStrategy):
+    __strat_name__ = "mcts-tester"
+
+    def __init__(self, net):
+        super(MCTSTesterStrategy, self).__init__()
+        self.net = net
+
+    def setup(self, player, game):
+        self.net.eval()
+        return 0
+
+    def process_phase(self, phase, combos):
+        if len(combos) == 0:
+            return -1
+        probs, v = self.net.predict(MCTSSample.eval(phase))
+        cbr = np.zeros(128)
+        submap = dict()
+        for i, x in enumerate(combos):
+            cbr[x.bitwise] = 1
+            submap[x.bitwise] = i
+        probs *= cbr
+        if np.sum(probs) <= 0:
+            return -1
+        br = random.choices(range(128), weights=probs, k=1)[0]
+        if br in submap:
+            return submap[br]
+        print("sampled invalid move")
+        return -1
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        return self.process_phase(game.export_phaseinfo(), combos)
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        return self.process_phase(game.export_phaseinfo(), combos)
+
+
+class MCTSTrainerStrategy(BaseStrategy):
+    __strat_name__ = "mcts-trainer"
+
+    def __init__(self, coll):
+        super(MCTSTrainerStrategy, self).__init__()
+        self.coll = coll
+        self.net = coll.net
+        self.prev_s = None
+        self.prev_a = None
+
+    def setup(self, player, game):
+        self.net.eval()
+        return 0
+
+    def process_phase(self, phase, combos):
+        br = self.coll.search(phase, combos)
+        if br == -1:
+            return -1
+        for i, x in enumerate(combos):
+            if x.bitwise == br:
+                return i
+        # print("sampled invalid move")
+        return -1
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        ind = self.process_phase(game.export_phaseinfo(), combos)
+        if ind == -1 or len(combos) < 4:
+            return ind
+        if ind == 0 and random.random() < 0.4:
+            # print("randomly fail yield")
+            return -1
+        return ind
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        ind = self.process_phase(game.export_phaseinfo(), combos)
+        if ind == -1 or len(combos) < 4:
+            return ind
+        #
+        sel_blk = combos[ind].base_defense
+        num_discards = len(combos[ind].parts)
+        lower_poss = 0
+        for i, c in enumerate(combos):
+            c_blk = c.base_defense
+            c_dsc = len(c.parts)
+            if c_dsc < num_discards and c_blk <= sel_blk:
+                lower_poss += 1
+        if random.random() < (lower_poss / len(combos)):
+            # print("randomly fail blk:", combos[ind], lower_poss)
+            return -1
+        return ind
+
+
+class MCTSLog(DummyLog):
+    def __init__(self, coll):
+        super().__init__()
+        self.coll = coll
+        self.memories = []
+
+    ####
+    def endgame(self, reason, game):
+        end_phase = game.export_phaseinfo()
+        self.coll.search(end_phase, [])
+        self.coll.reset_sim()

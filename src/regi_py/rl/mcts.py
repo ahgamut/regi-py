@@ -29,10 +29,11 @@ class MCTSCollector:
         #
         self.Q = dict()  # [(s,a)] -> q
         self.N0 = CounterDict()  # [s] -> int
-        self.N1 = CounterDict()  # [(s,a)] -> int
+        self.N1 = dict()  # [s] -> array of ints
         self.P = dict()  # [s] -> probability vector
         self.E = DupeFailDict()  # [s] -> ??? (only for endgame?)
         #
+        self.repeats = dict()  # [s] -> number of times we called search(s)
         self.depth = dict()  # [s] -> phase_count (basically)
         self.C = DupeFailDict()  # [s] -> combos
         self.vals = DupeFailDict()  # [s] -> v (filled backwards?)
@@ -77,15 +78,13 @@ class MCTSCollector:
     def calc_policy(self, s):
         den = self.N0[s] + self.epsilon
         arr = np.zeros(len(self.C[s]), dtype=np.float32)
-        if len(arr) > 0:
-            for a in range(len(self.C[s])):
-                arr[a] = self.N1[(s, a)] / den
-            if self.depth[s] > self.bound:
-                best = np.argmax(arr)
-                arr *= 0
-                arr[best] = 1.0
+        arr = (self.N1[s] * self.C[s]) / den
+        if self.depth[s] > self.bound:
+            best = np.argmax(arr)
+            arr *= 0
+            arr[best] = 1.0
         # print(f"policy for {s} is", arr)
-        return arr
+        return normalize_probs(arr)
 
     def _search(self, s, phase, combos):
         if s not in self.C:
@@ -93,6 +92,7 @@ class MCTSCollector:
             for x in combos:
                 cbr[x.bitwise] = 1
             self.C[s] = cbr
+            self.N1[s] = np.zeros(128, dtype=np.float32)
         #
         if s not in self.E:
             self.E[s] = phase.game_endvalue
@@ -104,12 +104,9 @@ class MCTSCollector:
         if s not in self.P:
             # print("getting probs for", s)
             # normalized probs
-            self.P[s], v = self.net.predict(MCTSSample.eval(phase))
-            self.P[s] *= self.C[s]
-            t = np.sum(self.P[s])
-            if t != 0:
-                self.P[s] /= t
-            self.vals[s] = v
+            p_hat, v_hat = self.net.predict(MCTSSample.eval(phase))
+            self.P[s] = normalize_probs(p_hat * self.C[s])
+            self.vals[s] = v_hat
             self.N0[s] = 0
             self.update_backwards(s)
             return random.choices(range(128), weights=self.P[s], k=1)[0]
@@ -123,7 +120,7 @@ class MCTSCollector:
             prob_a = self.P[s][a]
             if (s, a) in self.Q:
                 u1 = self.Q[(s, a)]
-                u2 = self.puct * prob_a * np.sqrt(self.N0[s]) / (1 + self.N1[(s, a)])
+                u2 = self.puct * prob_a * np.sqrt(self.N0[s]) / (1 + self.N1[s][a])
                 u = u1 + u2
             else:  # Q = 0 ?
                 u = self.puct * prob_a * np.sqrt(self.N0[s] + self.epsilon)
@@ -136,6 +133,7 @@ class MCTSCollector:
         return best_act
 
     def _connect(self, prev_s, prev_a, cur_s):
+        self.repeats[cur_s] = self.repeats.get(cur_s, 0) + 1
         if prev_s is None:
             self.depth[cur_s] = 0
             return
@@ -154,18 +152,38 @@ class MCTSCollector:
                 if s is None:
                     return
                 if (s, a) in self.Q:
-                    q1 = self.N1[(s, a)] * self.Q[(s, a)] + v
-                    q2 = 1 + self.N1[(s, a)]
+                    q1 = self.N1[s][a] * self.Q[(s, a)] + v
+                    q2 = 1 + self.N1[s][a]
                     self.Q[(s, a)] = q1 / q2
-                    self.N1[(s, a)] += 1
+                    self.N1[s][a] += 1
                 else:
                     self.Q[(s, a)] = v
-                    self.N1[(s, a)] = 1
+                    self.N1[s][a] = 1
 
                 self.N0[s] += 1
                 set_qn(s)
 
         set_qn(next_s)
+
+    def get_explorable_phase(self, max_sims):
+        explore_s = None
+        for s, sim in self.repeats.items():
+            if sim >= max_sims or self.E.get(s, -1) != 0:
+                continue
+            explore_s = s
+            break
+
+        if explore_s is None:
+            return None
+        return self.phases.inverse(explore_s)
+
+    def get_end_phases(self):
+        res = []
+        for s, val in self.E.items():
+            if val != 0:
+                phase = self.phases.inverse(s)
+                res.append(phase)
+        return res
 
     def rewardize(self, end_phase):
         r1 = dict()
@@ -190,139 +208,71 @@ class MCTSCollector:
         return r1
 
 
-class MCTSTesterStrategy(BaseStrategy):
-    __strat_name__ = "mcts-tester"
-
-    def __init__(self, net):
-        super(MCTSTesterStrategy, self).__init__()
-        self.net = net
-
-    def setup(self, player, game):
-        self.net.eval()
-        return 0
-
-    def process_phase(self, phase, combos):
-        if len(combos) == 0:
-            return -1
-        probs, v = self.net.predict(MCTSSample.eval(phase))
-        cbr = np.zeros(128)
-        submap = dict()
-        for i, x in enumerate(combos):
-            cbr[x.bitwise] = 1
-            submap[x.bitwise] = i
-        probs *= cbr
-        if np.sum(probs) <= 0:
-            return -1
-        br = random.choices(range(128), weights=probs, k=1)[0]
-        if br in submap:
-            return submap[br]
-        print("sampled invalid move")
-        return -1
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        return self.process_phase(game.export_phaseinfo(), combos)
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        return self.process_phase(game.export_phaseinfo(), combos)
-
-
-class MCTSTrainerStrategy(BaseStrategy):
-    __strat_name__ = "mcts-trainer"
-
-    def __init__(self, coll):
-        super(MCTSTrainerStrategy, self).__init__()
-        self.coll = coll
-        self.net = coll.net
-        self.prev_s = None
-        self.prev_a = None
-
-    def setup(self, player, game):
-        self.net.eval()
-        return 0
-
-    def process_phase(self, phase, combos):
-        br = self.coll.search(phase, combos)
-        if br == -1:
-            return -1
-        for i, x in enumerate(combos):
-            if x.bitwise == br:
-                return i
-        # print("sampled invalid move")
-        return -1
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        ind = self.process_phase(game.export_phaseinfo(), combos)
-        if ind == -1 or len(combos) < 4:
-            return ind
-        if ind == 0 and random.random() < 0.4:
-            # print("randomly fail yield")
-            return -1
-        return ind
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        ind = self.process_phase(game.export_phaseinfo(), combos)
-        if ind == -1 or len(combos) < 4:
-            return ind
-        # 
-        sel_blk = combos[ind].base_defense
-        num_discards = len(combos[ind].parts)
-        lower_poss = 0
-        for i, c in enumerate(combos):
-            c_blk = c.base_defense
-            c_dsc = len(c.parts)
-            if c_dsc < num_discards and c_blk <= sel_blk:
-                lower_poss += 1
-        if random.random() < (lower_poss / len(combos)):
-            # print("randomly fail blk:", combos[ind], lower_poss)
-            return -1
-        return ind
-
-
-class MCTSLog(DummyLog):
-    def __init__(self, coll):
-        super().__init__()
-        self.coll = coll
-        self.memories = []
-
-    ####
-    def endgame(self, reason, game):
-        end_phase = game.export_phaseinfo()
-        self.coll.search(end_phase, [])
-        # print(self.coll.N1)
-        self.memories = list(self.coll.rewardize(end_phase).values())
-        self.coll.reset_sim()
-
-
 class MCTS:
-    def __init__(self, num_players, net, puct=0.1, N=1000):
+    def __init__(self, net, puct=0.1, N=1000, batch_size=16):
         self.N = N
-        self.examples = []
-        self.played_games = set()
+        self._examples = dict()
         #
-        self.num_players = num_players
         self.net = net
         self.coll = MCTSCollector(net, puct)
         self.log = MCTSLog(self.coll)
-        self.game = GameState(self.log)
-        for i in range(num_players):
-            self.game.add_player(MCTSTrainerStrategy(self.coll))
         #
         self.start_phase = None
         self.reset_game()
 
     def reset_game(self):
+        self.num_players = random.randint(2, 4)
+        self.game = GameState(self.log)
+        for i in range(self.num_players):
+            self.game.add_player(MCTSTrainerStrategy(self.coll))
         self.game._init_random()
-        # print(self.coll.N1)
         self.coll.clear()
         self.start_phase = self.game.export_phaseinfo()
-        self.played_games.add(self.start_phase)
+
+    def get_examples(self):
+        return list(self._examples.values())
+
+    def clear_examples(self):
+        self._examples.clear()
+
+    def _sim_game_from(self, phase, sims):
+        cur_s = self.coll.phases[phase]
+        for _ in range(sims):
+            self.coll.reset_sim()
+            self.game._init_phaseinfo(phase)
+            self.game.start_loop()
+        self._collect_examples(sims)
+
+    def _collect_examples(self, sims):
+        end_list = self.coll.get_end_phases()
+        for end in end_list:
+            r1 = self.coll.rewardize(end)
+            for s, exp in r1.items():
+                if self.coll.repeats[s] < sims:
+                    continue
+                v0 = self._examples.get(s)
+                if v0 is None:
+                    self._examples[s] = exp
+                elif exp.value == v0.value:
+                    # we already have this, so update policy only
+                    self._examples[s].policy = exp.policy
+                else:  # different result
+                    self._examples[-s] = exp
+                if len(self._examples) >= self.N:
+                    return
 
     def sim_game_full(self, sims=5):
-        for _ in range(sims):
-            if len(self.examples) >= self.N:
+        sim_count = 0
+        if sim_count == 0:
+            self._sim_game_from(self.start_phase, sims)
+
+        while sim_count != len(self._examples):
+            sim_count = len(self._examples)
+            phase = self.coll.get_explorable_phase(sims)
+            if phase is None:
+                break
+            self._sim_game_from(phase, sims)
+            if len(self._examples) >= self.N:
                 return True
-            self.game._init_phaseinfo(self.start_phase)
-            self.log.memories.clear()
-            self.game.start_loop()
-            self.examples += self.log.memories
-        return False  # rerun to collect more examples
+
+        return True
