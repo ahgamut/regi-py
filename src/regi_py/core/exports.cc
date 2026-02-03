@@ -348,6 +348,11 @@ void bind_gamestate(pybind11::object &m)
         .def("get_combo_damage", &GameState::calcDamageOfCombo)
         .def("get_combo_block", &GameState::calcBlockOfCombo)
         .def("start_loop", &GameState::startLoop)
+        .def("_step", &GameState::onePhase)
+        .def("_set_status", [](GameState &g, GameStatus s) {
+                g.status = s;
+        })
+        .def_property_readonly("is_runnable", &GameState::gameRunning)
         .def("initialize",
              [](GameState &g)
              {
