@@ -138,7 +138,7 @@ def explorer(tid, shared_model, queue, device, params):
         diffe = total_enemy_hp(examples[0].phase) - total_enemy_hp(examples[-1].phase)
         if len(examples) > 0:
             print(
-                f"P{tid} +{len(examples)} q={queue.qsize()} ({examples[-1].value}) dmg={diffe}",
+                f"P{tid},q={queue.qsize()},t={len(examples)},e={examples[-1].value},dmg={diffe}",
                 file=sys.stderr,
             )
 
