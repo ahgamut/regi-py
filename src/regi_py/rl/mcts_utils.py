@@ -146,9 +146,16 @@ class MCTSTrainerStrategy(BaseStrategy):
         ind = self.process_phase(game.export_phaseinfo(), combos)
         if ind == -1 or len(combos) < 4:
             return ind
-        if ind == 0 and random.random() < 0.4:
-            # print("randomly fail yield")
-            return -1
+        if len(game.enemy_pile) <= 0:
+            return ind
+        if ind == 0:
+            cur_enemy = game.enemy_pile[0]
+            if game.get_current_block(cur_enemy) >= cur_enemy.strength:
+                # print("yield ok because full block")
+                return ind
+            if random.random() < 0.4:
+                # print("randomly fail yield")
+                return -1
         return ind
 
     def getDefenseIndex(self, combos, player, damage, game):
