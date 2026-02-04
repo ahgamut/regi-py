@@ -106,8 +106,7 @@ class BatchedMCTSCollector:
             # print(f"getting probs for {s}", phase, phase.game_endvalue)
             # normalized probs
             p_hat, v_hat = self.net.predict(MCTSSample.eval(phase))
-            if p_hat.max() < 1e-8:
-                p_hat = self.C[s]
+            p_hat = p_hat + (1e-8 * self.C[s])
             self.P[s] = normalize_probs(p_hat * self.C[s])
             self.vals[s] = v_hat
             self.N0[s] = 0
@@ -186,7 +185,6 @@ class BatchedMCTSCollector:
         # TODO: call batch_predict only for unique futures?
         if len(s_estims) > 0:
             batch_inds = list(range(0, len(s_estims), self.batch_size))
-            p_hat = np.zeros((len(s_estims), 128), dtype=np.float32)
             v_hat = np.zeros(len(s_estims), dtype=np.float32)
             if batch_inds[-1] != len(s_estims):
                 batch_inds.append(len(s_estims))
@@ -195,7 +193,6 @@ class BatchedMCTSCollector:
                 j_end = batch_inds[j + 1]
                 sub = s_estims[j_start:j_end]
                 p0, v0 = self.net.batch_predict(sub)
-                p_hat[j_start:j_end] = p0
                 v_hat[j_start:j_end] = v0
 
         # updates happen after we have values (or estimates) for all states
