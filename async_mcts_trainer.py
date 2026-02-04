@@ -86,7 +86,7 @@ def trainer(tid, shared_model, queue, device, params):
         train_model = train_model.to(device)
         train_model.train()
         loss_fn = MCTSLoss
-        optimizer = torch.optim.Adam(train_model.parameters(), lr=0.01)
+        optimizer = torch.optim.SGD(train_model.parameters())
 
     ep = -1
     samples = []
