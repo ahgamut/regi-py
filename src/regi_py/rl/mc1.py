@@ -103,6 +103,7 @@ class ProbModule(nn.Module):
         )
         self.net2 = nn.Conv1d(1, 1, kernel_size=3, padding=1)
         self.ac = nn.ReLU()
+        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         N = x.shape[0]
@@ -110,6 +111,7 @@ class ProbModule(nn.Module):
         x = self.net2(x)
         x = self.ac(x) + 1e-8
         x = x.reshape(N, -1)
+        x = self.softmax(x)
         return x
 
 

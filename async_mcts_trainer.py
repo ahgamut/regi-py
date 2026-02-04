@@ -21,7 +21,7 @@ def MCTSLoss(prob, v, prob_hat, v_hat):
     loss1 = nn.functional.mse_loss(v, v_hat)
     # loss2 = nn.functional.mse_loss(prob, prob_hat)
     p1 = prob
-    p2 = -nn.functional.log_softmax(prob_hat, dim=1)
+    p2 = -torch.log(prob_hat)
     loss2 = (p1 * p2).sum()
     return loss1 + loss2
 
