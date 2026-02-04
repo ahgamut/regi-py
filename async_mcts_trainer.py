@@ -13,7 +13,7 @@ import numpy as np
 #
 from regi_py import GameState, DummyLog, CXXConsoleLog
 from regi_py import get_strategy_map
-from regi_py.rl import MCTS, MC1Model, MCTSTesterStrategy
+from regi_py.rl import BatchedMCTS, MCTS, MC1Model, MCTSTesterStrategy
 
 
 def MCTSLoss(prob, v, prob_hat, v_hat):
@@ -122,7 +122,7 @@ def explorer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to explore")
     torch.set_num_threads(params.num_threads)
     small_N = params.memory_size // (params.num_processes - 1)
-    mcts = MCTS(
+    mcts = BatchedMCTS(
         net=shared_model,
         N=small_N,
         batch_size=params.batch_size,
@@ -135,9 +135,10 @@ def explorer(tid, shared_model, queue, device, params):
         examples = mcts.get_examples()
         for x in examples:
             queue.put(x)
+        diffe = total_enemy_hp(examples[0].phase) - total_enemy_hp(examples[-1].phase)
         if len(examples) > 0:
             print(
-                f"P{tid} +{len(examples)} q={queue.qsize()} ({examples[-1].value})",
+                f"P{tid} +{len(examples)} q={queue.qsize()} ({examples[-1].value}) dmg={diffe}",
                 file=sys.stderr,
             )
 
