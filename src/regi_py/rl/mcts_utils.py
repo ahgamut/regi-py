@@ -17,7 +17,8 @@ def normalize_probs(arr):
         arr /= t
     else:
         # this is probably for terminal cases
-        arr[0] = 1.0
+        # print("throwing")
+        arr[-1] = 1.0
     return arr
 
 
