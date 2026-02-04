@@ -102,16 +102,14 @@ class ProbModule(nn.Module):
             channels=[4] * preset + [3, 2, 1], shapes=[3] * depth, paddings=[1] * depth
         )
         self.net2 = nn.Conv1d(1, 1, kernel_size=3, padding=1)
-        self.ac = nn.ReLU()
-        self.softmax = nn.Softmax(dim=1)
+        self.ac = nn.LogSoftmax(dim=1)
 
     def forward(self, x):
         N = x.shape[0]
         x = self.net1(x)
         x = self.net2(x)
-        x = self.ac(x) + 1e-8
         x = x.reshape(N, -1)
-        x = self.softmax(x)
+        x = self.ac(x)
         return x
 
 
@@ -174,24 +172,24 @@ class MC1Model(torch.nn.Module):
         # print(used_pile.shape, x3.shape)
 
         x4 = torch.cat([x0, x1, x2, x3], dim=1)
-        prob_hat = self.prob_net(x4)
+        lprob_hat = self.prob_net(x4)
         v_hat = self.val_net(x4)
         # print(x4.shape, prob_hat.shape, v_hat.shape)
 
-        return prob_hat, v_hat
+        return lprob_hat, v_hat
 
     def predict(self, sample):
         states, _, _ = self.tensorify([sample], 1)
-        prob_hat0, v_hat0 = self.forward(states)
-        prob_hat = prob_hat0.cpu().detach().numpy()[0]
+        lprob_hat0, v_hat0 = self.forward(states)
+        prob_hat = lprob_hat0.cpu().exp().detach().numpy()[0]
         v_hat = v_hat0.cpu().detach().numpy()[0]
         return prob_hat, v_hat
 
     def batch_predict(self, batch):
         # print("calling batch_predict for: ", len(batch))
         states, _, _ = self.tensorify(batch, len(batch))
-        prob_hat0, v_hat0 = self.forward(states)
-        prob_hat = prob_hat0.cpu().detach().numpy()
+        lprob_hat0, v_hat0 = self.forward(states)
+        prob_hat = lprob_hat0.cpu().exp().detach().numpy()
         v_hat = v_hat0.cpu().detach().numpy()
         return prob_hat, v_hat
 
@@ -271,4 +269,5 @@ class MC1Model(torch.nn.Module):
             discard_pile=discard_pile.to(device),
             player_atk=player_atk.to(device),
         )
-        return res, probs.to(device), values.to(device)
+        logprobs = torch.nn.functional.log_softmax(probs + 1e-8, dim=1)
+        return res, logprobs.to(device), values.to(device)

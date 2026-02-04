@@ -16,20 +16,20 @@ from regi_py import get_strategy_map
 from regi_py.rl import BatchedMCTS, MCTS, MC1Model, MCTSTesterStrategy
 
 
-def MCTSLoss(prob, v, prob_hat, v_hat):
+def MCTSLoss(lprob, v, lprob_hat, v_hat):
     n = v.shape[0]
     loss1 = nn.functional.mse_loss(v, v_hat)
     # loss2 = nn.functional.mse_loss(prob, prob_hat)
-    p1 = prob
-    p2 = -torch.log(prob_hat + 1e-8)
-    loss2 = (p1 * p2).sum()
+    loss2 = nn.functional.kl_div(
+        input=lprob_hat, target=lprob, reduction="batchmean", log_target=True
+    )
     return loss1 + loss2
 
 
 def run_epoch(model, batch, optimizer):
-    states, prob, v = batch
-    prob_hat, v_hat = model(states)
-    loss = MCTSLoss(prob, v, prob_hat, v_hat)
+    states, lprob, v = batch
+    lprob_hat, v_hat = model(states)
+    loss = MCTSLoss(lprob, v, lprob_hat, v_hat)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
