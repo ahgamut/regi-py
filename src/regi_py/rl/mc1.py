@@ -135,6 +135,7 @@ class ValueModule(nn.Module):
 class MC1Model(torch.nn.Module):
     NOT_A_CARD = 1  # (GLITCH ACE)
     UNKNOWN_CARD = 2  # (GLITCH TWO)
+    NOT_PLAYING = 3 # (GLITCH THREE)
     CARD_DIMENSION = 16
 
     def __init__(self):
@@ -224,10 +225,13 @@ class MC1Model(torch.nn.Module):
             for j, c in enumerate(opc[cur]):
                 player_cards[b, 0, j] = c.index
             # other player cards
-            for i in range(1, N):
-                ii = (cur + i) % N
-                for j, c in enumerate(opc[ii]):
-                    player_cards[b, i, j] = cls.UNKNOWN_CARD
+            for i in range(1, 4):
+                if i < N:
+                    ii = (cur + i) % N
+                    for j, c in enumerate(opc[ii]):
+                        player_cards[b, i, j] = cls.UNKNOWN_CARD
+                else:
+                    player_cards[b, i, :] = cls.NOT_PLAYING
             # enemies
             for i, c in enumerate(phase.enemy_pile):
                 if i == 0:
