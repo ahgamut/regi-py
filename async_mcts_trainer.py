@@ -76,6 +76,26 @@ def test_model(episode, model, num_simulations):
     torch.save(model.state_dict(), f"./weights/model_{episode}.pt")
 
 
+def get_split_optimizer(model):
+    decay = []
+    no_decay = []
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        if "bias" in name or "bn" in name or "batchnorm" in name:
+            no_decay.append(param)
+        else:
+            decay.append(param)
+
+    grps = [
+        {"params": decay, "weight_decay": 1e-4},
+        {"params": no_decay, "weight_decay": 0},
+    ]
+
+    optimizer = torch.optim.AdamW(grps, lr=1e-3)
+    return optimizer
+
+
 def trainer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to train")
     torch.set_num_threads(params.num_threads)
@@ -86,7 +106,7 @@ def trainer(tid, shared_model, queue, device, params):
         train_model = train_model.to(device)
         train_model.train()
         loss_fn = MCTSLoss
-        optimizer = torch.optim.SGD(train_model.parameters())
+        optimizer = get_split_optimizer(train_model)
 
     ep = -1
     samples = []
