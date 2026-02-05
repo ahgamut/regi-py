@@ -147,8 +147,8 @@ class MC1Model(torch.nn.Module):
         self.dd_mod = DrawDiscardModule(2)
         self.em_mod = EnemyPileModule(2)
         self.up_mod = UsedPileModule(16)
-        self.prob_net = ProbModule(3)
-        self.val_net = ValueModule(1)
+        self.prob_net = ProbModule(10)
+        self.val_net = ValueModule(10)
 
     def forward(self, states):
         player_cards = self.gen_emb(states["player_cards"])
