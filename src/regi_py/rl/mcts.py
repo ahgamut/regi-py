@@ -17,7 +17,7 @@ import numpy as np
 
 
 class MCTSCollector:
-    def __init__(self, net, puct, epsilon=1e-8, bound=30):
+    def __init__(self, net, puct, epsilon=1e-8, bound=120):
         self.bound = bound
         self.net = net
         self.puct = puct
@@ -102,10 +102,12 @@ class MCTSCollector:
     def _search_ucb(self, s, phase):
         # ucb
         cur_best = -float("inf")
-        best_act = 0
+        best_act = -1
 
         # pick the action with the highest upper confidence bound
-        for a in range(len(self.C[s])):
+        actions = self.C[s].nonzero()[0]
+        for a0 in actions:
+            a = int(a0)
             prob_a = self.P[s][a]
             if (s, a) in self.Q:
                 u1 = self.Q[(s, a)]
@@ -193,13 +195,16 @@ class MCTSCollector:
         for i in range(root_phase.num_players):
             tmp.add_player(exp_strat)
         #
+        actions = self.C[root_s].nonzero()[0]
         for _ in range(max_sims):
             best_a = self._search_ucb(root_s, root_phase)
             next_s = self.f_edges[(root_s, best_a)]
             next_phase = self.phases.inverse(next_s)
             tmp._init_phaseinfo(next_phase)
             tmp.start_loop()
-            val = 1.0 - (enemy_hp_left(tmp.export_phaseinfo()) / 360)
+            vstart = enemy_hp_left(next_phase)
+            vend = enemy_hp_left(tmp.export_phaseinfo())
+            val = (vstart - vend) / 360
             self.vals[next_s] = val
             self.update_backwards(next_s)
 
@@ -210,7 +215,7 @@ class MCTSCollector:
 
 
 class MCTS:
-    def __init__(self, net, puct=0.1, N=1000, batch_size=16, randomize=False):
+    def __init__(self, net, puct=0.25, N=1000, batch_size=16, randomize=False):
         self.N = N
         self._examples = list()
         #
@@ -248,7 +253,9 @@ class MCTS:
         # get best action according to ucb
         best_a = self.coll._search_ucb(cur_s, phase)
         next_s = self.coll.f_edges[(cur_s, best_a)]
-        # print(f"{cur_s, best_a} -> {next_s}")
+        # prob = self.coll.P[cur_s]
+        # pol = self.coll.N1[cur_s] / self.coll.N0[cur_s]
+        # print(f"{cur_s, best_a} -> {next_s} prob={prob[best_a]}, pol={pol[best_a]}")
         next_phase = self.coll.phases.inverse(next_s)
         return next_phase
 
