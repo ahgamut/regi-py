@@ -25,17 +25,18 @@ def MCTSLoss(lprob, v, lprob_hat, v_hat):
         input=lprob_hat, target=lprob, reduction="batchmean", log_target=True
     )
     # loss2 = torch.sum(lprob.exp() * lprob_hat) / n
-    return loss1 + loss2
+    return loss1, loss2
 
 
 def run_epoch(model, batch, optimizer):
     states, lprob, v = batch
     lprob_hat, v_hat = model(states)
-    loss = MCTSLoss(lprob, v, lprob_hat, v_hat)
+    loss1, loss2 = MCTSLoss(lprob, v, lprob_hat, v_hat)
+    loss = loss1 + loss2
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    return loss.item()
+    return loss1.item(), loss2.item()
 
 
 def total_enemy_hp(game):
@@ -126,13 +127,20 @@ def trainer(tid, shared_model, queue, device, params):
             time.sleep(1)
             continue
 
-        losses = []
+        losses1 = []
+        losses2 = []
         for e in range(params.epochs):
             batch = train_model.tensorify(samples, params.batch_size)
-            loss = run_epoch(train_model, batch, optimizer)
-            losses.append(loss)
+            loss1, loss2 = run_epoch(train_model, batch, optimizer)
+            losses1.append(loss1)
+            losses2.append(loss2)
 
-        print("training in episode", ep, "loss =", np.mean(loss), file=sys.stderr)
+        print(
+            "training episode",
+            ep,
+            f"loss1={np.mean(losses1)}, loss2={np.mean(losses2)}",
+            file=sys.stderr,
+        )
         shared_model.load_state_dict(train_model.state_dict())
         if ep % params.test_every == 0:
             test_model(ep, shared_model, params.num_simulations)
@@ -231,9 +239,7 @@ def main():
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
-    parser.add_argument(
-        "--weights-path", default="", help="weights"
-    )
+    parser.add_argument("--weights-path", default="", help="weights")
     params = parser.parse_args()
     assert params.num_processes >= 2
     if params.num_threads == 0:
