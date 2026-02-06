@@ -13,7 +13,7 @@ import numpy as np
 #
 from regi_py import GameState, DummyLog, CXXConsoleLog
 from regi_py import get_strategy_map
-from regi_py.rl import BatchedMCTS, MCTS, MC1Model, MCTSTesterStrategy
+from regi_py.rl import BatchedMCTS, MCTS, MC2Model, MC1Model, MCTSTesterStrategy
 
 
 def MCTSLoss(lprob, v, lprob_hat, v_hat):
@@ -102,7 +102,7 @@ def trainer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to train")
     torch.set_num_threads(params.num_threads)
     with torch.device(device):
-        train_model = MC1Model()
+        train_model = MC2Model()
         train_model.device = device
         train_model.load_state_dict(shared_model.state_dict())
         train_model = train_model.to(device)
@@ -177,7 +177,7 @@ def submain(params):
     test_device = "cpu"
 
     with torch.device(test_device):
-        shared_model = MC1Model()
+        shared_model = MC2Model()
         if os.path.isfile(params.weights_path):
             shared_model.load_state_dict(
                 torch.load(
