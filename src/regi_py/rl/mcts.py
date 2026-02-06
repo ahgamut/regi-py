@@ -24,7 +24,7 @@ class MCTSCollector:
         self.epsilon = epsilon
         self.phases = PhaseLoader()  # [PhaseInfo] -> s
         #
-        self.f_edges = DupeListDict()  # [(s, a)] -> s'
+        self.f_edges = DupeFailDict()  # [(s, a)] -> s'
         self.b_edges = DupeListDict()  # [s'] -> (s, a)
         #
         self.Q = dict()  # [(s,a)] -> q
@@ -36,19 +36,14 @@ class MCTSCollector:
         self.repeats = dict()  # [s] -> number of times we called search(s)
         self.depth = dict()  # [s] -> phase_count (basically)
         self.C = DupeFailDict()  # [s] -> combos
-        self.vals = DupeFailDict()  # [s] -> v (filled backwards?)
+        self.vals = dict()  # [s] -> v (filled backwards?)
         #
-        self.prev_s = None
-        self.prev_a = None
-        self.shortcut = None
 
     def __len__(self):
         return len(self.N0)
 
     def reset_sim(self):
-        self.prev_s = None
-        self.prev_a = None
-        self.shortcut = None
+        pass
 
     def clear(self):
         self.phases.clear()
@@ -68,24 +63,11 @@ class MCTSCollector:
         #
         self.reset_sim()
 
-    def search(self, phase, combos):
-        cur_s = self.phases[phase]
-        self._connect(self.prev_s, self.prev_a, cur_s)
-        if self.shortcut is not None:
-            a = self.shortcut
-            self.shortcut = None
-        else:
-            a = self._search(cur_s, phase, combos)
-        self.prev_s = cur_s
-        self.prev_a = a
-        # print(f"picked ({self.prev_s}, {self.prev_a})")
-        return a
-
     def calc_policy(self, s):
         den = self.N0[s] + self.epsilon
         arr = np.zeros(len(self.C[s]), dtype=np.float32)
         arr = (self.N1[s] * self.C[s]) / den
-        if self.depth[s] > self.bound:
+        if self.depth.get(s, 0) > self.bound:
             best = np.argmax(arr)
             arr *= 0
             arr[best] = 1.0
@@ -104,7 +86,7 @@ class MCTSCollector:
             self.E[s] = phase.game_endvalue
         if phase.game_endvalue != 0:
             # print("ending at", s, "with", phase.game_endvalue)
-            self.vals[s] = phase.game_endvalue
+            self.vals[s] = 1.0 - (enemy_hp_left(phase) / 360.0)
             self.update_backwards(s)
             return -1
         if s not in self.P:
@@ -115,8 +97,9 @@ class MCTSCollector:
             self.vals[s] = v_hat
             self.N0[s] = 0
             self.update_backwards(s)
-            return random.choices(range(128), weights=self.P[s], k=1)[0]
+        return random.choices(range(128), weights=self.P[s], k=1)[0]
 
+    def _search_ucb(self, s, phase):
         # ucb
         cur_best = -float("inf")
         best_act = 0
@@ -135,7 +118,6 @@ class MCTSCollector:
                 cur_best = u
                 best_act = a
 
-        # print(f"best_act from {s} is {best_act} (u={cur_best})")
         return best_act
 
     def _connect(self, prev_s, prev_a, cur_s):
@@ -146,17 +128,18 @@ class MCTSCollector:
         # print("adding edge", (prev_s, prev_a), "->", cur_s)
         self.f_edges[(prev_s, prev_a)] = cur_s
         self.b_edges[cur_s] = (prev_s, prev_a)  # ouch
-        self.depth[cur_s] = self.depth[prev_s] + 1
+        self.depth[cur_s] = self.depth.get(cur_s, 0) + 1
 
     def update_backwards(self, next_s):
         v = self.vals[next_s]
 
-        def set_qn(s0):
+        s0_stack = [next_s]
+        while len(s0_stack) > 0:
+            s0 = s0_stack[-1]
             for x in self.b_edges.get(s0, []):
-                # print("updating", x, "from", s0)
                 s, a = x
                 if s is None:
-                    return
+                    continue
                 if (s, a) in self.Q:
                     q1 = self.N1[s][a] * self.Q[(s, a)] + v
                     q2 = 1 + self.N1[s][a]
@@ -167,57 +150,69 @@ class MCTSCollector:
                     self.N1[s][a] = 1
 
                 self.N0[s] += 1
-                set_qn(s)
+                s0_stack.append(s)
 
-        set_qn(next_s)
+            s0_stack.pop(0)
 
-    def get_explorable_phase(self, max_sims):
-        explore_s = None
-        for s, sim in self.repeats.items():
-            if sim >= max_sims or self.E.get(s, -1) != 0:
-                continue
-            explore_s = s
-            break
+    def sim_temp_games(self, root_phase, max_sims):
+        log = DummyLog()
+        tmp = GameState(log)
+        exp_strat = MCTSExplorerStrategy(root_phase)
+        for i in range(root_phase.num_players):
+            tmp.add_player(exp_strat)
 
-        if explore_s is None:
-            return None
-        return self.phases.inverse(explore_s)
+        tmp._init_phaseinfo(root_phase)
+        tmp.start_loop()
+        root_combos = exp_strat.root_combos
+        exp_strat.is_recording = False
 
-    def get_end_phases(self):
-        res = []
-        for s, val in self.E.items():
-            if val != 0:
-                phase = self.phases.inverse(s)
-                res.append(phase)
-        return res
+        for i in range(len(root_combos)):
+            exp_strat.shortcut = i
+            tmp._init_phaseinfo(root_phase)
+            tmp.start_loop()
+            if exp_strat.next_phases[i] is None:
+                exp_strat.next_phases[i] = tmp.export_phaseinfo()
 
-    def rewardize(self, end_phase):
-        r1 = dict()
-        s_end = self.phases[end_phase]
-        pi_end = self.calc_policy(s_end)
-        r1[s_end] = MCTSSample(end_phase, pi_end, self.E[s_end], self.C[s_end])
+        next_phases = exp_strat.next_phases
+        root_s = self.phases[root_phase]
+        for i, next_phase in enumerate(next_phases):
+            assert next_phase is not None
+            root_a = root_combos[i].bitwise
+            next_s = self.phases[next_phase]
+            # print(f"drawing {root_s, root_a} -> {next_s}")
+            assert root_s != next_s
+            self._connect(root_s, root_a, next_s)
 
-        def set_egv(ind, next_ind, res):
-            if ind not in res:
-                # print(ind, "gets the value: ", res[next_ind].value)
-                phase = self.phases.inverse(ind)
-                policy = self.calc_policy(ind)
-                reward = MCTSSample(phase, policy, res[next_ind].value, self.C[ind])
-                res[ind] = reward
-            for x in self.b_edges.get(ind, []):
-                s, a = x
-                if s is None:
-                    return
-                set_egv(s, ind, res)
+        self._search(root_s, root_phase, root_combos)
+        self._run_temp_sims(root_s, root_phase, root_combos, max_sims)
 
-        set_egv(s_end, None, r1)
-        return r1
+    def _run_temp_sims(self, root_s, root_phase, root_combos, max_sims):
+        log = DummyLog()
+        tmp = GameState(log)
+        exp_strat = RandomStrategy()
+        for i in range(root_phase.num_players):
+            tmp.add_player(exp_strat)
+        #
+        for _ in range(max_sims):
+            best_a = self._search_ucb(root_s, root_phase)
+            next_s = self.f_edges[(root_s, best_a)]
+            next_phase = self.phases.inverse(next_s)
+            tmp._init_phaseinfo(next_phase)
+            tmp.start_loop()
+            val = 1.0 - (enemy_hp_left(tmp.export_phaseinfo()) / 360)
+            self.vals[next_s] = val
+            self.update_backwards(next_s)
+
+    def get_example(self, s):
+        phase = self.phases.inverse(s)
+        example = MCTSSample(phase, self.calc_policy(s), self.E[s], self.C[s])
+        return example
 
 
 class MCTS:
     def __init__(self, net, puct=0.1, N=1000, batch_size=16, randomize=False):
         self.N = N
-        self._examples = dict()
+        self._examples = list()
         #
         self.net = net
         self.randomize = randomize
@@ -240,44 +235,32 @@ class MCTS:
         self.start_phase = self.game.export_phaseinfo()
 
     def get_examples(self):
-        return list(self._examples.values())
+        return self._examples
 
     def clear_examples(self):
         self._examples.clear()
 
     def _sim_game_from(self, phase, sims):
+        self.coll.sim_temp_games(phase, sims)
         cur_s = self.coll.phases[phase]
-        for _ in range(sims):
-            self.coll.reset_sim()
-            self.game._init_phaseinfo(phase)
-            self.game.start_loop()
-
+        # print("simmed", cur_s)
+        self._examples.append(self.coll.get_example(cur_s))
         # get best action according to ucb
-        best_a = self.coll.search(phase, None)
-        self.coll.reset_sim()
-        # set as shortcut and run sim once so edge exists
-        self.coll.shortcut = best_a
-        self.game._init_phaseinfo(phase)
-        self.game.start_loop()
-
-        next_s = int(self.coll.f_edges[(cur_s, best_a)][0])
-        if next_s not in self.coll.phases._inverse:
-            print(self.coll.phases._inverse)
-        phase = self.coll.phases.inverse(next_s)
-        return phase
+        best_a = self.coll._search_ucb(cur_s, phase)
+        next_s = self.coll.f_edges[(cur_s, best_a)]
+        # print(f"{cur_s, best_a} -> {next_s}")
+        next_phase = self.coll.phases.inverse(next_s)
+        return next_phase
 
     def _collect_examples(self, sims, end_phase):
-        r1 = self.coll.rewardize(end_phase)
-        for s, exp in r1.items():
-            self._examples[s] = exp
+        diffe = 1 - (enemy_hp_left(end_phase) / 360.0)
+        for exp in self._examples:
+            exp.value = diffe
 
     def sim_game_full(self, sims=5):
-        phase = self.start_phase
-        cur_s = self.coll.phases[phase]
-        self._sim_game_from(phase, sims)
-        while self.coll.E[cur_s] == 0:
+        phase = self._sim_game_from(self.start_phase, sims)
+        while phase.game_endvalue == 0:
             phase = self._sim_game_from(phase, sims)
-            cur_s = self.coll.phases[phase]
 
         self._collect_examples(sims, phase)
         return True

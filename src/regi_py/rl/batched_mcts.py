@@ -288,11 +288,15 @@ class BatchedMCTS:
         # print(self.coll.f_edges)
         return next_phase, next_s
 
+    def _collect_examples(self, sims, end_phase):
+        diffe = 1 - (enemy_hp_left(end_phase) / 360.0)
+        for exp in self._examples:
+            exp.value = diffe
+
     def sim_game_full(self, sims=5):
         phase = self.start_phase
         while phase.game_endvalue == 0:
             phase, cur_s = self._sim_game_from(phase, sims)
 
-        for exp in self._examples:
-            exp.value = phase.game_endvalue
+        self._collect_examples(sims, phase)
         return True
