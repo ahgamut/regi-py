@@ -18,11 +18,13 @@ from regi_py.rl import BatchedMCTS, MCTS, MC1Model, MCTSTesterStrategy
 
 def MCTSLoss(lprob, v, lprob_hat, v_hat):
     n = v.shape[0]
+    # loss1 = nn.functional.mse_loss(v, v_hat)
     loss1 = nn.functional.mse_loss(v, v_hat)
     # loss2 = nn.functional.mse_loss(prob, prob_hat)
     loss2 = nn.functional.kl_div(
         input=lprob_hat, target=lprob, reduction="batchmean", log_target=True
     )
+    # loss2 = torch.sum(lprob.exp() * lprob_hat) / n
     return loss1 + loss2
 
 
@@ -142,11 +144,11 @@ def explorer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to explore")
     torch.set_num_threads(params.num_threads)
     small_N = params.memory_size // (params.num_processes - 1)
-    mcts = BatchedMCTS(
+    mcts = MCTS(
         net=shared_model,
         N=small_N,
         batch_size=params.batch_size,
-        randomize=(tid % 2 == 0),
+        randomize=False,
     )
     while True:
         mcts.clear_examples()
@@ -158,7 +160,7 @@ def explorer(tid, shared_model, queue, device, params):
         diffe = total_enemy_hp(examples[0].phase) - total_enemy_hp(examples[-1].phase)
         if len(examples) > 0:
             print(
-                f"P{tid},q={queue.qsize()},t={len(examples)},e={examples[-1].value},dmg={diffe}",
+                f"P{tid},q={queue.qsize()},t={len(examples)},e={examples[-1].value:.4f},dmg={diffe}",
                 file=sys.stderr,
             )
 
