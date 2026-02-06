@@ -121,7 +121,7 @@ class ValueModule(nn.Module):
             channels=[4] * preset + [3, 2, 1], shapes=[3] * depth, paddings=[1] * depth
         )
         self.net2 = nn.Linear(128, 1)
-        self.ac = nn.Sigmoid()
+        self.ac = nn.ReLU()
 
     def forward(self, x):
         N = x.shape[0]
