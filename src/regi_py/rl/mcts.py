@@ -215,7 +215,7 @@ class MCTSCollector:
 
 
 class MCTS:
-    def __init__(self, net, puct=1.25, N=1000, batch_size=16, randomize=False):
+    def __init__(self, net, puct=0.1, N=1000, batch_size=16, randomize=False):
         self.N = N
         self._examples = list()
         #
@@ -260,7 +260,10 @@ class MCTS:
         return next_phase
 
     def _collect_examples(self, sims, end_phase):
-        diffe = 1 - (enemy_hp_left(end_phase) / 360.0)
+        if self.randomize:
+            diffe = int(end_phase.game_endvalue == 1)
+        else:
+            diffe = 1 - (enemy_hp_left(end_phase) / 360.0)
         for exp in self._examples:
             exp.value = diffe
 

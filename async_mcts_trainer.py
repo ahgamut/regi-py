@@ -95,7 +95,7 @@ def get_split_optimizer(model):
         {"params": no_decay, "weight_decay": 0},
     ]
 
-    optimizer = torch.optim.AdamW(grps, lr=1e-3)
+    optimizer = torch.optim.AdamW(grps, lr=5e-3)
     return optimizer
 
 
