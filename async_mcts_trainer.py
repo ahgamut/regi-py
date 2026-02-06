@@ -232,7 +232,7 @@ def main():
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
     parser.add_argument(
-        "--weights-path", default="./weights/best_model.pt", help="weights"
+        "--weights-path", default="", help="weights"
     )
     params = parser.parse_args()
     assert params.num_processes >= 2
