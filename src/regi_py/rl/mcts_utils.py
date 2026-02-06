@@ -22,6 +22,58 @@ def normalize_probs(arr):
     return arr
 
 
+def enemy_hp_left(game):
+    return sum(max(x.hp, 0) for x in game.enemy_pile)
+
+
+def attack_yieldfail(ind, game, combos):
+    if enemy_hp_left(game) == 0:
+        return True
+    cur_enemy = game.enemy_pile[0]
+    if game.get_current_block(cur_enemy) >= cur_enemy.strength:
+        # print("yield ok because full block")
+        return True
+    return random.random() >= 0.4
+
+
+def defend_throwing(ind, game, combos):
+    sel_blk = combos[ind].base_defense
+    num_discards = len(combos[ind].parts)
+    lower_poss = 0
+    for c in enumerate(combos):
+        c_blk = c.base_defense
+        c_dsc = len(c.parts)
+        if c_dsc < num_discards and c_blk <= sel_blk:
+            lower_poss += 1
+    lower_prob = min(0.9, lower_poss / len(combos))
+    return random.random() >= lower_prob
+
+
+def get_nicer_attacks(game, combos):
+    res = []
+    if len(combos) < 4:
+        return combos
+    for ind, c in enumerate(combos):
+        if c.bitwise != 0:
+            res.append(c)
+            continue
+        if not attack_yieldfail(ind, game, combos):
+            res.append(c)
+
+    return res
+
+
+def get_nicer_defends(game, combos):
+    if len(combos) < 4:
+        return combos
+    res = []
+    N = len(combos)
+    for ind in range(N):
+        if not defend_throwing(ind, game, combos):
+            res.append(combos[ind])
+    return res
+
+
 @dataclass(repr=True, eq=False, slots=True)
 class MCTSSample:
     phase: PhaseInfo
@@ -133,8 +185,12 @@ class MCTSTrainerStrategy(BaseStrategy):
         self.net.eval()
         return 0
 
-    def process_phase(self, phase, combos):
-        br = self.coll.search(phase, combos)
+    def process_phase(self, game, phase, combos):
+        if phase.phase_attacking:
+            subcombos = get_nicer_attacks(game, combos)
+        else:
+            subcombos = get_nicer_defends(game, combos)
+        br = self.coll.search(phase, subcombos)
         if br == -1:
             return -1
         for i, x in enumerate(combos):
@@ -145,36 +201,62 @@ class MCTSTrainerStrategy(BaseStrategy):
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
         ind = self.process_phase(game.export_phaseinfo(), combos)
-        if ind == -1 or len(combos) < 4:
-            return ind
-        if len(game.enemy_pile) <= 0:
-            return ind
-        if ind == 0:
-            cur_enemy = game.enemy_pile[0]
-            if game.get_current_block(cur_enemy) >= cur_enemy.strength:
-                # print("yield ok because full block")
-                return ind
-            if random.random() < 0.4:
-                # print("randomly fail yield")
-                return -1
         return ind
 
     def getDefenseIndex(self, combos, player, damage, game):
         ind = self.process_phase(game.export_phaseinfo(), combos)
-        if ind == -1 or len(combos) < 4:
-            return ind
+        return ind
+
+
+class MCTSExplorerStrategy(BaseStrategy):
+    __strat_name__ = "mcts-explorer"
+
+    def __init__(self, root_phase):
+        super(MCTSExplorerStrategy, self).__init__()
+        self.root_phase = root_phase
+        self.reroll()
+
+    def reroll(self):
+        self.shortcut = None
+        self.root_combos = None
+        self.next_phases = None
         #
-        sel_blk = combos[ind].base_defense
-        num_discards = len(combos[ind].parts)
-        lower_poss = 0
-        for i, c in enumerate(combos):
-            c_blk = c.base_defense
-            c_dsc = len(c.parts)
-            if c_dsc < num_discards and c_blk <= sel_blk:
-                lower_poss += 1
-        if random.random() < (lower_poss / len(combos)):
-            # print("randomly fail blk:", combos[ind], lower_poss)
-            return -1
+        self.prev_phase = None
+        self.prev_a = None
+        self.is_recording = True
+
+    def setup(self, player, game):
+        return 0
+
+    def mark_combo(self, phase):
+        self.next_phases[self.prev_a] = phase
+
+    def update_prev(self, a):
+        self.prev_a = a
+
+    def process_phase(self, phase, combos):
+        if str(phase) == str(self.root_phase):
+            if self.is_recording:
+                self.root_combos = combos
+                self.next_phases = [None] * len(combos)
+            self.prev_phase = phase
+        elif str(self.prev_phase) == str(self.root_phase):
+            self.mark_combo(phase)
+            self.prev_phase = phase
+        if self.shortcut is not None:
+            ind = self.shortcut
+            self.shortcut = None
+        else:
+            ind = random.choice(range(len(combos)))
+        self.update_prev(ind)
+        return ind
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        ind = self.process_phase(game.export_phaseinfo(), combos)
+        return ind
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        ind = self.process_phase(game.export_phaseinfo(), combos)
         return ind
 
 
