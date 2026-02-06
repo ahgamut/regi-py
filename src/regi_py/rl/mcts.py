@@ -215,7 +215,7 @@ class MCTSCollector:
 
 
 class MCTS:
-    def __init__(self, net, puct=0.25, N=1000, batch_size=16, randomize=False):
+    def __init__(self, net, puct=1.25, N=1000, batch_size=16, randomize=False):
         self.N = N
         self._examples = list()
         #
