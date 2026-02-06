@@ -1,0 +1,296 @@
+from regi_py.core import *
+from regi_py.rl.utils import *
+from regi_py.rl.subnets import LinearBlock, Conv1dBlock, Conv2dBlock
+from regi_py.strats import DamageStrategy, PreserveStrategy
+import random
+import time
+
+#
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
+
+__all__ = ("MC2Model",)
+
+
+def card_embedding(dim, pad_id):
+    return nn.Embedding(70, embedding_dim=dim, padding_idx=pad_id)
+
+
+class DrawDiscardModule(nn.Module):
+    def __init__(self, target=1):
+        super().__init__()
+        self.net1 = card_embedding(64, pad_id=None)
+        self.net2 = card_embedding(64, pad_id=None)
+
+    def forward(self, draw_pile, discard_pile):
+        N = draw_pile.shape[0]
+        x0 = self.net1(draw_pile)
+        x1 = self.net2(discard_pile)
+        x = torch.cat([x0, x1], dim=1).view(N, 1, 2, 64)
+        return x
+
+
+class UsedPileModule(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.net1 = Conv2dBlock(
+            channels=[16, 16, 16, 16, 16, 16],
+            shapes=[3, 3, 3, 3, 3],
+            paddings=[1, 1, 1, 1, 1],
+        )
+
+    def forward(self, pile):
+        x = self.net1(pile)
+        return x
+
+
+class Conv2dBlockWithAux(nn.Module):
+    def __init__(self, shapes, channels, paddings, num_embeddings, embedding_dim):
+        super().__init__()
+        self.ac = nn.ReLU()
+        self.nets = []
+        self.feeds = []
+        self.emb = nn.Embedding(
+            num_embeddings, embedding_dim=embedding_dim, padding_idx=None
+        )
+        self.embedding_dim = embedding_dim
+        self.num_embeddings = num_embeddings
+        for i in range(0, len(channels) - 1):
+            self.nets.append(
+                nn.Sequential(
+                    nn.Conv2d(
+                        kernel_size=shapes[i],
+                        in_channels=channels[i],
+                        out_channels=channels[i + 1],
+                        padding=paddings[i],
+                    ),
+                    nn.BatchNorm2d(num_features=channels[i + 1]),
+                )
+            )
+
+    def forward(self, data, aux):
+        x = data
+        x1 = self.emb(aux)
+        for i, net in enumerate(self.nets):
+            y1 = self.ac(net(x))
+            y2 = x1.view(y1.shape[0], 1, 1, self.embedding_dim).expand_as(y1)
+            y = y1 + y2
+            if y.shape == x.shape:
+                x = x + y
+            else:
+                x = y
+        return x
+
+
+class EnemyPileModule(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.net1 = Conv2dBlock(
+            channels=[1, 16, 16, 16, 16],  #
+            shapes=[3, 3, 3, 3],  #
+            paddings=[(0, 1), 1, (0, 1), 1],  #
+        )
+        self.emb = nn.Embedding(num_embeddings=41, embedding_dim=64, padding_idx=None)
+        self.ac = nn.ReLU()
+
+    def forward(self, cards, hp):
+        N = cards.shape[0]
+        enemies = cards.view(N, 1, 12, 64)
+        h2 = self.emb(hp.view(N, 1, 12))
+        x = self.net1(enemies + h2)
+        return self.ac(x)
+
+
+class PlayerCardsModule(nn.Module):
+
+    def __init__(self, dim=64):
+        super().__init__()
+        self.net1 = Conv2dBlockWithAux(
+            channels=[4, 16, 16, 16, 16, 16, 16, 16, 16],  #
+            shapes=[1, 3, 3, 1, 3, 1, 3, 3],  #
+            paddings=[0, 1, 1, 0, 1, 0, 1, 1],  #
+            num_embeddings=2,
+            embedding_dim=dim,
+        )
+        self.ac = nn.ReLU()
+
+    def forward(self, cards, atk_def):
+        x0 = self.net1(cards, atk_def)
+        return self.ac(x0)
+
+
+class ComboModule(nn.Module):
+    def __init__(self, preset=3):
+        super().__init__()
+        depth = preset + 2
+        self.net1 = Conv2dBlock(
+            channels=[16] * preset + [3, 2, 1], shapes=[3] * depth, paddings=[1] * depth
+        )
+        self.net1.ac = nn.ReLU()
+        self.prob_net = Conv1dBlock(
+            channels=[22, 2, 2],
+            shapes=[1, 1],
+            paddings=[0, 0],
+        )
+        self.val_net = Conv1dBlock(
+            channels=[22, 4, 4],
+            shapes=[3, 3],
+            paddings=[1, 1],
+        )
+        self.val_mix = nn.Linear(256, 1)
+        self.prob_net.ac = nn.ReLU()
+        self.softmax = nn.LogSoftmax(dim=1)
+
+    def forward(self, x):
+        N = x.shape[0]
+        x0 = self.net1(x)
+        x1 = x0.reshape(N, x0.shape[2], x0.shape[3])
+        #
+        probs = self.prob_net(x1).reshape(N, -1)
+        probs = self.softmax(probs)
+        #
+        vals = self.val_net(x1).reshape(N, -1)
+        valf = self.val_mix(vals).reshape(N)
+        return probs, valf
+
+
+class MC2Model(torch.nn.Module):
+    NOT_A_CARD = 1  # (GLITCH ACE)
+    UNKNOWN_CARD = 2  # (GLITCH TWO)
+    NOT_PLAYING = 3  # (GLITCH THREE)
+    CARD_DIMENSION = 64
+
+    def __init__(self):
+        super(MC2Model, self).__init__()
+        self.device = "cpu"
+        self.gen_emb = card_embedding(self.CARD_DIMENSION, self.NOT_A_CARD)
+
+        self.pc_mod = PlayerCardsModule()
+        self.dd_mod = DrawDiscardModule(2)
+        self.em_mod = EnemyPileModule(2)
+        self.up_mod = UsedPileModule(16)
+        self.bignet = ComboModule(10)
+
+    def forward(self, states):
+        player_cards = self.gen_emb(states["player_cards"])
+        N = player_cards.shape[0]
+        player_atk = states["player_atk"]
+        x0 = self.pc_mod(player_cards, player_atk)
+        # print(player_cards.shape, x0.shape)
+        #
+        draw_pile = states["draw_pile"]
+        discard_pile = states["discard_pile"]
+        x1 = self.dd_mod(draw_pile, discard_pile).expand(-1, 16, -1, -1)
+        # print(draw_pile.shape, x1.shape)
+        #
+        enemy_pile = self.gen_emb(states["enemy_pile"])
+        enemy_hp = states["enemy_hp"]
+        x2 = self.em_mod(enemy_pile, enemy_hp)
+        # print(enemy_pile.shape, x2.shape)
+        #
+        used_pile = self.gen_emb(states["used_pile"])
+        x3 = self.up_mod(used_pile)
+        # print(used_pile.shape, x3.shape)
+
+        x4 = torch.cat([x0, x1, x2, x3], dim=2)
+        # print(x4.shape)
+        lprob_hat, v_hat = self.bignet(x4)
+        # print(x4.shape, prob_hat.shape, v_hat.shape)
+
+        return lprob_hat, v_hat
+
+    def predict(self, sample):
+        states, _, _ = self.tensorify([sample], 1)
+        lprob_hat0, v_hat0 = self.forward(states)
+        prob_hat = lprob_hat0.cpu().exp().detach().numpy()[0]
+        v_hat = v_hat0.cpu().detach().numpy()[0]
+        return prob_hat, v_hat
+
+    def batch_predict(self, batch):
+        # print("calling batch_predict for: ", len(batch))
+        states, _, _ = self.tensorify(batch, len(batch))
+        lprob_hat0, v_hat0 = self.forward(states)
+        prob_hat = lprob_hat0.cpu().exp().detach().numpy()
+        v_hat = v_hat0.cpu().detach().numpy()
+        return prob_hat, v_hat
+
+    def tensorify(self, examples, batch_size):
+        return MC2Model._tensorify(examples, batch_size, self.device)
+
+    @classmethod
+    def _tensorify(cls, examples, batch_size, device):
+        sub = random.sample(examples, batch_size)
+
+        player_cards = torch.full((batch_size, 4, 8), cls.NOT_A_CARD, dtype=torch.long)
+        enemy_pile = torch.full((batch_size, 12), cls.NOT_A_CARD, dtype=torch.long)
+        enemy_hp = torch.zeros((batch_size, 12), dtype=torch.long)
+        used_pile = torch.full((batch_size, 16, 4), cls.NOT_A_CARD, dtype=torch.long)
+        draw_pile = torch.full((batch_size, 1), 0, dtype=torch.long)
+        discard_pile = torch.full((batch_size, 1), 0, dtype=torch.long)
+        player_atk = torch.zeros((batch_size,), dtype=torch.long)
+        probs = torch.zeros((batch_size, 128))
+        values = torch.zeros((batch_size,))
+
+        for b, s in enumerate(sub):
+            # access
+            phase = s.phase
+            opc = phase.player_cards
+            N = phase.num_players
+            cur = phase.active_player
+            combi = phase.used_combos
+            num_draw = len(phase.draw_pile)
+            num_discard = len(phase.discard_pile)
+            assert len(phase.enemy_pile) <= 12, "too many enemies"
+
+            # active player cards
+            for j, c in enumerate(opc[cur]):
+                player_cards[b, 0, j] = c.index
+            # other player cards
+            for i in range(1, 4):
+                if i < N:
+                    ii = (cur + i) % N
+                    for j, c in enumerate(opc[ii]):
+                        player_cards[b, i, j] = cls.UNKNOWN_CARD
+                else:
+                    player_cards[b, i, :] = cls.NOT_PLAYING
+            # enemies
+            for i, c in enumerate(phase.enemy_pile):
+                if i == 0:
+                    enemy_pile[b, i] = c.index
+                else:
+                    enemy_pile[b, i] = int(c.entry)  # GLITCH, ENTRY
+
+                enemy_hp[b, i] = max(0, c.hp)
+            # used combos
+            for i in range(min(len(combi), 16)):
+                for j, c in enumerate(combi[i].parts):
+                    used_pile[b, (16 - i - 1), j] = c.index
+            # attacking?
+            player_atk[b] = 1 if phase.phase_attacking else 0
+            # draw
+            if num_draw > 0:
+                draw_pile[b, 0] = num_draw
+            # discard_pile
+            if num_discard > 0:
+                discard_pile[b, 0] = num_discard
+            # results
+            if len(s.policy) > 0:
+                pb = s.policy
+                if len(s.combos) > 0:
+                    pb *= s.policy * s.combos
+                probs[b] = torch.from_numpy(pb)
+            values[b] = s.value
+
+        res = dict(
+            player_cards=player_cards.to(device),
+            enemy_pile=enemy_pile.to(device),
+            enemy_hp=enemy_hp.to(device),
+            used_pile=used_pile.to(device),
+            draw_pile=draw_pile.to(device),
+            discard_pile=discard_pile.to(device),
+            player_atk=player_atk.to(device),
+        )
+        logprobs = torch.nn.functional.log_softmax(probs + 1e-8, dim=1)
+        return res, logprobs.to(device), values.to(device)
