@@ -40,11 +40,11 @@ def defend_throwing(ind, game, combos):
     sel_blk = combos[ind].base_defense
     num_discards = len(combos[ind].parts)
     lower_poss = 0
-    for c in enumerate(combos):
+    for c in combos:
         c_blk = c.base_defense
         c_dsc = len(c.parts)
         if c_dsc < num_discards and c_blk <= sel_blk:
-            lower_poss += 1
+            lower_poss += 1.5
     lower_prob = min(0.9, lower_poss / len(combos))
     return random.random() >= lower_prob
 
@@ -200,11 +200,11 @@ class MCTSTrainerStrategy(BaseStrategy):
         return -1
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
-        ind = self.process_phase(game.export_phaseinfo(), combos)
+        ind = self.process_phase(game, game.export_phaseinfo(), combos)
         return ind
 
     def getDefenseIndex(self, combos, player, damage, game):
-        ind = self.process_phase(game.export_phaseinfo(), combos)
+        ind = self.process_phase(game, game.export_phaseinfo(), combos)
         return ind
 
 
