@@ -1,5 +1,4 @@
 # R Script to Read and Process Regicide Game JSON Files
-# Code from Copilot with modifications by Marie
 
 # packages
 library(jsonlite)
@@ -191,9 +190,19 @@ game <- game |>
 game <- left_join(game, strategy, join_by(game.active_player_id == id)) |>
   relocate(strategy, .after = "game.active_player_id")
   
+# Keep only relevant events: 
+  # STARTGAME, ATTACK, DEFEND, ENEMYKILL, FULLBLOCK,
+  # FAILBLOCK, DECKEMPTY, ENDGAME, POSTGAME
+
+  game <- game |>
+    filter(event %in% c("STARTGAME", "ATTACK", "DEFEND",
+                        "ENEMYKILL", "FULLBLOCK", "FAILBLOCK",
+                        "DECKEPMTY", "ENDGAME", "POSTGAME"))
+
 # Return the parsed game JSON file
 return(game)
 }
 
 # test_game <- parse_game_json(json_path = "game_json/regi-1769630227033.json")
 # test_game2 <- parse_game_json(json_path = "game_json/regi-1769630521039.json")
+
