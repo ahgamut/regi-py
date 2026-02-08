@@ -27,6 +27,8 @@ def enemy_hp_left(game):
 
 
 def attack_yieldfail(ind, game, combos):
+    if len(combos) < 4:
+        return False
     if enemy_hp_left(game) == 0:
         return False
     cur_enemy = game.enemy_pile[0]
@@ -37,6 +39,8 @@ def attack_yieldfail(ind, game, combos):
 
 
 def defend_throwing(ind, game, combos):
+    if len(combos) < 4:
+        return False
     sel_blk = combos[ind].base_defense
     num_discards = len(combos[ind].parts)
     lower_poss = 0

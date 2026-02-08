@@ -169,7 +169,7 @@ class MCTSCollector:
 
         self._search(root_s, root_phase, root_combos)
         vals = []
-        for phase in next_phases:
+        for next_phase in next_phases:
             vals.append(quick_game_value(next_phase, relative_diff=False))
         return np.max(vals)
 
