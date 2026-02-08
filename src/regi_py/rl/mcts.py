@@ -156,9 +156,9 @@ class MCTSCollector:
 
             s0_stack.pop(0)
 
-    def sim_temp_games(self, root_phase, max_sims):
-        next_phases, root_combos = get_expansion_at(root_phase)
+    def expand_and_valuate(self, root_phase):
         root_s = self.phases[root_phase]
+        next_phases, root_combos = get_expansion_at(root_phase)
         for i, next_phase in enumerate(next_phases):
             assert next_phase is not None
             root_a = root_combos[i].bitwise
@@ -168,17 +168,34 @@ class MCTSCollector:
             self._connect(root_s, root_a, next_s)
 
         self._search(root_s, root_phase, root_combos)
-        self._run_temp_sims(root_s, root_phase, root_combos, max_sims)
+        vals = []
+        for phase in next_phases:
+            vals.append(quick_game_value(next_phase, relative_diff=False))
+        return np.max(vals)
 
-    def _run_temp_sims(self, root_s, root_phase, root_combos, max_sims):
-        actions = self.C[root_s].nonzero()[0]
-        for _ in range(max_sims):
-            best_a = self._search_ucb(root_s, root_phase)
-            next_s = self.f_edges[(root_s, best_a)]
-            next_phase = self.phases.inverse(next_s)
-            val = quick_game_value(next_phase)
-            self.vals[next_s] = val
-            self.update_backwards(next_s)
+    def sim_temp_games(self, root_phase, max_sims):
+        root_s = self.phases[root_phase]
+        for sim in range(max_sims):
+            cur_s = root_s
+            cur_phase = root_phase
+
+            while self.N0.get(cur_s, 0) != 0:  # we have already expanded cur_s
+                if cur_phase.game_endvalue != 0:
+                    break
+                best_a = self._search_ucb(cur_s, cur_phase)
+                next_s = self.f_edges[(cur_s, best_a)]
+                next_phase = self.phases.inverse(next_s)
+                #
+                cur_s, cur_phase = next_s, next_phase
+
+            # print(f"sim {sim} ending at phase {cur_s}")
+            if cur_phase.game_endvalue == 0:
+                val = self.expand_and_valuate(cur_phase)
+            else:
+                val = int(cur_phase.game_endvalue == 1)
+            self.N0[cur_s] = 1
+            self.vals[cur_s] = val
+            self.update_backwards(cur_s)
 
     def get_example(self, s):
         phase = self.phases.inverse(s)
@@ -225,8 +242,8 @@ class MCTS:
         # get best action according to ucb
         best_a = self.coll._search_ucb(cur_s, phase)
         next_s = self.coll.f_edges[(cur_s, best_a)]
-        # prob = self.coll.P[cur_s]
-        # pol = self.coll.N1[cur_s] / self.coll.N0[cur_s]
+        prob = self.coll.P[cur_s]
+        pol = self.coll.N1[cur_s] / self.coll.N0[cur_s]
         # print(f"{cur_s, best_a} -> {next_s} prob={prob[best_a]}, pol={pol[best_a]}")
         next_phase = self.coll.phases.inverse(next_s)
         return next_phase

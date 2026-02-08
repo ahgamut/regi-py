@@ -28,12 +28,12 @@ def enemy_hp_left(game):
 
 def attack_yieldfail(ind, game, combos):
     if enemy_hp_left(game) == 0:
-        return True
+        return False
     cur_enemy = game.enemy_pile[0]
     if game.get_current_block(cur_enemy) >= cur_enemy.strength:
         # print("yield ok because full block")
-        return True
-    return random.random() >= 0.4
+        return False
+    return random.random() <= 0.4
 
 
 def defend_throwing(ind, game, combos):
@@ -46,7 +46,7 @@ def defend_throwing(ind, game, combos):
         if c_dsc < num_discards and c_blk <= sel_blk:
             lower_poss += 1.5
     lower_prob = min(0.9, lower_poss / len(combos))
-    return random.random() >= lower_prob
+    return random.random() <= lower_prob
 
 
 def get_nicer_attacks(game, combos):
@@ -287,10 +287,33 @@ def get_expansion_at(root_phase):
     return next_phases, root_combos
 
 
+class TrimmedRandomStrategy(BaseStrategy):
+    __strat_name__ = "trim-random"
+
+    def setup(self, player, game):
+        return 0
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        if len(combos) == 0:
+            return -1
+        ind = random.randint(0, len(combos) - 1)
+        if attack_yieldfail(ind, game, combos):
+            return -1
+        return ind
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        if len(combos) == 0:
+            return -1
+        ind = random.randint(0, len(combos) - 1)
+        if defend_throwing(ind, game, combos):
+            return -1
+        return ind
+
+
 def quick_game_value(root_phase, relative_diff=False):
     log = DummyLog()
     tmp = GameState(log)
-    exp_strat = RandomStrategy()
+    exp_strat = TrimmedRandomStrategy()
     for i in range(root_phase.num_players):
         tmp.add_player(exp_strat)
     tmp._init_phaseinfo(root_phase)
