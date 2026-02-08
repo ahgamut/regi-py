@@ -17,7 +17,7 @@ import numpy as np
 
 
 class MCTSCollector:
-    def __init__(self, net, puct, epsilon=1e-8, bound=120):
+    def __init__(self, net, puct, epsilon=1e-8, bound=30):
         self.bound = bound
         self.net = net
         self.puct = puct
@@ -64,13 +64,10 @@ class MCTSCollector:
         self.reset_sim()
 
     def calc_policy(self, s):
-        den = self.N0[s] + self.epsilon
-        arr = np.zeros(len(self.C[s]), dtype=np.float32)
-        arr = (self.N1[s] * self.C[s]) / den
-        if self.depth.get(s, 0) > self.bound:
-            best = np.argmax(arr)
-            arr *= 0
-            arr[best] = 1.0
+        depth = self.depth.get(s, 0)
+        expo = max(1.1, depth / self.bound)
+        expo = min(4.0, depth)
+        arr = (self.N1[s] * self.C[s]) ** expo
         # print(f"policy for {s} is", arr)
         return normalize_probs(arr)
 
