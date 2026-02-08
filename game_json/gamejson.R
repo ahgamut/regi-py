@@ -238,13 +238,15 @@ diagram_game_phase <- function(turn){
       `Enemies Left`, `Active Player ID`,
     starts_with("Number of Cards"), `Current Enemy HP`,
   `Current Enemy Attack Value`), as.character)) |>
+    relocate(starts_with("Number of Cards"), .after = everything()) |>
   pivot_longer(
     cols = c(Event, `Active Player ID`, 
     `Game Phase Count`, `Player Hand`,
-    starts_with("Number of Cards"), `Combos Played`,
+    `Combos Played`,
     `Draw Pile Size`, `Discard Pile Size`,
     `Enemies Left`, 
-    `Current Enemy`, `Current Enemy HP`, `Current Enemy Attack Value`),
+    `Current Enemy`, `Current Enemy HP`, `Current Enemy Attack Value`,
+    starts_with("Number of Cards")),
     names_to = c("labels"),
     values_to = "value"
   ) |>
@@ -252,14 +254,39 @@ diagram_game_phase <- function(turn){
                                    {value}"))
   
   # Add coordinates for diagram
-  # Need to adapt based on number of players
-  plotdf <- plotdf |>
-  mutate(x = c(0, 0, 0, 0, -2, -2, -2, 0, 1, 2, -1, 0, -1, 1),
-         y = c(2, 3, 4, -2, 4, 3, 2, -1, 0, 0, 0, 0, 1, 1))
+  if (nrow(plotdf) == 13) {
+    # 2 player game
+    plotdf <- plotdf |>
+  mutate(x = c(0, 0, 0, 0, 0, 1, 2, -1, 0, -1, 1, -3, -3),
+         y = c(2, 3, 4, -2, -1, 0, 0, 0, 0, 1, 1, 4, 3))
+  } else if (nrow(plotdf) == 14) {
+    # 3 player game
+    plotdf <- plotdf |>
+  mutate(x = c(0, 0, 0, 0, 0, 1, 2, -1, 0, -1, 1, -3, -3, -3),
+         y = c(2, 3, 4, -2, -1, 0, 0, 0, 0, 1, 1, 4, 3, 2))
+  } else if (nrow(plotdf == 15)){
+    # 4 player game
+    plotdf <- plotdf |>
+  mutate(x = c(0, 0, 0, 0, 0, 1, 2, -1, 0, -1, 1, -3, -3, -3, -3),
+         y = c(2, 3, 4, -2, -1, 0, 0, 0, 0, 1, 1, 4, 3, 2, 1))
+  }
+  
 
 ggplot(data = plotdf, aes(x = x, y = y, label = plot_info)) +
   geom_text() +
   theme_void() +
   scale_x_continuous(limits = c(-4, 4))
+  
 }
 
+# rows_to_plot <- test_game[2:11,]
+# rows_to_plot_list <- split(rows_to_plot, seq(nrow(rows_to_plot)))
+
+# rows_to_plot_list |>
+#   map(\(x) diagram_game_phase(x))
+
+# test_game_plot <- test_game[2:59,]
+# test_game_plot_list <- split(test_game_plot, seq(nrow(test_game_plot)))
+
+# test_game_diagrams <- test_game_plot_list |>
+#    map(\(x) diagram_game_phase(x))
