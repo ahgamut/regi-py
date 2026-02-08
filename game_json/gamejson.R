@@ -3,6 +3,7 @@
 # packages
 library(jsonlite)
 library(tidyverse)
+library(glue)
 
 # Functions
 # Function to flatten combo column
@@ -205,4 +206,60 @@ return(game)
 
 # test_game <- parse_game_json(json_path = "game_json/regi-1769630227033.json")
 # test_game2 <- parse_game_json(json_path = "game_json/regi-1769630521039.json")
+
+# Function to make a diagram of a Regicide game game phase
+# (i.e., one row of a parsed )
+diagram_game_phase <- function(turn){
+  plotdf <- turn |>
+  select(event, game.active_player_id, game.phase_count, player.cards,
+    starts_with("num_cards_player"), used_combos.value,
+    game.draw_pile_size, game.discard_pile_size,
+    game.enemy_pile_size,
+    game.current_enemy.value, game.current_enemy.hp, game.current_enemy.strength) |>
+  rename(
+    Event = event,
+    `Active Player ID` = game.active_player_id,
+    `Game Phase Count` = game.phase_count,
+    `Player Hand` = player.cards,
+    `Combos Played` = used_combos.value,
+    `Draw Pile Size` = game.draw_pile_size,
+    `Discard Pile Size` = game.discard_pile_size,
+    `Enemies Left` = game.enemy_pile_size,
+    `Current Enemy` = game.current_enemy.value,
+    `Current Enemy HP` = game.current_enemy.hp,
+    `Current Enemy Attack Value` = game.current_enemy.strength
+  ) |>
+  rename_with(
+    ~paste0("Number of Cards for Player ", str_sub(.x, 18)),
+    .cols = starts_with("num_cards_player")
+  ) |>
+  mutate(across(
+    c(`Game Phase Count`, `Draw Pile Size`, `Discard Pile Size`, 
+      `Enemies Left`, `Active Player ID`,
+    starts_with("Number of Cards"), `Current Enemy HP`,
+  `Current Enemy Attack Value`), as.character)) |>
+  pivot_longer(
+    cols = c(Event, `Active Player ID`, 
+    `Game Phase Count`, `Player Hand`,
+    starts_with("Number of Cards"), `Combos Played`,
+    `Draw Pile Size`, `Discard Pile Size`,
+    `Enemies Left`, 
+    `Current Enemy`, `Current Enemy HP`, `Current Enemy Attack Value`),
+    names_to = c("labels"),
+    values_to = "value"
+  ) |>
+  mutate(plot_info = glue::glue("{labels}
+                                   {value}"))
+  
+  # Add coordinates for diagram
+  # Need to adapt based on number of players
+  plotdf <- plotdf |>
+  mutate(x = c(0, 0, 0, 0, -2, -2, -2, 0, 1, 2, -1, 0, -1, 1),
+         y = c(2, 3, 4, -2, 4, 3, 2, -1, 0, 0, 0, 0, 1, 1))
+
+ggplot(data = plotdf, aes(x = x, y = y, label = plot_info)) +
+  geom_text() +
+  theme_void() +
+  scale_x_continuous(limits = c(-4, 4))
+}
 
