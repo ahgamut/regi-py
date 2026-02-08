@@ -284,7 +284,7 @@ void loadPhaseInfoOrFail(PhaseInfo &info, std::string s)
 {
     if (!info.loadFromString(s))
     {
-        throw std::runtime_error("unable to load info from string");
+        throw std::runtime_error("unable to load info from string: " + s);
     }
 }
 
