@@ -157,25 +157,7 @@ class MCTSCollector:
             s0_stack.pop(0)
 
     def sim_temp_games(self, root_phase, max_sims):
-        log = DummyLog()
-        tmp = GameState(log)
-        exp_strat = MCTSExplorerStrategy(root_phase)
-        for i in range(root_phase.num_players):
-            tmp.add_player(exp_strat)
-
-        tmp._init_phaseinfo(root_phase)
-        tmp.start_loop()
-        root_combos = exp_strat.root_combos
-        exp_strat.is_recording = False
-
-        for i in range(len(root_combos)):
-            exp_strat.shortcut = i
-            tmp._init_phaseinfo(root_phase)
-            tmp.start_loop()
-            if exp_strat.next_phases[i] is None:
-                exp_strat.next_phases[i] = tmp.export_phaseinfo()
-
-        next_phases = exp_strat.next_phases
+        next_phases, root_combos = get_expansion_at(root_phase)
         root_s = self.phases[root_phase]
         for i, next_phase in enumerate(next_phases):
             assert next_phase is not None
@@ -189,22 +171,12 @@ class MCTSCollector:
         self._run_temp_sims(root_s, root_phase, root_combos, max_sims)
 
     def _run_temp_sims(self, root_s, root_phase, root_combos, max_sims):
-        log = DummyLog()
-        tmp = GameState(log)
-        exp_strat = RandomStrategy()
-        for i in range(root_phase.num_players):
-            tmp.add_player(exp_strat)
-        #
         actions = self.C[root_s].nonzero()[0]
         for _ in range(max_sims):
             best_a = self._search_ucb(root_s, root_phase)
             next_s = self.f_edges[(root_s, best_a)]
             next_phase = self.phases.inverse(next_s)
-            tmp._init_phaseinfo(next_phase)
-            tmp.start_loop()
-            vstart = enemy_hp_left(next_phase)
-            vend = enemy_hp_left(tmp.export_phaseinfo())
-            val = (vstart - vend) / 360
+            val = quick_game_value(next_phase)
             self.vals[next_s] = val
             self.update_backwards(next_s)
 

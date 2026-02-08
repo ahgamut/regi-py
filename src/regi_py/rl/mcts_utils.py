@@ -260,6 +260,50 @@ class MCTSExplorerStrategy(BaseStrategy):
         return ind
 
 
+def get_expansion_at(root_phase):
+    log = DummyLog()
+    tmp = GameState(log)
+    exp_strat = MCTSExplorerStrategy(root_phase)
+    for i in range(root_phase.num_players):
+        tmp.add_player(exp_strat)
+
+    tmp._init_phaseinfo(root_phase)
+    tmp.start_loop()
+    root_combos = exp_strat.root_combos
+    exp_strat.is_recording = False
+
+    for i in range(len(root_combos)):
+        exp_strat.shortcut = i
+        tmp._init_phaseinfo(root_phase)
+        tmp.start_loop()
+        if exp_strat.next_phases[i] is None:
+            exp_strat.next_phases[i] = tmp.export_phaseinfo()
+
+    next_phases = exp_strat.next_phases
+    assert len(next_phases) == len(root_combos)
+    for x in next_phases:
+        assert x is not None
+
+    return next_phases, root_combos
+
+
+def quick_game_value(root_phase, relative_diff=False):
+    log = DummyLog()
+    tmp = GameState(log)
+    exp_strat = RandomStrategy()
+    for i in range(root_phase.num_players):
+        tmp.add_player(exp_strat)
+    tmp._init_phaseinfo(root_phase)
+    tmp.start_loop()
+    if relative_diff:
+        vstart = enemy_hp_left(root_phase)
+    else:
+        vstart = 360
+    vend = enemy_hp_left(tmp.export_phaseinfo())
+    val = (vstart - vend) / 360
+    return val
+
+
 class MCTSLog(DummyLog):
     def __init__(self, coll):
         super().__init__()
