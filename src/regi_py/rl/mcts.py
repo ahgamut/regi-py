@@ -258,7 +258,10 @@ class MCTS:
         return next_phase
 
     def _collect_examples(self, sims, end_phase):
-        diffe = int(end_phase.game_endvalue == 1)
+        enemies_beaten = 12 - len(end_phase.enemy_pile)
+        diffe = enemies_beaten / 8
+        if diffe <= 0:
+            diffe = -1
         for exp in self._examples:
             exp.value = diffe
 
