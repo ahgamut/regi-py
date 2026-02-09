@@ -24,3 +24,24 @@ class TrimmedRandomStrategy(BaseStrategy):
         if defend_throwing(ind, game, combos):
             return -1
         return ind
+
+
+def quick_game_value(root_phase, relative_diff=False):
+    log = DummyLog()
+    tmp = GameState(log)
+    exp_strat = TrimmedRandomStrategy()
+    for i in range(root_phase.num_players):
+        tmp.add_player(exp_strat)
+    tmp._init_phaseinfo(root_phase)
+    tmp.start_loop()
+    end_phase = tmp.export_phaseinfo()
+    if end_phase.game_endvalue == 1:
+        return 2
+    #
+    if relative_diff:
+        vstart = enemy_hp_left(root_phase)
+    else:
+        vstart = 360
+    vend = enemy_hp_left(end_phase)
+    val = (vstart - vend) / 360
+    return val

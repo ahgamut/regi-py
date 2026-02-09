@@ -19,7 +19,7 @@ def attack_yieldfail(ind, game, combos):
     return random.random() <= 0.4
 
 
-def defend_throwing(ind, game, combos):
+def defend_throwing(ind, game, combos, score_only=False):
     if len(combos) < 4:
         return False
     sel_blk = combos[ind].base_defense
@@ -31,6 +31,8 @@ def defend_throwing(ind, game, combos):
         if c_dsc < num_discards and c_blk <= sel_blk:
             lower_poss += 1.5
     lower_prob = min(0.9, lower_poss / len(combos))
+    if score_only:
+        return lower_prob
     return random.random() <= lower_prob
 
 
@@ -57,24 +59,3 @@ def get_nicer_defends(game, combos):
         if not defend_throwing(ind, game, combos):
             res.append(combos[ind])
     return res
-
-
-def quick_game_value(root_phase, relative_diff=False):
-    log = DummyLog()
-    tmp = GameState(log)
-    exp_strat = TrimmedRandomStrategy()
-    for i in range(root_phase.num_players):
-        tmp.add_player(exp_strat)
-    tmp._init_phaseinfo(root_phase)
-    tmp.start_loop()
-    end_phase = tmp.export_phaseinfo()
-    if end_phase.game_endvalue == 1:
-        return 2
-    #
-    if relative_diff:
-        vstart = enemy_hp_left(root_phase)
-    else:
-        vstart = 360
-    vend = enemy_hp_left(end_phase)
-    val = (vstart - vend) / 360
-    return val

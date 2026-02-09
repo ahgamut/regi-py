@@ -5,6 +5,7 @@ from .basic import DummyStrategy
 from .preserve import PreserveStrategy
 from .suitpref import AllPrefs as AllSuits
 from .trim_random import TrimmedRandomStrategy
+from .brute_sampling import BruteSamplingStrategy
 
 STRATEGY_LIST = [
     RandomStrategy,
@@ -12,4 +13,5 @@ STRATEGY_LIST = [
     DummyStrategy,
     PreserveStrategy,
     TrimmedRandomStrategy,
+    BruteSamplingStrategy,
 ] + AllSuits
