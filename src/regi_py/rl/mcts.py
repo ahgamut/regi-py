@@ -165,10 +165,10 @@ class MCTSCollector:
             self._connect(root_s, root_a, next_s)
 
         self._search(root_s, root_phase, root_combos)
-        vals = []
-        for next_phase in next_phases:
-            vals.append(quick_game_value(next_phase, relative_diff=False))
-        return np.mean(vals)
+        if root_phase.game_endvalue != 0:
+            self.vals[root_s] = int(root_phase.game_endvalue == 1)
+
+        return self.vals[root_s]
 
     def sim_temp_games(self, root_phase, max_sims):
         root_s = self.phases[root_phase]
@@ -189,8 +189,8 @@ class MCTSCollector:
             if cur_phase.game_endvalue == 0:
                 val = self.expand_and_valuate(cur_phase)
             else:
-                val = cur_phase.game_endvalue
-            self.N0[cur_s] = 1
+                val = int(cur_phase.game_endvalue == 1)
+            self.N0[cur_s] = self.N0.get(cur_s, 0) + 1
             self.vals[cur_s] = val
             self.update_backwards(cur_s)
 
@@ -201,7 +201,7 @@ class MCTSCollector:
 
 
 class MCTS:
-    def __init__(self, net, puct=0.1, N=1000, batch_size=16, randomize=False):
+    def __init__(self, net, puct=1.25, N=1000, batch_size=16, randomize=False):
         self.N = N
         self._examples = list()
         #
