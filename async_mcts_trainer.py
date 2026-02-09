@@ -192,10 +192,10 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             threshold=0.55,
         ):
             shared_model.load_state_dict(train_model.state_dict())
-            if (episode - prev_best) > params.test_every:
+            if (ep - prev_best) > params.test_every:
                 print("episode", ep, "saved updated model", file=sys.stderr)
                 test_model(ep, shared_model, params.num_simulations)
-            prev_best = episode
+            prev_best = ep
 
     torch.save(shared_model.state_dict(), "./weights/model_end.pt")
 
