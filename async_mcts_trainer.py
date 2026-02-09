@@ -192,7 +192,6 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
         ):
             print("episode", ep, "updated model")
             shared_model.load_state_dict(train_model.state_dict())
-        if ep % params.test_every == 0:
             test_model(ep, shared_model, params.num_simulations)
 
     torch.save(shared_model.state_dict(), "./weights/model_end.pt")
