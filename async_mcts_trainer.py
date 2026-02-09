@@ -13,6 +13,7 @@ import numpy as np
 #
 from regi_py import GameState, DummyLog, CXXConsoleLog
 from regi_py import get_strategy_map
+from regi_py.strats import RandomStrategy
 from regi_py.rl import BatchedMCTS, MCTS, MC2Model, MC1Model, MCTSTesterStrategy
 
 
@@ -80,7 +81,22 @@ def test_model(episode, model, num_simulations):
     print("episode", episode, "saved model", file=sys.stderr)
 
 
-def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=0.6):
+def make_preset_games(num_games):
+    preset_games = []
+    log = DummyLog()
+    for _ in range(num_games):
+        game = GameState(log)
+        num_players = random.randint(2, 4)
+        for i in range(num_players):
+            game.add_player(RandomStrategy())
+        game.initialize()
+        preset_games.append(game.export_phaseinfo())
+    return preset_games
+
+
+def improved_gameplay(
+    episode, new_model, old_model, num_simulations, threshold=0.6, preset_games=None
+):
     new_model.eval()
     old_model.eval()
     log1 = EndGameLog()
@@ -96,8 +112,12 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
             game1.add_player(MCTSTesterStrategy(old_model))
             game2.add_player(MCTSTesterStrategy(new_model))
         #
-        game1.initialize()
-        game2._init_phaseinfo(game1.export_phaseinfo())
+        if preset_games is None:
+            game1.initialize()
+            game2._init_phaseinfo(game1.export_phaseinfo())
+        else:
+            game1._init_phaseinfo(preset_games[s])
+            game2._init_phaseinfo(preset_games[s])
         #
         game1.start_loop()
         game2.start_loop()
@@ -105,8 +125,12 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
         diff1 = log1.e0 - log1.e1
         diff2 = log2.e0 - log2.e1
         #
-        if diff2 >= diff1:
+        if diff2 >= diff1 and diff2 != 0:
+            # print(f"old: {diff1}, new: {diff2} => new is better")
             newer_better += 1
+        else:
+            # print(f"old: {diff1}, new: {diff2} => new is worse")
+            pass
 
     nb_ratio = newer_better / num_simulations
     print(f"{episode} newer better in {100*nb_ratio:.4f}% of games", file=sys.stderr)
@@ -152,6 +176,7 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
         bench_model = bench_model.to(test_device)
         bench_model.eval()
 
+    preset_games = make_preset_games(32)
     ep = -1
     samples = []
     prev_best = 0
@@ -165,7 +190,6 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             except Exception as e:
                 print(f"P{tid} error loading sample:", e)
                 continue
-            train_model.load_state_dict(shared_model.state_dict())
         elif len(samples) < params.memory_size:
             time.sleep(1)
             continue
@@ -191,6 +215,7 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             old_model=shared_model,
             num_simulations=32,
             threshold=0.55,
+            preset_games=preset_games,
         ):
             print("episode", ep, "updated model", file=sys.stderr)
             shared_model.load_state_dict(train_model.state_dict())
