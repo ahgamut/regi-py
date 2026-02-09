@@ -108,7 +108,7 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
             newer_better += 1
 
     nb_ratio = newer_better / num_simulations
-    print(f"new model better in {100*nb_ratio:.4f}% of games")
+    print(f"{episode} newer better in {100*nb_ratio:.4f}% of games", file=sys.stderr)
     return nb_ratio > threshold
 
 
@@ -153,6 +153,7 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
 
     ep = -1
     samples = []
+    prev_best = 0
     while ep < params.num_episodes:
         if queue.qsize() >= params.memory_size:
             samples.clear()
@@ -190,9 +191,11 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             num_simulations=32,
             threshold=0.55,
         ):
-            print("episode", ep, "updated model")
             shared_model.load_state_dict(train_model.state_dict())
-            test_model(ep, shared_model, params.num_simulations)
+            if (episode - prev_best) > params.test_every:
+                print("episode", ep, "saved updated model", file=sys.stderr)
+                test_model(ep, shared_model, params.num_simulations)
+            prev_best = episode
 
     torch.save(shared_model.state_dict(), "./weights/model_end.pt")
 
