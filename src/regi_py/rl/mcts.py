@@ -17,7 +17,7 @@ import numpy as np
 
 
 class MCTSCollector:
-    def __init__(self, net, puct, epsilon=1e-1, bound=30):
+    def __init__(self, net, puct, epsilon=0.25, bound=30):
         self.bound = bound
         self.net = net
         self.puct = puct
@@ -65,13 +65,13 @@ class MCTSCollector:
         self.reset_sim()
 
     def get_noise(self):
-        alpha = [0.3] * 128
+        alpha = [0.25] * 128
         noise = self.noise_rng.dirichlet(alpha)
         return noise
 
     def calc_policy(self, s):
         depth = self.depth.get(s, 0)
-        expo = max(1.1, depth / self.bound)
+        expo = max(1.0, depth / self.bound)
         expo = min(4.0, expo)
         arr = (self.N1[s] * self.C[s]) ** expo
         # print(f"policy for {s} is", arr)
@@ -210,6 +210,17 @@ class MCTSCollector:
         return example
 
 
+def valuation_quick(phase):
+    enemies_beaten = 360 - enemy_hp_left(phase)
+    if enemies_beaten <= 80:
+        diffe = -1
+    elif enemies_beaten > 330:
+        diffe = 2
+    else:
+        diffe = enemies_beaten / 330
+    return diffe
+
+
 class MCTS:
     def __init__(self, net, puct=1.25, N=1000, batch_size=16, randomize=False):
         self.N = N
@@ -258,10 +269,7 @@ class MCTS:
         return next_phase
 
     def _collect_examples(self, sims, end_phase):
-        enemies_beaten = 12 - len(end_phase.enemy_pile)
-        diffe = enemies_beaten / 8
-        if diffe <= 0:
-            diffe = -1
+        diffe = valuation_quick(end_phase)
         for exp in self._examples:
             exp.value = diffe
 
