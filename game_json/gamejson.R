@@ -94,7 +94,6 @@ flatten_card_pile <- function(card_pile){
 }
 
 # Function to read and parse a game JSON file
-#"game_json/regi-1769630227033.json"
 parse_game_json <- function(json_path){
 # Read the raw game JSON file
 raw <- jsonlite::fromJSON(json_path, flatten = TRUE)
@@ -115,20 +114,6 @@ game <- game |>
   relocate(all_of(c("value", "strength")), .after = "event") |>
   rename(combo.value = value,
          combo.strength = strength)
-  
-# Flatten the combos column
-flattened_combo_options <- game$combos |>
-  map(possibly(combos_flatten, otherwise = data.frame(value = NA, strength = NA), quiet = TRUE)) |>
-  bind_rows()
-
-# Create 2 new columns (combos.value and combos.strenth)
-# as a result of flattening the combos list column
-game <- bind_cols(game, flattened_combo_options)
-game <- game |>
-  select(!combos) |>
-  relocate(all_of(c("value", "strength")), .after = "userid") |>
-  rename(combos.value = value,
-         combos.strength = strength)
 
 # Update the player.cards and game.active_player.cards columns
 # to be strings instead of lists
@@ -206,6 +191,7 @@ return(game)
 
 # test_game <- parse_game_json(json_path = "game_json/regi-1769630227033.json")
 # test_game2 <- parse_game_json(json_path = "game_json/regi-1769630521039.json")
+# win <- parse_game_json("game_json/first-win.json")
 
 # Function to make a diagram of a Regicide game game phase
 # (i.e., one row of a parsed )
@@ -290,3 +276,7 @@ ggplot(data = plotdf, aes(x = x, y = y, label = plot_info)) +
 
 # test_game_diagrams <- test_game_plot_list |>
 #    map(\(x) diagram_game_phase(x))
+
+# win_list <- split(win, seq(nrow(win)))
+# win_diagrams <- win_list |>
+#     map(\(x) diagram_game_phase(x))
