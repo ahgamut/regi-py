@@ -72,7 +72,7 @@ class MCTSCollector:
     def calc_policy(self, s):
         depth = self.depth.get(s, 0)
         expo = max(1.1, depth / self.bound)
-        expo = min(4.0, depth)
+        expo = min(4.0, expo)
         arr = (self.N1[s] * self.C[s]) ** expo
         # print(f"policy for {s} is", arr)
         return normalize_probs(arr)
@@ -127,6 +127,9 @@ class MCTSCollector:
         return best_act
 
     def _connect(self, prev_s, prev_a, cur_s):
+        prev_a = int(prev_a)
+        prev_s = int(prev_s)
+        cur_s = int(cur_s)
         self.repeats[cur_s] = self.repeats.get(cur_s, 0) + 1
         if prev_s is None:
             self.depth[cur_s] = 0
@@ -242,13 +245,15 @@ class MCTS:
         self.coll.sim_temp_games(phase, sims)
         cur_s = self.coll.phases[phase]
         # print("simmed", cur_s)
-        self._examples.append(self.coll.get_example(cur_s))
-        # get best action according to ucb
-        best_a = self.coll._search_ucb(cur_s, phase)
-        next_s = self.coll.f_edges[(cur_s, best_a)]
+        example = self.coll.get_example(cur_s)
+        self._examples.append(example)
+        # get best action from visit counts
+        opt_a = random.choices(range(128), weights=example.policy, k=1)[0]
+        # best_a = self.coll._search_ucb(cur_s, phase)
+        next_s = self.coll.f_edges[(cur_s, opt_a)]
         prob = self.coll.P[cur_s]
         pol = self.coll.N1[cur_s] / self.coll.N0[cur_s]
-        # print(f"{cur_s, best_a} -> {next_s} prob={prob[best_a]}, pol={pol[best_a]}")
+        # print(f"{cur_s, opt_a} -> {next_s} prob={prob[opt_a]}, pol={pol[opt_a]}")
         next_phase = self.coll.phases.inverse(next_s)
         return next_phase
 
