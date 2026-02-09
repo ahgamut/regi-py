@@ -79,6 +79,39 @@ def test_model(episode, model, num_simulations):
     torch.save(model.state_dict(), f"./weights/model_{episode}.pt")
 
 
+def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=0.6):
+    new_model.eval()
+    old_model.eval()
+    log1 = EndGameLog()
+    log2 = EndGameLog()
+
+    newer_better = 0
+
+    for s in range(num_simulations):
+        game1 = GameState(log1)
+        game2 = GameState(log2)
+        num_players = random.randint(2, 4)
+        for i in range(num_players):
+            game1.add_player(MCTSTesterStrategy(old_model))
+            game2.add_player(MCTSTesterStrategy(new_model))
+        #
+        game1.initialize()
+        game2._init_phaseinfo(game1.export_phaseinfo())
+        #
+        game1.start_loop()
+        game2.start_loop()
+        #
+        diff1 = log1.e0 - log1.e1
+        diff2 = log2.e0 - log2.e1
+        #
+        if diff2 >= diff1:
+            newer_better += 1
+
+    nb_ratio = newer_better / num_simulations
+    print(f"new model better in {100*nb_ratio:.4f}% of games")
+    return nb_ratio > threshold
+
+
 def get_split_optimizer(model):
     decay = []
     no_decay = []
@@ -99,17 +132,24 @@ def get_split_optimizer(model):
     return optimizer
 
 
-def trainer(tid, shared_model, queue, device, params):
-    print(f"P{tid} on {device} to train")
+def trainer(tid, shared_model, queue, train_device, test_device, params):
+    print(f"P{tid} on {train_device} to train")
     torch.set_num_threads(params.num_threads)
-    with torch.device(device):
+    with torch.device(train_device):
         train_model = MC2Model()
-        train_model.device = device
+        train_model.device = train_device
         train_model.load_state_dict(shared_model.state_dict())
-        train_model = train_model.to(device)
+        train_model = train_model.to(train_device)
         train_model.train()
         loss_fn = MCTSLoss
         optimizer = get_split_optimizer(train_model)
+
+    with torch.device(test_device):
+        bench_model = MC2Model()
+        bench_model.device = test_device
+        bench_model.load_state_dict(shared_model.state_dict())
+        bench_model = bench_model.to(test_device)
+        bench_model.eval()
 
     ep = -1
     samples = []
@@ -123,6 +163,7 @@ def trainer(tid, shared_model, queue, device, params):
             except Exception as e:
                 print(f"P{tid} error loading sample:", e)
                 continue
+            train_model.load_state_dict(shared_model.state_dict())
         elif len(samples) < params.memory_size:
             time.sleep(1)
             continue
@@ -136,12 +177,21 @@ def trainer(tid, shared_model, queue, device, params):
             losses2.append(loss2)
 
         print(
-            "training episode",
+            "episode",
             ep,
             f"loss1={np.mean(losses1)}, loss2={np.mean(losses2)}",
             file=sys.stderr,
         )
-        shared_model.load_state_dict(train_model.state_dict())
+        bench_model.load_state_dict(train_model.state_dict())
+        if improved_gameplay(
+            ep,
+            new_model=bench_model,
+            old_model=shared_model,
+            num_simulations=32,
+            threshold=0.55,
+        ):
+            print("episode", ep, "updated model")
+            shared_model.load_state_dict(train_model.state_dict())
         if ep % params.test_every == 0:
             test_model(ep, shared_model, params.num_simulations)
 
@@ -201,7 +251,7 @@ def submain(params):
 
     p_trainer = mp.Process(
         target=trainer,
-        args=(0, shared_model, exp_queue, train_device, params),
+        args=(0, shared_model, exp_queue, train_device, test_device, params),
     )
     p_trainer.start()
 
