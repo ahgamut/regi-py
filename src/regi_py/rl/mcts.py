@@ -17,7 +17,7 @@ import numpy as np
 
 
 class MCTSCollector:
-    def __init__(self, net, puct, epsilon=1e-8, bound=30):
+    def __init__(self, net, puct, epsilon=1e-1, bound=30):
         self.bound = bound
         self.net = net
         self.puct = puct
@@ -38,6 +38,7 @@ class MCTSCollector:
         self.C = DupeFailDict()  # [s] -> combos
         self.vals = dict()  # [s] -> v (filled backwards?)
         #
+        self.noise_rng = np.random.default_rng()
 
     def __len__(self):
         return len(self.N0)
@@ -62,6 +63,11 @@ class MCTSCollector:
         self.vals.clear()
         #
         self.reset_sim()
+
+    def get_noise(self):
+        alpha = [0.3] * 128
+        noise = self.noise_rng.dirichlet(alpha)
+        return noise
 
     def calc_policy(self, s):
         depth = self.depth.get(s, 0)
@@ -90,6 +96,7 @@ class MCTSCollector:
             # print("getting probs for", s)
             # normalized probs
             p_hat, v_hat = self.net.predict(MCTSSample.eval(phase))
+            p_hat = p_hat * (1 - self.epsilon) + self.epsilon * self.get_noise()
             self.P[s] = normalize_probs(p_hat * self.C[s])
             self.vals[s] = v_hat
             self.N0[s] = 0
