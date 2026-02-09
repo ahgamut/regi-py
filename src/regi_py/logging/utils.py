@@ -12,7 +12,7 @@ def dump_game(game):
     result["phase_count"] = game.phase_count
     result["phase_attacking"] = game.phase_attacking
     result["hand_size"] = game.hand_size
-    result["players"] = [dump_player_limited(player) for player in game.players]
+    result["players"] = [dump_player(player) for player in game.players]
     result["past_yields"] = game.past_yields
     result["status"] = str(game.status.name)
     result["used_combos"] = [dump_combo(combo) for combo in game.used_combos]

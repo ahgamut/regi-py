@@ -232,7 +232,7 @@ function updateBoard(game) {
     let g = Alpine.store('gamestate');
     let enemy_view = document.getElementById('enemy-view');
     let game_view = document.getElementById('game-view');
-    console.log(game);
+    // console.log(game);
     game_view.replaceChildren();
     game_view.appendChild(makeContextInfo(game));
     game_view.appendChild(makeOtherPlayerInfo(game));
@@ -360,13 +360,14 @@ function processLog(data) {
         case 'STATE':
             g.statusz = "RUNNING";
             if (data.game.active_player_id !== null) {
-                updateCards(data.game.players[g.playerid]);
                 if (data.game.active_player_id != g.playerid) {
                     let submitter = document.getElementById('main-button');
                     let yielder = document.getElementById('side-button');
                     setButtonActivity(submitter, false);
                     setButtonActivity(yielder, false);
                     logMessage(`Wait for Player ${data.game.active_player_id} to play..`);
+                } else {
+                    updateCards(data.game.active_player);
                 }
             }
         case 'DEBUG':
