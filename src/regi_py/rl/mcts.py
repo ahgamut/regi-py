@@ -253,10 +253,7 @@ class MCTS:
         return next_phase
 
     def _collect_examples(self, sims, end_phase):
-        if self.randomize:
-            diffe = int(end_phase.game_endvalue == 1)
-        else:
-            diffe = 1 - (enemy_hp_left(end_phase) / 360.0)
+        diffe = int(end_phase.game_endvalue == 1)
         for exp in self._examples:
             exp.value = diffe
 
