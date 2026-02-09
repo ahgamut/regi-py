@@ -9,8 +9,10 @@ import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
 import numpy as np
+from dataclasses import dataclass
 
 #
+from regi_py.core import PhaseInfo
 from regi_py import GameState, DummyLog, CXXConsoleLog
 from regi_py import get_strategy_map
 from regi_py.strats import RandomStrategy
@@ -81,6 +83,11 @@ def test_model(episode, model, num_simulations):
     print("episode", episode, "saved model", file=sys.stderr)
 
 
+@dataclass(slots=True)
+class PresetGame:
+    phase: PhaseInfo
+    best: int
+
 def make_preset_games(num_games):
     preset_games = []
     log = DummyLog()
@@ -90,7 +97,7 @@ def make_preset_games(num_games):
         for i in range(num_players):
             game.add_player(RandomStrategy())
         game.initialize()
-        preset_games.append(game.export_phaseinfo())
+        preset_games.append(PresetGame(game.export_phaseinfo(), 0))
     return preset_games
 
 
@@ -107,17 +114,21 @@ def improved_gameplay(
     for s in range(num_simulations):
         game1 = GameState(log1)
         game2 = GameState(log2)
-        num_players = random.randint(2, 4)
-        for i in range(num_players):
-            game1.add_player(MCTSTesterStrategy(old_model))
-            game2.add_player(MCTSTesterStrategy(new_model))
         #
         if preset_games is None:
+            num_players = random.randint(2, 4)
+            for i in range(num_players):
+                game1.add_player(MCTSTesterStrategy(old_model))
+                game2.add_player(MCTSTesterStrategy(new_model))
             game1.initialize()
             game2._init_phaseinfo(game1.export_phaseinfo())
         else:
-            game1._init_phaseinfo(preset_games[s])
-            game2._init_phaseinfo(preset_games[s])
+            num_players = preset_games[s].phase.num_players
+            for i in range(num_players):
+                game1.add_player(MCTSTesterStrategy(old_model))
+                game2.add_player(MCTSTesterStrategy(new_model))
+            game1._init_phaseinfo(preset_games[s].phase)
+            game2._init_phaseinfo(preset_games[s].phase)
         #
         game1.start_loop()
         game2.start_loop()
@@ -125,11 +136,15 @@ def improved_gameplay(
         diff1 = log1.e0 - log1.e1
         diff2 = log2.e0 - log2.e1
         #
-        if diff2 >= diff1 and diff2 != 0:
-            # print(f"old: {diff1}, new: {diff2} => new is better")
-            newer_better += 1
+        if preset_games is None:
+            if diff2 >= diff1 and diff2 != 0:
+                # print(f"old: {diff1}, new: {diff2} => new is better")
+                newer_better += 1
         else:
-            # print(f"old: {diff1}, new: {diff2} => new is worse")
+            if diff2 >= preset_games[s].best and diff2 != 0:
+                print(f"old: {preset_games[s].best}, new: {diff2} => new is better", file=sys.stderr)
+                newer_better += 1
+                preset_games[s].best = diff2
             pass
 
     nb_ratio = newer_better / num_simulations
