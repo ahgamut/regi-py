@@ -77,6 +77,7 @@ def test_model(episode, model, num_simulations):
         diffe.append(log.diffe())
     print("test games:", diffe, file=sys.stderr)
     torch.save(model.state_dict(), f"./weights/model_{episode}.pt")
+    print("episode", episode, "saved model", file=sys.stderr)
 
 
 def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=0.6):
@@ -191,11 +192,11 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             num_simulations=32,
             threshold=0.55,
         ):
+            print("episode", ep, "updated model", file=sys.stderr)
             shared_model.load_state_dict(train_model.state_dict())
-            if (ep - prev_best) > params.test_every:
-                print("episode", ep, "saved updated model", file=sys.stderr)
+            if (ep - prev_best) >= params.test_every:
                 test_model(ep, shared_model, params.num_simulations)
-            prev_best = ep
+                prev_best = ep
 
     torch.save(shared_model.state_dict(), "./weights/model_end.pt")
 
