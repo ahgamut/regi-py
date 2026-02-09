@@ -187,6 +187,10 @@ void bind_player(pybind11::object &m)
         .def_readonly("cards", &Player::cards)
         .def_readonly("id", &Player::id)
         .def_readonly("alive", &Player::alive)
+        .def_property_readonly("strategy", [](Player &player) {
+                py::object strat = py::cast(player.strat);
+                return py::getattr(strat, "__strat_name__");
+        })
         .def("__repr__", &stringify<Player>)
         .def("__str__", &stringify<Player>);
 }

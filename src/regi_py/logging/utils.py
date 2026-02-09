@@ -39,6 +39,7 @@ def dump_player_limited(player):
     result["id"] = player.id
     result["alive"] = player.alive
     result["num_cards"] = len(player.cards)
+    result["strategy"] = player.strategy
     return result
 
 
