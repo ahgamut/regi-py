@@ -330,11 +330,15 @@ def quick_game_value(root_phase, relative_diff=False):
         tmp.add_player(exp_strat)
     tmp._init_phaseinfo(root_phase)
     tmp.start_loop()
+    end_phase = tmp.export_phaseinfo()
+    if end_phase.game_endvalue == 1:
+        return 2
+    #
     if relative_diff:
         vstart = enemy_hp_left(root_phase)
     else:
         vstart = 360
-    vend = enemy_hp_left(tmp.export_phaseinfo())
+    vend = enemy_hp_left(end_phase)
     val = (vstart - vend) / 360
     return val
 
