@@ -18,7 +18,7 @@ function receive_ws(event) {
     let info = JSON.parse(JSON.parse(event.data));
     let g = Alpine.store('gamestate');
     if (info.data !== null) {
-        g.history.push(info.data);
+        console.log(info);
     }
     switch(info.type) {
         case "loading":
@@ -32,6 +32,7 @@ function receive_ws(event) {
         case "log":
             // logMessage(JSON.stringify(info.data));
             processLog(info.data);
+            g.history.push(info.data);
             break;
         case "select-attack":
             logMessage(`you have to attack`, 'is-primary');
