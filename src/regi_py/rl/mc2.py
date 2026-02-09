@@ -65,6 +65,7 @@ class Conv2dBlockWithAux(nn.Module):
                         in_channels=channels[i],
                         out_channels=channels[i + 1],
                         padding=paddings[i],
+                        bias=False,
                     ),
                     nn.BatchNorm2d(num_features=channels[i + 1]),
                 )

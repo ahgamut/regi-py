@@ -37,7 +37,7 @@ class Conv1dBlock(nn.Module):
                         in_channels=channels[i],
                         out_channels=channels[i + 1],
                         padding=paddings[i],
-                        bias=True,
+                        bias=False,
                     ),
                     nn.BatchNorm1d(num_features=channels[i + 1]),
                 )
@@ -68,6 +68,7 @@ class Conv2dBlock(nn.Module):
                         in_channels=channels[i],
                         out_channels=channels[i + 1],
                         padding=paddings[i],
+                        bias=False,
                     ),
                     nn.BatchNorm2d(num_features=channels[i + 1]),
                 )
