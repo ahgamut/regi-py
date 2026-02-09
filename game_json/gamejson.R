@@ -183,7 +183,7 @@ game <- left_join(game, strategy, join_by(game.active_player_id == id)) |>
   game <- game |>
     filter(event %in% c("STARTGAME", "ATTACK", "DEFEND",
                         "ENEMYKILL", "FULLBLOCK", "FAILBLOCK",
-                        "DECKEPMTY", "ENDGAME", "POSTGAME"))
+                        "DECKEMPTY", "ENDGAME", "POSTGAME"))
 
 # Return the parsed game JSON file
 return(game)
