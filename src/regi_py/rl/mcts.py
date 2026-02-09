@@ -155,7 +155,7 @@ class MCTSCollector:
 
     def expand_and_valuate(self, root_phase):
         root_s = self.phases[root_phase]
-        next_phases, root_combos = get_expansion_at(root_phase)
+        next_phases, root_combos = get_expansion_at(root_phase, trim=True)
         for i, next_phase in enumerate(next_phases):
             assert next_phase is not None
             root_a = root_combos[i].bitwise
@@ -167,8 +167,8 @@ class MCTSCollector:
         self._search(root_s, root_phase, root_combos)
         vals = []
         for next_phase in next_phases:
-            vals.append(quick_game_value(next_phase, relative_diff=False))
-        return np.max(vals)
+            vals.append(quick_game_value(next_phase, relative_diff=True))
+        return np.mean(vals)
 
     def sim_temp_games(self, root_phase, max_sims):
         root_s = self.phases[root_phase]

@@ -61,7 +61,7 @@ def get_nicer_attacks(game, combos):
         if c.bitwise != 0:
             res.append(c)
             continue
-        if not attack_yieldfail(ind, game, combos):
+        if random.random() > 0.4:
             res.append(c)
 
     return res
@@ -264,7 +264,7 @@ class MCTSExplorerStrategy(BaseStrategy):
         return ind
 
 
-def get_expansion_at(root_phase):
+def get_expansion_at(root_phase, trim=False):
     log = DummyLog()
     tmp = GameState(log)
     exp_strat = MCTSExplorerStrategy(root_phase)
@@ -275,6 +275,14 @@ def get_expansion_at(root_phase):
     tmp.start_loop()
     root_combos = exp_strat.root_combos
     exp_strat.is_recording = False
+
+    if trim:
+        if root_phase.phase_attacking:
+            root_combos = get_nicer_attacks(None, root_combos)
+        else:
+            root_combos = get_nicer_defends(None, root_combos)
+        exp_strat.root_combos = root_combos
+        exp_strat.next_phases = [None] * len(root_combos)
 
     for i in range(len(root_combos)):
         exp_strat.shortcut = i
