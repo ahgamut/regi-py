@@ -229,7 +229,7 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             new_model=bench_model,
             old_model=shared_model,
             num_simulations=32,
-            threshold=0.55,
+            threshold=0.05,
             preset_games=preset_games,
         ):
             print("episode", ep, "updated model", file=sys.stderr)
