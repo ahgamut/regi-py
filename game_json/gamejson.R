@@ -201,7 +201,8 @@ diagram_game_phase <- function(turn){
     starts_with("num_cards_player"), used_combos.value,
     game.draw_pile_size, game.discard_pile_size,
     game.enemy_pile_size,
-    game.current_enemy.value, game.current_enemy.hp, game.current_enemy.strength) |>
+    game.current_enemy.value, game.current_enemy.hp
+  ) |>
   rename(
     Event = event,
     `Active Player ID` = game.active_player_id,
@@ -212,8 +213,7 @@ diagram_game_phase <- function(turn){
     `Discard Pile Size` = game.discard_pile_size,
     `Enemies Left` = game.enemy_pile_size,
     `Current Enemy` = game.current_enemy.value,
-    `Current Enemy HP` = game.current_enemy.hp,
-    `Current Enemy Attack Value` = game.current_enemy.strength
+    `Current Enemy HP` = game.current_enemy.hp
   ) |>
   rename_with(
     ~paste0("Number of Cards for Player ", str_sub(.x, 18)),
@@ -222,8 +222,9 @@ diagram_game_phase <- function(turn){
   mutate(across(
     c(`Game Phase Count`, `Draw Pile Size`, `Discard Pile Size`, 
       `Enemies Left`, `Active Player ID`,
-    starts_with("Number of Cards"), `Current Enemy HP`,
-  `Current Enemy Attack Value`), as.character),
+    starts_with("Number of Cards"), `Current Enemy HP`
+  ), 
+  as.character),
    `Combos Played` = str_replace_all(`Combos Played`, ";", "\n")) |>
     relocate(starts_with("Number of Cards"), .after = everything()) |>
   pivot_longer(
@@ -232,7 +233,7 @@ diagram_game_phase <- function(turn){
     `Combos Played`,
     `Draw Pile Size`, `Discard Pile Size`,
     `Enemies Left`, 
-    `Current Enemy`, `Current Enemy HP`, `Current Enemy Attack Value`,
+    `Current Enemy`, `Current Enemy HP`, 
     starts_with("Number of Cards")),
     names_to = c("labels"),
     values_to = "value"
@@ -244,21 +245,21 @@ diagram_game_phase <- function(turn){
     )
   
   # Add coordinates for diagram
-  if (nrow(plotdf) == 13) {
+  if (nrow(plotdf) == 12) {
     # 2 player game
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, -2.25, 0, 0),
-           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6.5, 6, 5.5))
-  } else if (nrow(plotdf) == 14) {
+    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0),
+           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5))
+  } else if (nrow(plotdf) == 13) {
     # 3 player game
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, -2.25, 0, 0, 0),
-           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6.5, 6, 5.5, 5))
-  } else if (nrow(plotdf == 15)){
+    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0),
+           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5))
+  } else if (nrow(plotdf == 14)){
     # 4 player game
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, -2.25, 0, 0, 0, 0),
-           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6.5, 6, 5.5, 5, 4.5))
+    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0, 0),
+           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5, 4.5))
   }
   
 
@@ -283,5 +284,5 @@ return(game_diagram)
 #    map(\(x) diagram_game_phase(x))
 
 # win_list <- split(win, seq(nrow(win)))
-# win_diagrams <- win_list |>
-#     map(\(x) diagram_game_phase(x))
+win_diagrams <- win_list |>
+    map(\(x) diagram_game_phase(x))
