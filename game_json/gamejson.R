@@ -196,8 +196,10 @@ return(game)
 # Function to make a diagram of a Regicide game game phase
 # (i.e., one row of a parsed )
 diagram_game_phase <- function(turn){
+
   plotdf <- turn |>
-  select(event, game.active_player_id, game.phase_count, player.cards,
+  select(event, game.active_player_id, combo.value,
+    game.phase_count, player.cards,
     starts_with("num_cards_player"), used_combos.value,
     game.draw_pile_size, game.discard_pile_size,
     game.enemy_pile_size,
@@ -206,10 +208,11 @@ diagram_game_phase <- function(turn){
   rename(
     Event = event,
     `Active Player ID` = game.active_player_id,
+    `Cards Discarded` = combo.value,
     `Game Phase Count` = game.phase_count,
     `Player Hand` = player.cards,
-    `Combos Played` = used_combos.value,
-    `Draw Pile Size` = game.draw_pile_size,
+    `Cards Played` = used_combos.value,
+    `Tavern Deck Size` = game.draw_pile_size,
     `Discard Pile Size` = game.discard_pile_size,
     `Enemies Left` = game.enemy_pile_size,
     `Current Enemy` = game.current_enemy.value,
@@ -220,18 +223,18 @@ diagram_game_phase <- function(turn){
     .cols = starts_with("num_cards_player")
   ) |>
   mutate(across(
-    c(`Game Phase Count`, `Draw Pile Size`, `Discard Pile Size`, 
+    c(`Game Phase Count`, `Tavern Deck Size`, `Discard Pile Size`, 
       `Enemies Left`, `Active Player ID`,
     starts_with("Number of Cards"), `Current Enemy HP`
-  ), 
-  as.character),
-   `Combos Played` = str_replace_all(`Combos Played`, ";", "\n")) |>
+  ), as.character),
+   `Cards Played` = str_replace_all(`Cards Played`, ";", "\n"),
+   `Cards Discarded` = ifelse(Event == "DEFEND", `Cards Discarded`, NA)) |>
     relocate(starts_with("Number of Cards"), .after = everything()) |>
   pivot_longer(
-    cols = c(Event, `Active Player ID`, 
+    cols = c(Event, `Active Player ID`, `Cards Discarded`,
     `Game Phase Count`, `Player Hand`,
-    `Combos Played`,
-    `Draw Pile Size`, `Discard Pile Size`,
+    `Cards Played`,
+    `Tavern Deck Size`, `Discard Pile Size`,
     `Enemies Left`, 
     `Current Enemy`, `Current Enemy HP`, 
     starts_with("Number of Cards")),
@@ -240,26 +243,26 @@ diagram_game_phase <- function(turn){
   ) |>
   mutate(
     plot_info = 
-    dplyr::case_when(labels %in% c("Combos Played", "Player Hand") ~ glue::glue("{labels}:\n{value}"),
+    dplyr::case_when(labels %in% c("Cards Played", "Player Hand", "Cards Discarded") ~ glue::glue("{labels}:\n{value}"),
       .default = glue::glue("{labels}: {value}"))
     )
   
   # Add coordinates for diagram
-  if (nrow(plotdf) == 12) {
+  if (nrow(plotdf) == 13) {
     # 2 player game
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0),
-           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5))
-  } else if (nrow(plotdf) == 13) {
+    mutate(x = c(-2.25, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0),
+           y = c(9, 7.5, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5))
+  } else if (nrow(plotdf) == 14) {
     # 3 player game
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0),
-           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5))
-  } else if (nrow(plotdf == 14)){
+    mutate(x = c(-2.25, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0),
+           y = c(9, 7.5, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5))
+  } else if (nrow(plotdf == 15)){
     # 4 player game
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0, 0),
-           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5, 4.5))
+    mutate(x = c(-2.25, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0, 0),
+           y = c(9, 7.5, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5, 4.5))
   }
   
 
