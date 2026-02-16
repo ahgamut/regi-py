@@ -223,7 +223,8 @@ diagram_game_phase <- function(turn){
     c(`Game Phase Count`, `Draw Pile Size`, `Discard Pile Size`, 
       `Enemies Left`, `Active Player ID`,
     starts_with("Number of Cards"), `Current Enemy HP`,
-  `Current Enemy Attack Value`), as.character)) |>
+  `Current Enemy Attack Value`), as.character),
+   `Combos Played` = str_replace_all(`Combos Played`, ";", "\n")) |>
     relocate(starts_with("Number of Cards"), .after = everything()) |>
   pivot_longer(
     cols = c(Event, `Active Player ID`, 
@@ -236,33 +237,37 @@ diagram_game_phase <- function(turn){
     names_to = c("labels"),
     values_to = "value"
   ) |>
-  mutate(plot_info = glue::glue("{labels}
-                                   {value}"))
+  mutate(
+    plot_info = 
+    dplyr::case_when(labels %in% c("Combos Played", "Player Hand") ~ glue::glue("{labels}:\n{value}"),
+      .default = glue::glue("{labels}: {value}"))
+    )
   
   # Add coordinates for diagram
   if (nrow(plotdf) == 13) {
     # 2 player game
     plotdf <- plotdf |>
-  mutate(x = c(0, 0, 0, 0, 0, 1, 2, -1, 0, -1, 1, -3, -3),
-         y = c(2, 3, 4, -2, -1, 0, 0, 0, 0, 1, 1, 4, 3))
+    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, -2.25, 0, 0),
+           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6.5, 6, 5.5))
   } else if (nrow(plotdf) == 14) {
     # 3 player game
     plotdf <- plotdf |>
-  mutate(x = c(0, 0, 0, 0, 0, 1, 2, -1, 0, -1, 1, -3, -3, -3),
-         y = c(2, 3, 4, -2, -1, 0, 0, 0, 0, 1, 1, 4, 3, 2))
+    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, -2.25, 0, 0, 0),
+           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6.5, 6, 5.5, 5))
   } else if (nrow(plotdf == 15)){
     # 4 player game
     plotdf <- plotdf |>
-  mutate(x = c(0, 0, 0, 0, 0, 1, 2, -1, 0, -1, 1, -3, -3, -3, -3),
-         y = c(2, 3, 4, -2, -1, 0, 0, 0, 0, 1, 1, 4, 3, 2, 1))
+    mutate(x = c(-2.25, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, -2.25, 0, 0, 0, 0),
+           y = c(9, 7.5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6.5, 6, 5.5, 5, 4.5))
   }
   
 
-ggplot(data = plotdf, aes(x = x, y = y, label = plot_info)) +
+game_diagram <- ggplot(data = plotdf, aes(x = x, y = y, label = plot_info)) +
   geom_text() +
   theme_void() +
-  scale_x_continuous(limits = c(-4, 4))
-  
+  scale_x_continuous(limits = c(-3, 3))
+
+return(game_diagram)
 }
 
 # rows_to_plot <- test_game[2:11,]
