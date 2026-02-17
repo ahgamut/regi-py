@@ -4,6 +4,14 @@
 
 namespace regi
 {
+    i32 Strategy::provideRedirect(const Player &player, const GameState &g) {
+        i32 ind = getRedirectIndex(player, g);
+        if (ind < 0 || ind > g.totalPlayers() || ind == g.activePlayerID) {
+            return -1;
+        }
+        return ind;
+    }
+
     void calcAttackMoves(const std::vector<Card> &cards, std::vector<Combo> &combos,
                          bool yieldAllowed, Combo &cur, i32 i)
     {
@@ -19,7 +27,7 @@ namespace regi
             // if combo is valid, accumulate,
             // and try extending the combo
             combos.push_back(cur);
-            for (i32 j = i + 1; j < cards.size(); ++j)
+        for (i32 j = i + 1; j < cards.size(); ++j)
             {
                 calcAttackMoves(cards, combos, yieldAllowed, cur, j);
             }
@@ -168,6 +176,19 @@ namespace regi
         return selectRandomCombo(combos);
     }
 
+    i32 RandomStrategy::getRedirectIndex(const Player &player, const GameState &g)
+    {
+        i32 N = g.totalPlayers();
+        if (N < 2 || player.id != g.activePlayerID) {
+            return -1;
+        }
+        std::random_device dev;
+        std::default_random_engine engine(dev());
+        i32 offset = 1 + (engine() % (N - 1));
+        i32 nextPlayerID = (g.activePlayerID + offset) % N;
+        return nextPlayerID;
+    }
+
     i32 DamageStrategy::setup(const Player &player, const GameState &g)
     {
         (void)player;
@@ -239,6 +260,19 @@ namespace regi
             }
         }
         return static_cast<i32>(pick);
+    }
+
+    i32 DamageStrategy::getRedirectIndex(const Player &player, const GameState &g)
+    {
+        i32 N = g.totalPlayers();
+        if (N < 2 || player.id != g.activePlayerID) {
+            return -1;
+        }
+        std::random_device dev;
+        std::default_random_engine engine(dev());
+        i32 offset = 1 + (engine() % (N - 1));
+        i32 nextPlayerID = (g.activePlayerID + offset) % N;
+        return nextPlayerID;
     }
 
 } /* namespace regi */

@@ -14,6 +14,10 @@ class BruteSamplingStrategy(BaseStrategy):
     def setup(self, player, game):
         return 0
 
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
     def process_moves(self, game, combos):
         root_phase = game.export_phaseinfo()
         next_phases, next_combos = get_expansion_at(root_phase, trim=True)

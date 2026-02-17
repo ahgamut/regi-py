@@ -161,6 +161,25 @@ class WebPlayerStrategy(BaseStrategy):
             option = -1
         return option
 
+    def getRedirectIndex(self, player, game):
+        # print("player: ", player.id, "needs to redirect: ")
+        data = {
+            "userid": self.userid,
+            "player": player,
+            "game": game,
+        }
+        result = {"type": "select-redirect", "data": data}
+
+        with self.portal_provider as portal:
+            response = portal.call(
+                WebPlayerStrategy.comms_twoway, self, self.websocket, result
+            )
+
+        option = int(response.get("choice", -1))
+        if option < 0 or option > game.num_players or option == player.id:
+            option = -1
+        return option
+
 
 class WebPlayerLog(JSONBaseLog):
     def __init__(self, manager):
@@ -267,7 +286,7 @@ class Context:
         t = 0
         while t != self.num_players:
             time.sleep(1)
-            t = sum(p.ready for p in self.strats[:self.num_players])
+            t = sum(p.ready for p in self.strats[: self.num_players])
             print(t, "players ready")
         self.game.start_loop()
 
@@ -298,6 +317,7 @@ def game_loop():
         while CTX.game is None:
             # print("we have no game")
             time.sleep(1)
+
 
 def player_join(userid, websocket):
     if len(app.state.CTX.strats) == len(app.state.CTX.userids):

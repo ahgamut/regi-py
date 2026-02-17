@@ -22,6 +22,7 @@ namespace regi
         NO_ENEMIES,
         BLOCK_FAILED,
         ATTACK_FAILED,
+        REDIRECT_FAILED,
         PLAYER_DEAD,
     };
 
@@ -65,9 +66,9 @@ namespace regi
         void setup();
 
         //
-        bool gameRunning() { return this->status == GameStatus::RUNNING; }
-        i32 getHandSize() { return handSize; }
-        i32 totalPlayers() { return static_cast<i32>(players.size()); }
+        bool gameRunning() const { return this->status == GameStatus::RUNNING; }
+        i32 getHandSize() const { return handSize; }
+        i32 totalPlayers() const { return static_cast<i32>(players.size()); }
 
         //
         void startLoop();
@@ -88,7 +89,7 @@ namespace regi
         i32 calcDamageOfCombo(Enemy &, Combo &);
         i32 calcDamage(Enemy &);
         void attackPhase(Player &, Enemy &);
-        void preAttackEffects(Player &, Enemy &);
+        void applyAttackEffects(Player &, Enemy &);
         i32 currentEnemyDead();
 
         //
@@ -96,6 +97,9 @@ namespace regi
         i32 calcBlock(Enemy &);
         void selectDefense(Player &, int);
         void defensePhase(Player &, Enemy &);
+
+        //
+        void selectRedirect(Player &);
 
         //
         friend struct BaseLog;
@@ -109,6 +113,7 @@ namespace regi
                             const GameState &) = 0;
         virtual void defend(const Player &, const Combo &, const i32,
                             const GameState &) = 0;
+        virtual void redirect(const Player &, const i32, const GameState &) = 0;
         virtual void failBlock(const Player &, const i32, const i32,
                                const GameState &) = 0;
         virtual void fullBlock(const Player &, const i32, const i32,
@@ -132,8 +137,10 @@ namespace regi
                                     const GameState &) = 0;
         virtual i32 getAttackIndex(const std::vector<Combo> &, const Player &, bool,
                                    const GameState &) = 0;
+        virtual i32 getRedirectIndex(const Player &, const GameState &) = 0;
         i32 provideAttack(Combo &, const Player &, bool, const GameState &);
         i32 provideDefense(Combo &, const Player &, i32, const GameState &);
+        i32 provideRedirect(const Player &, const GameState &);
     };
 
 } /* namespace regi */

@@ -11,6 +11,7 @@ namespace regi
                     const GameState &);
         void enemyKill(const Enemy &, const GameState &);
         void defend(const Player &, const Combo &, const i32, const GameState &);
+        void redirect(const Player &, const i32, const GameState &);
         void failBlock(const Player &, const i32, const i32, const GameState &);
         void fullBlock(const Player &, const i32, const i32, const GameState &);
         void drawOne(const Player &);

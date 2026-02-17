@@ -96,6 +96,10 @@ class MCTSTesterStrategy(BaseStrategy):
         self.net.eval()
         return 0
 
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
     def process_phase(self, phase, combos):
         if len(combos) == 0:
             return -1
@@ -134,6 +138,10 @@ class MCTSTrainerStrategy(BaseStrategy):
     def setup(self, player, game):
         self.net.eval()
         return 0
+
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
 
     def process_phase(self, game, phase, combos):
         if phase.phase_attacking:

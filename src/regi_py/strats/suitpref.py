@@ -48,6 +48,10 @@ class SuitPrefStrategy(BaseStrategy):
     def setup(self, player, game):
         return 0
 
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
     def get_preference(self, combo, is_attacking):
         sval = list(self.__suit_order__)
         pref = 0
@@ -58,10 +62,10 @@ class SuitPrefStrategy(BaseStrategy):
             ind = sval.index(SUITPREF_MAP[c.suit])
             if is_attacking:
                 low = 2 ** (3 - ind)
-                hi = 2**(4 - ind)
+                hi = 2 ** (4 - ind)
             else:
                 low = 2 ** (ind)
-                hi = 2**(ind + 1)
+                hi = 2 ** (ind + 1)
             pref = max(pref, random.randint(low, hi))
 
         return pref

@@ -40,6 +40,15 @@ namespace regi
         std::cout << "\n";
     }
 
+    void ConsoleLog::redirect(const Player &player, const i32 nextPlayerID, const GameState &g)
+    {
+        (void)g;
+        std::cout << "Player " << player.id;
+        std::cout << " played X! ";
+        std::cout << " next turn is Player " << nextPlayerID;
+        std::cout << "\n";
+    }
+
     void ConsoleLog::failBlock(const Player &player, const i32 damage,
                                const i32 maxblock, const GameState &g)
     {
@@ -146,10 +155,14 @@ namespace regi
             case ATTACK_FAILED:
                 std::cout << "endgame: someone was unable to attack (?)\n";
                 break;
+            case REDIRECT_FAILED:
+                std::cout << "endgame: someone played a joker wrong?\n";
+                break;
             case PLAYER_DEAD:
                 std::cout << "endgame: someone was not able to play\n";
                 break;
             case NO_ENEMIES:
+                std::cout << "endgame: no enemies left\n";
                 break;
         }
     }

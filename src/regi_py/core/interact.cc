@@ -59,4 +59,22 @@ namespace regi
         usedPile.push_back(atk);
     }
 
+    void GameState::selectRedirect(Player &player)
+    {
+        Combo atk;
+        Strategy &strat = player.strat;
+
+        i32 nextPlayerID = strat.provideRedirect(player, *this);
+        if (nextPlayerID < 0)
+        {
+            player.alive = false;
+            gameOver(REDIRECT_FAILED);
+            return;
+        }
+
+        log.redirect(player, nextPlayerID, *this);
+        currentPhaseIsAttack = true;
+        activePlayerID = nextPlayerID;
+    }
+
 } /* namespace regi */

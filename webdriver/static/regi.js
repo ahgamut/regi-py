@@ -42,6 +42,10 @@ function receive_ws(event) {
             logMessage(`you have to defend`, 'is-primary');
             selectDefend(info.data);
             break;
+        case "select-redirect":
+            logMessage(`select who plays next`, 'is-primary');
+            selectRedirect(info.data);
+            break;
         default:
             logMessage("fug", 'is-danger');
             logMessage(JSON.stringify(info));
@@ -54,6 +58,7 @@ function reset_game() {
     // console.log("Resetting game");
     let g = Alpine.store('gamestate');
     document.getElementById('messages').replaceChildren();
+    g.history = [];
     let message = {userid: g.userid, type:'player-reset', choice:0};
     send_ws(message);
 }
@@ -81,6 +86,47 @@ function player_ready() {
 
 
 function submit_option() {
+    let g = Alpine.store("gamestate");
+    if (g.redirection) {
+        submit_redirect_option();
+    } else {
+        submit_card_option();
+    }
+}
+
+function submit_redirect_option() {
+    let g = Alpine.store("gamestate");
+    let players = document.getElementById('other-players').firstChild;
+    let pickset = new Set([]);
+    const regex = /Player /i;
+    for (let player of players.children) {
+        if (player.classList.contains("is-focused")) {
+            pickset.add(player.innerHTML.replace(regex, ""));
+        }
+    }
+    console.log(pickset);
+
+    let pickIndex = -1;
+    let pickArr = Array.from(pickset);
+    if (pickArr.length != 1) {
+        logMessage(`Invalid redirection!`, 'is-warning');
+        g.turnMessage = "Invalid Redirection! Pick Again";
+    } else {
+        pickIndex = parseInt(pickArr[0]);
+        // send the option picked
+        let msg = { userid: g.userid, type: "player-move", choice: pickIndex };
+        send_ws(msg);
+        logMessage(`You selected Player ${Array.from(pickset)}`);
+        // after sending your option, disable the buttons
+        let submitter = document.getElementById('main-button');
+        let yielder = document.getElementById('side-button');
+        setButtonActivity(submitter, false);
+        setButtonActivity(yielder, false);
+        g.redirection = false;
+    }
+}
+
+function submit_card_option() {
     let g = Alpine.store("gamestate");
     let cur_player = g.data;
     // get selected cards
@@ -241,7 +287,7 @@ function updateBoard(game) {
     enemy_view.appendChild(makeUsedCombos(game.used_combos));
 }
 
-function getCardButton(card) {
+function getCardButton(card, block) {
     let b = document.createElement("div");
     b.className = "button is-link";
     b.addEventListener("click", () => { 
@@ -259,6 +305,30 @@ function getCardButton(card) {
     return b;
 }
 
+function getPlayerButton(player, block) {
+    let b = document.createElement("div");
+    b.className = "button is-link";
+    b.addEventListener("click", () => { 
+        if (b.classList.contains("is-focused")) {
+            b.classList.remove("is-focused") 
+            b.classList.remove("is-dark")
+            b.classList.add("is-link")
+        } else {
+            // mutually exclusive
+            for (const otherb of block.children) {
+                b.classList.remove("is-focused") 
+                b.classList.remove("is-dark")
+                b.classList.add("is-link")
+            }
+            b.classList.add("is-focused")
+            b.classList.add("is-dark")
+            b.classList.remove("is-link")
+        }
+    });
+    b.innerHTML = `Player ${player.id}`;
+    return b;
+}
+
 function updateCards(player) {
     let g = Alpine.store('gamestate');
     let target = document.getElementById('player-cards');
@@ -273,10 +343,27 @@ function updateCards(player) {
     target.appendChild(bgroup);
     // console.log(player);
 }
+function updateOtherPlayers(player, game) {
+    let g = Alpine.store('gamestate');
+    let target = document.getElementById('other-players');
+    target.replaceChildren();
+
+    let bgroup = document.createElement("div");
+    let players = game.players;
+    bgroup.className = "buttons has-addons are-medium";
+    for (let i = 0, len = players.length; i < len; i++) {
+        if (players[i].id != player.id) {
+            bgroup.appendChild(getPlayerButton(players[i], bgroup));
+        }
+    }
+    target.appendChild(bgroup);
+    // console.log(player);
+}
 
 function selectAttack(data) {
     let g = Alpine.store('gamestate');
     g.data = data;
+    g.redirection = false;
     let submitter = document.getElementById('main-button');
     let yielder = document.getElementById('side-button');
     setButtonActivity(submitter, true);
@@ -291,6 +378,7 @@ function selectAttack(data) {
 function selectDefend(data) {
     let g = Alpine.store('gamestate');
     g.data = data;
+    g.redirection = false;
     let submitter = document.getElementById('main-button');
     let yielder = document.getElementById('side-button');
     setButtonActivity(submitter, true);
@@ -301,6 +389,21 @@ function selectDefend(data) {
     // console.log(data);
     updateBoard(data.game);
     updateCards(data.player);
+}
+function selectRedirect(data) {
+    let g = Alpine.store('gamestate');
+    g.data = data;
+    g.redirection = true;
+    let submitter = document.getElementById('main-button');
+    let yielder = document.getElementById('side-button');
+    setButtonActivity(submitter, true);
+    setButtonActivity(yielder, false);
+    //
+    g.playerShould = `You have to pick the next player`;
+    g.turnMessage = "Select who will play next after you";
+    // console.log(data);
+    updateBoard(data.game);
+    updateOtherPlayers(data.player, data.game);
 }
 
 // logging
@@ -327,6 +430,9 @@ function processLog(data) {
             let combo2 = data.combo.map(x => x.value);
             logMessage(`${data.enemy.value} attacked Player ${data.player.id} for ${data.damage} damage`, 'is-info');
             logMessage(`Player ${data.player.id} blocked with ${combo2}`, 'is-info');
+            break;
+        case 'REDIRECT':
+            logMessage(`Player ${data.player.id} redirected play to ${data.next_playerid}`, 'is-info');
             break;
         case 'ENEMYKILL':
             let exact = data.enemy.hp === 0 ? " exact " : "";

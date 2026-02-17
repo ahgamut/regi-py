@@ -69,6 +69,7 @@ void bind_enums(pybind11::object &m)
         .value("NO_ENEMIES", EndGameReason::NO_ENEMIES)
         .value("BLOCK_FAILED", EndGameReason::BLOCK_FAILED)
         .value("ATTACK_FAILED", EndGameReason::ATTACK_FAILED)
+        .value("REDIRECT_FAILED", EndGameReason::REDIRECT_FAILED)
         .value("PLAYER_DEAD", EndGameReason::PLAYER_DEAD)
         .export_values()
         .finalize();
@@ -136,6 +137,10 @@ class PyBaseStrategy : public Strategy, py::trampoline_self_life_support
         PYBIND11_OVERRIDE_PURE(i32, Strategy, getAttackIndex, combos, player,
                                yieldAllowed, g);
     }
+    i32 getRedirectIndex(const Player &player, const GameState &g) override
+    {
+        PYBIND11_OVERRIDE_PURE(i32, Strategy, getRedirectIndex, player, g);
+    }
 };
 
 class PyRandomStrategy : public RandomStrategy, py::trampoline_self_life_support
@@ -154,6 +159,7 @@ void bind_strat(pybind11::object &m)
     base.def(py::init<>())
         .def("setup", &Strategy::setup)
         .def("getAttackIndex", &Strategy::getAttackIndex)
+        .def("getRedirectIndex", &Strategy::getRedirectIndex)
         .def("getDefenseIndex", &Strategy::getDefenseIndex);
     py::class_<RandomStrategy, PyRandomStrategy, py::smart_holder>(m, "RandomStrategy",
                                                                    base)
@@ -166,6 +172,7 @@ void bind_strat(pybind11::object &m)
                                       })
         .def("setup", &RandomStrategy::setup)
         .def("getAttackIndex", &RandomStrategy::getAttackIndex)
+        .def("getRedirectIndex", &RandomStrategy::getRedirectIndex)
         .def("getDefenseIndex", &RandomStrategy::getDefenseIndex);
     py::class_<DamageStrategy, PyDamageStrategy, py::smart_holder>(m, "DamageStrategy",
                                                                    base)
@@ -178,6 +185,7 @@ void bind_strat(pybind11::object &m)
                                       })
         .def("setup", &DamageStrategy::setup)
         .def("getAttackIndex", &DamageStrategy::getAttackIndex)
+        .def("getRedirectIndex", &DamageStrategy::getRedirectIndex)
         .def("getDefenseIndex", &DamageStrategy::getDefenseIndex);
 }
 
@@ -187,10 +195,12 @@ void bind_player(pybind11::object &m)
         .def_readonly("cards", &Player::cards)
         .def_readonly("id", &Player::id)
         .def_readonly("alive", &Player::alive)
-        .def_property_readonly("strategy", [](Player &player) {
-                py::object strat = py::cast(player.strat);
-                return py::getattr(strat, "__strat_name__");
-        })
+        .def_property_readonly("strategy",
+                               [](Player &player)
+                               {
+                                   py::object strat = py::cast(player.strat);
+                                   return py::getattr(strat, "__strat_name__");
+                               })
         .def("__repr__", &stringify<Player>)
         .def("__str__", &stringify<Player>);
 }
@@ -209,6 +219,11 @@ class PyBaseLog : public BaseLog, py::trampoline_self_life_support
                 const GameState &g) override
     {
         PYBIND11_OVERRIDE_PURE(void, BaseLog, defend, player, combo, damage, g);
+    }
+    void redirect(const Player &player, const i32 nextPlayerID,
+                  const GameState &g) override
+    {
+        PYBIND11_OVERRIDE_PURE(void, BaseLog, redirect, player, nextPlayerID, g);
     }
     void failBlock(const Player &player, const i32 damage, const i32 maxblock,
                    const GameState &g) override
@@ -269,6 +284,7 @@ void bind_log(pybind11::object &m)
     base.def(py::init<>())
         .def("attack", &BaseLog::attack)
         .def("defend", &BaseLog::defend)
+        .def("redirect", &BaseLog::redirect)
         .def("failBlock", &BaseLog::failBlock)
         .def("fullBlock", &BaseLog::fullBlock)
         .def("drawOne", &BaseLog::drawOne)
@@ -353,9 +369,7 @@ void bind_gamestate(pybind11::object &m)
         .def("get_combo_block", &GameState::calcBlockOfCombo)
         .def("start_loop", &GameState::startLoop)
         .def("_step", &GameState::onePhase)
-        .def("_set_status", [](GameState &g, GameStatus s) {
-                g.status = s;
-        })
+        .def("_set_status", [](GameState &g, GameStatus s) { g.status = s; })
         .def_property_readonly("is_runnable", &GameState::gameRunning)
         .def("initialize",
              [](GameState &g)

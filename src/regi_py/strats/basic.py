@@ -8,6 +8,10 @@ class DummyStrategy(BaseStrategy):
     def setup(self, player, game):
         return 0
 
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
     def getAttackIndex(self, combos, player, yield_allowed, game):
         if len(combos) == 0:
             return -1

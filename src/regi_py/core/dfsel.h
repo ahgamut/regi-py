@@ -19,6 +19,7 @@ namespace regi
                            const GameState &);
         i32 getDefenseIndex(const std::vector<Combo> &, const Player &, i32,
                             const GameState &);
+        i32 getRedirectIndex(const Player &, const GameState &);
     };
 
     struct DamageStrategy : public Strategy
@@ -30,6 +31,7 @@ namespace regi
                            const GameState &);
         i32 getDefenseIndex(const std::vector<Combo> &, const Player &, i32,
                             const GameState &);
+        i32 getRedirectIndex(const Player &, const GameState &);
     };
 
     i32 selectRandomCombo(const std::vector<Combo> &);

@@ -15,6 +15,7 @@ document.addEventListener('alpine:init', () => {
         userid: "{{ userid }}",
         playerid: "{{ playerid }}",
         statusz: "LOADING",
+        redirection: false,
         data: null,
         history: [],
     })
@@ -44,8 +45,15 @@ document.addEventListener('alpine:init', () => {
                 </div>
                 <div class="column is-two-fifths"  x-show="$store.gamestate.statusz == 'RUNNING'"> 
                     <h1 id="player-should" class="subtitle" x-text="$store.gamestate.playerShould"></h1>
-                    <h1 class="subtitle" x-text="'Your cards'"></h1>
-                    <div id="player-cards">
+                    <div x-show="!($store.gamestate.redirection)">
+                        <h1 class="subtitle" x-text="'Your cards'" ></h1>
+                        <div id="player-cards">
+                        </div>
+                    </div>
+                    <div x-show="$store.gamestate.redirection">
+                        <h1 class="subtitle" x-text="'Other Players'" ></h1>
+                        <div id="other-players">
+                        </div>
                     </div>
                 </div>
             </div>

@@ -20,6 +20,9 @@ class DummyLog(BaseLog):
     def attack(self, player, enemy, combo, damage, game):
         pass
 
+    def redirect(self, player, next_playerid, game):
+        pass
+
     def defend(self, player, combo, damage, game):
         pass
 

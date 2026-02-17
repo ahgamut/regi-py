@@ -169,7 +169,7 @@ namespace regi
         return calcDamageOfCombo(enemy, curcombo);
     }
 
-    void GameState::preAttackEffects(Player &player, Enemy &enemy)
+    void GameState::applyAttackEffects(Player &player, Enemy &enemy)
     {
         u32 epow = getPower(enemy);
         for (auto &combo : usedPile)
@@ -184,6 +184,7 @@ namespace regi
 
         if ((cpow & HEARTS_REPLENISH) != 0) { refreshDiscards(cval); }
         if ((cpow & DIAMONDS_DRAW) != 0) { refreshDraws(player.id, cval); }
+        if ((cpow & JOKER_NERF) != 0) { selectRedirect(player); }
         // else do nothing
     }
 
@@ -217,10 +218,10 @@ namespace regi
         phaseCount += 1;
         selectAttack(player, pastYieldsInARow < (totalPlayers() - 1));
         if (!gameRunning()) return;
-        preAttackEffects(player, enemy);
         i32 damage = calcDamage(enemy);
         enemy.hp -= damage;
         log.attack(player, enemy, usedPile.back(), damage, *this);
+        applyAttackEffects(player, enemy);
     }
 
     void GameState::gameOver(EndGameReason e)
@@ -247,6 +248,8 @@ namespace regi
         i32 tp = totalPlayers();
         if (activePlayerID < 0 || activePlayerID >= tp) { gameOver(INVALID_START_PLAYER_COUNT); }
         Player &player = players[activePlayerID];
+        i32 curID = activePlayerID;
+        //
         if (!player.alive)
         {
             gameOver(PLAYER_DEAD);
@@ -262,6 +265,7 @@ namespace regi
         {
             attackPhase(player, enemy);
             if (!gameRunning()) return;
+            if (curID != activePlayerID) return;
             // attack ended, defend if enemy still alive
             currentPhaseIsAttack = currentEnemyDead();
         }

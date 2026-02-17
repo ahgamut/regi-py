@@ -196,6 +196,10 @@ class RL1Strategy(BaseStrategy):
         self.model.eval()
         return 0
 
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
     def getAttackIndex(self, combos, player, yield_allowed, game):
         state = self.numberizer.numberize_state(combos, player, game, True)
         if random.random() < self.epsilon:

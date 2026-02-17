@@ -8,6 +8,10 @@ class PreserveStrategy(BaseStrategy):
     def setup(self, player, game):
         return 0
 
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
     def get_good_attacks(self, player, combos, game):
         e = game.enemy_pile[0]
         cur_block = game.get_current_block(e)

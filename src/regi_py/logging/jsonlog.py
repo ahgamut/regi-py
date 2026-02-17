@@ -12,7 +12,7 @@ class RegiEncoder(json.JSONEncoder):
         elif isinstance(obj, Enemy):
             return dump_enemy(obj)
         elif isinstance(obj, BaseStrategy):
-            return obj.__class__.__name__
+            return obj.__strat_name__
         elif isinstance(obj, Combo):
             return dump_combo(obj)
         elif isinstance(obj, Card):
@@ -70,6 +70,16 @@ class JSONBaseLog(BaseLog):
                 "enemy": game.enemy_pile[0],
                 "combo": combo,
                 "damage": damage,
+                "game": game,
+            }
+        )
+
+    def redirect(self, player, next_playerid, game):
+        self.log(
+            {
+                "event": "REDIRECT",
+                "player": player,
+                "next_playerid": next_playerid,
                 "game": game,
             }
         )
