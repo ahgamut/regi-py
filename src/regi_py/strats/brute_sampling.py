@@ -56,7 +56,7 @@ class BruteSamplingStrategy(BaseStrategy):
         except Exception as e:
             print("failed to process moves", e)
             ind = random.randint(0, len(combos) - 1)
-        if attack_yieldfail(ind, game, combos):
+        if combos[ind].bitwise == 0 and attack_yieldfail(ind, game, combos):
             print("this yield is randomly a fail", ind, combos[ind])
         return ind
 
