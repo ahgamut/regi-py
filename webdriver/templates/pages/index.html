@@ -9,10 +9,11 @@ Regicide Card Game
 <script charset="utf-8">
 document.addEventListener('alpine:init', () => {
     Alpine.store('gamestate', {
-        turnMessage: "loading",
         playerShould: "",
+        myTurn: false,
         ws: null,
         userid: "{{ userid }}",
+        username: "{{ username }}",
         playerid: "{{ playerid }}",
         statusz: "LOADING",
         redirection: false,
@@ -26,25 +27,31 @@ document.addEventListener('alpine:init', () => {
 
 
 {% block body %}
-<div class="container" x-data="{ dummy: null }" >
-    <div id="notification-tray" class="is-fixed-top is-fixed-right">
+<div class="container" x-data="{ activeTab: 'game' }" >
+    <div class="tabs is-boxed">
+        <ul>
+            <li :class="{ 'is-active': activeTab === 'game' }">
+                <a @click="activeTab = 'game'">Game</a>
+            </li>
+            <li :class="{ 'is-active': activeTab === 'log' }">
+                <a @click="activeTab = 'log'">Message Log</a>
+            </li>
+        </ul>
     </div>
-    <div id="outputspot" class="card is-fullwidth" style="min-height: 400px; border: 1px solid black;">
-        <h1 class="title" x-text="'Player: ' + $store.gamestate.playerid"></h1>
+    <div id="outputspot" class="card is-fullwidth" style="min-height: 400px; border: 1px solid black;" x-show="activeTab === 'game'">
+        <h1 class="title" x-text="'Game State'"></h1>
         <div id="game-overall" style="min-height: 320px; border: 1px solid black;">
             <div class="columns is-vcentered">
-                <div class="column is-two-fifths" x-show="$store.gamestate.statusz == 'RUNNING'"> 
-                    <h1 class="subtitle" x-text="'Enemy View'"></h1>
-                    <div id="enemy-view">
-                    </div>
-                </div>
-                <div class="column is-one-fifth" x-show="$store.gamestate.statusz == 'RUNNING'"> 
-                    <h1 class="subtitle" x-text="'Game View'"></h1>
+                <div class="column is-one-quarter" x-show="$store.gamestate.statusz == 'RUNNING'">
                     <div id="game-view">
                     </div>
                 </div>
-                <div class="column is-two-fifths"  x-show="$store.gamestate.statusz == 'RUNNING'"> 
-                    <h1 id="player-should" class="subtitle" x-text="$store.gamestate.playerShould"></h1>
+                <div class="column is-one-quarter has-text-centered" x-show="$store.gamestate.statusz == 'RUNNING'">
+                    <div id="enemy-view">
+                    </div>
+                </div>
+                <div class="column"  x-show="$store.gamestate.statusz == 'RUNNING'">
+                    <h1 id="player-should" class="subtitle" x-show="$store.gamestate.myTurn" x-text="$store.gamestate.playerShould"></h1>
                     <div x-show="!($store.gamestate.redirection)">
                         <h1 class="subtitle" x-text="'Your cards'" ></h1>
                         <div id="player-cards">
@@ -59,16 +66,17 @@ document.addEventListener('alpine:init', () => {
             </div>
         </div>
         <div class="columns is-vcentered">
-            <h1 id="turn-message" class="column subtitle is-three-fifths" x-text="$store.gamestate.turnMessage"></h1>
+            <div id="turn-message" class="column is-two-fifths"></div>
+            <div class="column is-one-fifth"></div>
             <div id="submit-zone" class="column is-two-fifths">
                 <div id="main-button" class="control button is-large is-primary" x-on:click="mainButtonRedirect()" x-text="mainButtonText()"></div>
                 <div id="side-button" class="control button is-large is-secondary" x-show="sideButtonText() != '<hide>'" x-on:click="sideButtonRedirect()" x-text="sideButtonText()"></div>
             </div>
         </div>
     </div>
-    <div id="logging" class="card is-fullwidth" x-data="{ open: true }" style="border: 1px solid black">
-        <header class="card-header title" x-on:click="open = !open"> Message Log </header>
-        <div class="card-content" style="min-height: 200px; max-height: 250px; overflow-y: scroll;" x-show="open">
+    <div id="logging" class="card is-fullwidth" style="border: 1px solid black;" x-show="activeTab === 'log'">
+        <h1 class="title" x-text="'Message Log'"></h1>
+        <div class="card-content" style="min-height: 400px; max-height: 500px; overflow-y: scroll;">
             <ul id='messages'>
             </ul>
         </div>

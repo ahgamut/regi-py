@@ -21,7 +21,7 @@ import fastapi
 #
 from anyio.from_thread import BlockingPortalProvider
 from anyio import from_thread, to_thread
-from fastapi import Cookie
+from fastapi import Cookie, Form
 from fastapi import FastAPI
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
@@ -79,9 +79,10 @@ class ConnectionManager:
 class WebPlayerStrategy(BaseStrategy):
     __strat_name__ = "player-webui"
 
-    def __init__(self, userid, websocket):
+    def __init__(self, userid, username, websocket):
         super().__init__()
         self.userid = userid
+        self.username = username
         self.websocket = websocket
         self.portal_provider = BlockingPortalProvider()
         self.response = None
@@ -192,7 +193,30 @@ class WebPlayerLog(JSONBaseLog):
     async def log_actual(manager, obj):
         result = {}
         result["type"] = "log"
-        result["data"] = obj
+
+        # Enrich log data with usernames
+        def enrich_with_usernames(data):
+            if isinstance(data, dict):
+                if (
+                    "player" in data
+                    and isinstance(data["player"], dict)
+                    and "id" in data["player"]
+                ):
+                    player_id = data["player"]["id"]
+                    # This assumes player_id is the index in app.state.CTX.userids
+                    if player_id < len(app.state.CTX.userids):
+                        userid = app.state.CTX.userids[player_id]
+                        username = app.state.CTX.usernames.get(userid)
+                        if username:
+                            data["player"]["username"] = username
+                for key, value in data.items():
+                    data[key] = enrich_with_usernames(value)
+            elif isinstance(data, list):
+                data = [enrich_with_usernames(item) for item in data]
+            return data
+
+        enriched_obj = enrich_with_usernames(obj)
+        result["data"] = enriched_obj
         await manager.broadcast_dict(result)
 
     def log(self, obj):
@@ -257,6 +281,7 @@ class Context:
         self.strats = []
         self.bots = bots
         self.userids = []
+        self.usernames = {}
         self.ALT_STARTED = False
         self.FUG_RESPONSE = None
         self.GLOB_THREAD = None
@@ -319,11 +344,12 @@ def game_loop():
             time.sleep(1)
 
 
-def player_join(userid, websocket):
+def player_join(userid, username, websocket):
     if len(app.state.CTX.strats) == len(app.state.CTX.userids):
         return
     strat = WebPlayerStrategy(
         userid,
+        username,
         websocket,
     )
     app.state.CTX.strats.append(strat)
@@ -334,15 +360,40 @@ def player_join(userid, websocket):
 
 # pylint: disable=W0613
 @app.get("/", response_class=HTMLResponse)
-def enter_custom(request: Request):
-    client = request.client
+def read_root(request: Request):
+    return templates.TemplateResponse("pages/login.html", {"request": request})
+
+
+@app.post("/login", response_class=RedirectResponse)
+async def login(request: Request, username: str = Form(...)):
     userid = str(uuid4())
     app.state.CTX.userids.append(userid)
+    app.state.CTX.usernames[userid] = username
+    response = RedirectResponse(url="/game", status_code=status.HTTP_302_FOUND)
+    response.set_cookie(key="userid", value=userid)
+    response.set_cookie(key="username", value=username)
+    return response
+
+
+@app.get("/game", response_class=HTMLResponse)
+def enter_custom(
+    request: Request,
+    userid: Optional[str] = Cookie(None),
+    username: Optional[str] = Cookie(None),
+):
+    if userid is None or username is None:
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
+    if userid not in app.state.CTX.userids:
+        app.state.CTX.userids.append(userid)
+        app.state.CTX.usernames[userid] = username
+
     response = templates.TemplateResponse(
         "pages/index.html",
         {
             "request": request,
             "userid": userid,
+            "username": username,
             "playerid": app.state.CTX.userids.index(userid),
         },
     )
@@ -370,7 +421,8 @@ async def process_data(data, websocket):
 
     print(pkg)
     if pkg["type"] == "player-join":
-        player_join(pkg["userid"], websocket)
+        username = CTX.usernames.get(pkg["userid"], "Unknown Player")
+        player_join(pkg["userid"], username, websocket)
         await CTX.manager.send_dict({"type": "loading", "remain": 1}, websocket)
     elif pkg["type"] in ["player-ready"]:
         playerid = CTX.manager.active_connections.index(websocket)
@@ -397,7 +449,8 @@ async def websocket_endpoint(websocket: WebSocket, userid: str):
     except WebSocketDisconnect:
         # FUG
         await app.state.CTX.manager.disconnect(websocket)
-        await app.state.CTX.manager.broadcast_string(f"Client {userid} left the chat")
+        username = app.state.CTX.usernames.get(userid, "Unknown Player")
+        await app.state.CTX.manager.broadcast_string(f"Client {username} left the chat")
 
 
 @contextlib.asynccontextmanager

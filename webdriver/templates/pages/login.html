@@ -1,0 +1,31 @@
+{% extends 'layouts/base.html' %}
+{% block title %}
+Regicide Login
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    <div class="columns is-centered">
+        <div class="column is-half">
+            <div class="card" style="margin-top: 50px;">
+                <div class="card-content">
+                    <p class="title is-4">Enter your name to play Regicide</p>
+                    <form action="/login" method="post">
+                        <div class="field">
+                            <label class="label">Name</label>
+                            <div class="control">
+                                <input class="input" type="text" name="username" placeholder="Your Name" required>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <div class="control">
+                                <button class="button is-primary">Play</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
