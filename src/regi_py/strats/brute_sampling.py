@@ -3,9 +3,8 @@ import numpy as np
 
 #
 from regi_py.core import BaseStrategy
-from regi_py.strats.mcts_explorer import get_expansion_at
+from regi_py.core import RandomStrategy
 from regi_py.strats.phase_utils import *
-from regi_py.strats.trim_random import quick_game_value
 
 
 class BruteSamplingStrategy(BaseStrategy):
@@ -29,7 +28,9 @@ class BruteSamplingStrategy(BaseStrategy):
 
         for i in range(N):
             for b in range(B):
-                val_cur[b] = quick_game_value(next_phases[i], relative_diff=True)
+                val_cur[b] = quick_game_value(
+                    next_phases[i], strat_klass=RandomStrategy, relative_diff=True
+                )
             # print(val_cur)
             if root_phase.phase_attacking:
                 yield_penalty = random.random() * int(next_combos[i].bitwise == 0)

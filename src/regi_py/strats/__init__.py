@@ -6,6 +6,7 @@ from .preserve import PreserveStrategy
 from .suitpref import AllPrefs as AllSuits
 from .trim_random import TrimmedRandomStrategy
 from .brute_sampling import BruteSamplingStrategy
+from .mcts_explorer import MCTSExplorerStrategy
 
 STRATEGY_LIST = [
     RandomStrategy,
@@ -14,4 +15,5 @@ STRATEGY_LIST = [
     PreserveStrategy,
     TrimmedRandomStrategy,
     BruteSamplingStrategy,
+    MCTSExplorerStrategy,
 ] + AllSuits

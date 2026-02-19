@@ -1,7 +1,6 @@
 from regi_py.core import *
 from regi_py.rl.utils import *
 from regi_py.strats.phase_utils import *
-from regi_py.strats.mcts_explorer import get_expansion_at
 from regi_py.logging import DummyLog
 
 #
