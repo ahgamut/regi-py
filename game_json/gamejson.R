@@ -287,5 +287,5 @@ return(game_diagram)
 #    map(\(x) diagram_game_phase(x))
 
 # win_list <- split(win, seq(nrow(win)))
-win_diagrams <- win_list |>
-    map(\(x) diagram_game_phase(x))
+# win_diagrams <- win_list |>
+#     map(\(x) diagram_game_phase(x))
