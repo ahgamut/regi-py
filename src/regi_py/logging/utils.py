@@ -15,7 +15,7 @@ def dump_game(game):
     result["players"] = [dump_player(player) for player in game.players]
     result["past_yields"] = game.past_yields
     result["status"] = str(game.status.name)
-    result["used_combos"] = [dump_combo(combo) for combo in game.used_combos]
+    result["used_combos"] = [dump_combo(combo) for combo in game.used_combos if len(combo.parts) != 0]
     result["current_enemy"] = None
     result["draw_pile_size"] = len(game.draw_pile)
     result["discard_pile_size"] = len(game.discard_pile)
