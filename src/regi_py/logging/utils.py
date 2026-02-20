@@ -18,12 +18,16 @@ def dump_game(game):
     result["used_combos"] = [dump_combo(combo) for combo in game.used_combos if len(combo.parts) != 0]
     result["current_enemy"] = None
     result["current_block"] = 0
+    result["progress"] = 0
     result["draw_pile_size"] = len(game.draw_pile)
     result["discard_pile_size"] = len(game.discard_pile)
     result["enemy_pile_size"] = len(game.enemy_pile)
     if len(game.enemy_pile) > 0:
         result["current_enemy"] = dump_enemy(game.enemy_pile[0])
         result["current_block"] = game.get_current_block(game.enemy_pile[0])
+        result["progress"] = 360 - sum(e.hp for e in game.enemy_pile)
+    else:
+        result["progress"] = 360
     result["enemy_pile"] = [str(x) for x in game.enemy_pile]
     return result
 
