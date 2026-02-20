@@ -13,7 +13,6 @@ STRATEGY_LIST = [
     DamageStrategy,
     DummyStrategy,
     PreserveStrategy,
-    TrimmedRandomStrategy,
     BruteSamplingStrategy,
     MCTSExplorerStrategy,
 ] + AllSuits

@@ -80,15 +80,15 @@ class MCTSNode:
         return new_node
 
     @staticmethod
-    def simulate(node, cur_max):
+    def simulate(node):
         end_value = node.root_phase.game_endvalue
         if end_value != 0:
-            return float(end_value == 1), 0
+            return float(end_value == 1)
 
         end_value = quick_game_value(
             node.root_phase, strat_klass=TrimmedRandomStrategy, relative_diff=True
         )
-        return end_value, end_value
+        return end_value
 
     @staticmethod
     def update(node, reward):
@@ -127,14 +127,12 @@ class MCTSExplorerStrategy(BaseStrategy):
 
     def simulate_node(self, phase):
         root_node = MCTSNode(phase, trim=self.trim, weight=self.weight)
-        progress = 0
 
         for i in range(self.iterations):
             node = MCTSNode.select(root_node)
             if not node.is_terminal():
                 node = MCTSNode.expand(node)
-            reward, p = MCTSNode.simulate(node, progress)
-            progress = max(p, progress)
+            reward = MCTSNode.simulate(node)
             MCTSNode.update(node, reward)
         return root_node
 

@@ -151,19 +151,37 @@ def get_expansion_at(root_phase, trim=False):
 
     return next_phases, root_combos
 
+
+class QuickLog(DummyLog):
+    def __init__(self):
+        super().__init__()
+        self.reason = None
+
+    def endgame(self, reason, game):
+        self.reason = reason
+
+
 def quick_game_sim(root_phase, strat_klass):
-    log = DummyLog()
+    log = QuickLog()
     tmp = GameState(log)
     exp_strat = strat_klass()
     for i in range(root_phase.num_players):
         tmp.add_player(exp_strat)
     tmp._init_phaseinfo(root_phase)
     tmp.start_loop()
-    end_phase = tmp.export_phaseinfo()
-    return end_phase
+    return tmp, log.reason
+
 
 def quick_game_value(root_phase, strat_klass, relative_diff=False):
-    end_phase = quick_game_sim(root_phase, strat_klass)
+    game, reason = quick_game_sim(root_phase, strat_klass)
+    # give bad values if due to move failure
+    if reason in (
+        EndGameReason.BLOCK_FAILED,
+        EndGameReason.ATTACK_FAILED,
+        EndGameReason.REDIRECT_FAILED,
+    ):
+        return -1
+    end_phase = game.export_phaseinfo()
     if end_phase.game_endvalue == 1:
         return 2
     #
