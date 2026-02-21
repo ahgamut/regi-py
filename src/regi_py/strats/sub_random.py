@@ -3,8 +3,8 @@ from regi_py.strats.phase_utils import *
 import random
 
 
-class PreserveStrategy(BaseStrategy):
-    __strat_name__ = "preserve"
+class SubsetRandomStrategy(BaseStrategy):
+    __strat_name__ = "sub-random"
 
     def setup(self, player, game):
         return 0
@@ -16,13 +16,13 @@ class PreserveStrategy(BaseStrategy):
     def getAttackIndex(self, combos, player, yield_allowed, game):
         if len(combos) == 0:
             return -1
-        good_combos = get_preserve_attacks(player, combos, game)
-        move = random.choice(good_combos)
+        sub = get_nonbad_attacks(game, combos)
+        move = random.choice(sub)
         return indexify(move, combos)
 
     def getDefenseIndex(self, combos, player, damage, game):
         if len(combos) == 0:
             return -1
-        good_combos = get_nonbad_defends(game, combos)
-        move = random.choice(good_combos)
+        sub = get_nonbad_defends(game, combos)
+        move = random.choice(sub)
         return indexify(move, combos)

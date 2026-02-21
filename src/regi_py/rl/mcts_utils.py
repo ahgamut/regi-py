@@ -144,9 +144,9 @@ class MCTSTrainerStrategy(BaseStrategy):
 
     def process_phase(self, game, phase, combos):
         if phase.phase_attacking:
-            subcombos = get_nicer_attacks(game, combos)
+            subcombos = get_nonbad_attacks(game, combos)
         else:
-            subcombos = get_nicer_defends(game, combos)
+            subcombos = get_nonbad_defends(game, combos)
         br = self.coll.search(phase, subcombos)
         if br == -1:
             return -1

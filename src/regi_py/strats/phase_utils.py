@@ -36,7 +36,7 @@ def defend_throwing(ind, game, combos, score_only=False):
     return random.random() <= lower_prob
 
 
-def get_nicer_attacks(game, combos):
+def get_nonbad_attacks(game, combos):
     res = []
     if len(combos) < 4:
         return combos
@@ -50,7 +50,43 @@ def get_nicer_attacks(game, combos):
     return res
 
 
-def get_nicer_defends(game, combos):
+def get_preserve_attacks(player, combos, game):
+    if len(combos) < 3:
+        return combos
+    e = game.enemy_pile[0]
+    cur_block = game.get_current_block(e)
+    ac_map = {str(x): x for x in player.cards}
+    all_cards = set(x for x in player.cards)
+
+    good_combos = []
+    for ind, x in enumerate(combos):
+        dmg = game.get_combo_damage(e, x)
+        cset = set(c for c in x.parts)
+        remain = list(c for c in (all_cards - cset))
+        new_blk = game.get_combo_block(e, x)
+        remain_blk = sum(c.strength for c in remain)
+        # print(x, "attacks for", dmg, "blocks for", new_blk)
+        # print("we already block for", cur_block)
+        # print("remaining cards can block at most", remain_blk)
+
+        if remain_blk >= e.strength - (cur_block + new_blk):
+            good_combos.append(x)
+
+    if len(good_combos) == 0:
+        return combos
+
+    good_combos = list(
+        sorted(
+            good_combos,
+            reverse=True,
+            key=lambda x: game.get_combo_damage(e, x),
+        )
+    )
+    # print(len(combos) - len(good_indices), "combos were removed")
+    return good_combos
+
+
+def get_nonbad_defends(game, combos):
     if len(combos) < 4:
         return combos
     res = []
@@ -117,6 +153,14 @@ class PhaseRecorderStrategy(BaseStrategy):
         return ind
 
 
+def indexify(move, combos):
+    for i, c in enumerate(combos):
+        if c.bitwise == move.bitwise:
+            return i
+    raise RuntimeError("unable to index move")
+    return 0
+
+
 def get_expansion_at(root_phase, trim=False):
     log = DummyLog()
     tmp = GameState(log)
@@ -131,9 +175,9 @@ def get_expansion_at(root_phase, trim=False):
 
     if trim:
         if root_phase.phase_attacking:
-            root_combos = get_nicer_attacks(None, root_combos)
+            root_combos = get_nonbad_attacks(None, root_combos)
         else:
-            root_combos = get_nicer_defends(None, root_combos)
+            root_combos = get_nonbad_defends(None, root_combos)
         exp_strat.root_combos = root_combos
         exp_strat.next_phases = [None] * len(root_combos)
 
