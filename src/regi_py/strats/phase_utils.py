@@ -16,7 +16,7 @@ def attack_yieldfail(ind, game, combos):
     if game.get_current_block(cur_enemy) >= cur_enemy.strength:
         # print("yield ok because full block")
         return False
-    return random.random() <= 0.4
+    return random.random() <= 0.7
 
 
 def defend_throwing(ind, game, combos, score_only=False):
@@ -29,8 +29,8 @@ def defend_throwing(ind, game, combos, score_only=False):
         c_blk = c.base_defense
         c_dsc = len(c.parts)
         if c_dsc < num_discards and c_blk <= sel_blk:
-            lower_poss += 1.5
-    lower_prob = min(0.9, lower_poss / len(combos))
+            lower_poss += 3
+    lower_prob = min(1.0, lower_poss / len(combos))
     if score_only:
         return lower_prob
     return random.random() <= lower_prob
@@ -44,7 +44,7 @@ def get_nonbad_attacks(game, combos):
         if c.bitwise != 0:
             res.append(c)
             continue
-        if random.random() > 0.4:
+        if random.random() > 0.6:
             res.append(c)
 
     return res

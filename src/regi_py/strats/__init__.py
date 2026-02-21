@@ -16,5 +16,4 @@ STRATEGY_LIST = [
     DummyStrategy,
     PreserveStrategy,
     BruteSamplingStrategy,
-    MCTSExplorerStrategy,
 ] + AllSuits

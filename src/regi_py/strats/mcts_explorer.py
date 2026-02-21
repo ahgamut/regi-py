@@ -85,9 +85,10 @@ class MCTSNode:
         if end_value != 0:
             return float(end_value == 1)
 
-        end_value = quick_game_value(
-            node.root_phase, strat_klass=SubsetRandomStrategy, relative_diff=True
-        )
+        end_game, _ = quick_game_sim(node.root_phase, strat_klass=SubsetRandomStrategy)
+        s = enemy_hp_left(node.root_phase)
+        e = enemy_hp_left(end_game)
+        end_value = (s - e) / s
         return end_value
 
     @staticmethod
@@ -101,7 +102,7 @@ class MCTSNode:
 class MCTSExplorerStrategy(BaseStrategy):
     __strat_name__ = "mcts-explorer"
 
-    def __init__(self, iterations=1024, trim=True, weight=math.sqrt(2)):
+    def __init__(self, iterations=2048, trim=True, weight=math.sqrt(2)):
         super(MCTSExplorerStrategy, self).__init__()
         self.iterations = iterations
         self.trim = trim
@@ -139,6 +140,8 @@ class MCTSExplorerStrategy(BaseStrategy):
     def process_phase(self, phase, combos):
         root_node = self.simulate_node(phase)
         best_combo = root_node.best_combo
+        for i, x in enumerate(root_node.children):
+            print(x.prev_combo, x.visits / root_node.visits)
         for ind, c in enumerate(combos):
             if c.bitwise == best_combo.bitwise:
                 return ind
