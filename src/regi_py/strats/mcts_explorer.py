@@ -1,7 +1,7 @@
 from regi_py.core import BaseStrategy
 from regi_py.core import RandomStrategy
 from regi_py.strats.phase_utils import *
-from regi_py.strats.trim_random import TrimmedRandomStrategy
+from regi_py.strats.sub_random import SubsetRandomStrategy
 import random
 import math
 
@@ -86,7 +86,7 @@ class MCTSNode:
             return float(end_value == 1)
 
         end_value = quick_game_value(
-            node.root_phase, strat_klass=TrimmedRandomStrategy, relative_diff=True
+            node.root_phase, strat_klass=SubsetRandomStrategy, relative_diff=True
         )
         return end_value
 

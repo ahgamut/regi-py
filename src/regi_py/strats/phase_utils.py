@@ -219,12 +219,6 @@ def quick_game_sim(root_phase, strat_klass):
 def quick_game_value(root_phase, strat_klass, relative_diff=False):
     game, reason = quick_game_sim(root_phase, strat_klass)
     # give bad values if due to move failure
-    if reason in (
-        EndGameReason.BLOCK_FAILED,
-        EndGameReason.ATTACK_FAILED,
-        EndGameReason.REDIRECT_FAILED,
-    ):
-        return -1
     end_phase = game.export_phaseinfo()
     if end_phase.game_endvalue == 1:
         return 2
