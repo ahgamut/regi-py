@@ -140,8 +140,8 @@ class MCTSExplorerStrategy(BaseStrategy):
     def process_phase(self, phase, combos):
         root_node = self.simulate_node(phase)
         best_combo = root_node.best_combo
-        for i, x in enumerate(root_node.children):
-            print(x.prev_combo, x.visits / root_node.visits)
+        # for i, x in enumerate(root_node.children):
+        #    print(x.prev_combo, x.visits / root_node.visits)
         for ind, c in enumerate(combos):
             if c.bitwise == best_combo.bitwise:
                 return ind
