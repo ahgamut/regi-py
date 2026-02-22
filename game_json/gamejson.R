@@ -289,3 +289,58 @@ return(game_diagram)
 # win_list <- split(win, seq(nrow(win)))
 # win_diagrams <- win_list |>
 #     map(\(x) diagram_game_phase(x))
+
+progress_breaks <- c(20, 40, 60, 80, 
+                     110, 140, 170, 200,
+                    240, 280, 320, 360)
+
+progress_labels <- c("1st Jack", "2nd Jack", "3rd Jack", "4th Jack",
+                     "1st Queen", "2nd Queen", "3rd Queen", "4th Queen",
+                    "1st King", "2nd King", "3rd King", "Win")
+
+# Function to make a line plot
+# Input
+# df: The dataframe to plot.
+# group: The grouping variable for the plot.
+# statistic: The variable containing the statistic to plot.
+# k: The number of groups to plot.
+# top: Should the top groups be plotted (TRUE) or the bottom groups (FALSE)?
+# breaks: Breaks for the scale for the statistic
+# labels: Labels for the scale for the statistic
+# lims: Vector of scale limits for the statistic
+# xlabel: The x label for the plot.
+# ylabel: The y label for the plot
+lineplot <- function(df, group, statistic, k = nrow(df), top = TRUE, 
+                     breaks = progress_breaks, labels = progress_labels, lims = c(0, 360),
+                     xlabel, ylabel){
+
+    if (isTRUE(top)) {
+      # Top k groups
+      dfarr <- df |> 
+        arrange(desc({{ statistic }})) |>
+        head(n = k) |>
+        mutate(grouparr = reorder(factor({{ group }}), {{ statistic }}))
+    } else {
+      # Bottom k groups
+      dfarr <- df |>
+        arrange(desc({{ statistic }})) |>
+        tail(n = k) |>
+        mutate(grouparr = reorder(factor({{ group }}), {{ statistic }}))
+    }
+  
+  lp <- dfarr |>
+    ggplot(aes(y = grouparr)) +
+    geom_point(aes(x = {{ statistic }})) +
+    geom_segment(aes(x = 0, xend = {{ statistic }},
+                     yend = grouparr)) +
+    scale_x_continuous(breaks = breaks,
+                       labels = labels,
+                       limits = lims) +
+    labs(x = xlabel, y = ylabel) +
+    theme_bw() +
+    theme(panel.grid.major.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+  return(lp)
+}
+
