@@ -16,10 +16,12 @@ STRATEGY_MAP = get_strategy_map()
 
 def create_teams(num_teams, num_players):
     bots = list(STRATEGY_MAP.keys())
+    default_bots = ("random", "damage", "brute", "preserve", "mcts-explorer")
+    default_teams = [tuple([x] * num_players) for x in default_bots]
 
-    teams = set()
-    while len(teams) < (num_teams):
-        team = tuple(random.choices(bots, k=2))
+    teams = set(default_teams)
+    while len(teams) < (num_teams + len(default_teams)):
+        team = tuple(random.choices(bots, k=num_players))
         teams.add(team)
     return list(teams)
 

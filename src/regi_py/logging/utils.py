@@ -25,7 +25,7 @@ def dump_game(game):
     if len(game.enemy_pile) > 0:
         result["current_enemy"] = dump_enemy(game.enemy_pile[0])
         result["current_block"] = game.get_current_block(game.enemy_pile[0])
-        result["progress"] = 360 - sum(e.hp for e in game.enemy_pile)
+        result["progress"] = 360 - sum(e.hp for e in game.enemy_pile if e.hp > 0)
     else:
         result["progress"] = 360
     result["enemy_pile"] = [str(x) for x in game.enemy_pile]
