@@ -16,9 +16,58 @@ function send_ws(message)
     let res = g.ws.send(raw);
 }
 
+function clearGameCookies() {
+    document.cookie = "userid=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+    document.cookie = "username=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+}
+
+let _msgQueue = [];
+let _msgProcessing = false;
+const MSG_DELAY = 250;
+
+function _processQueue() {
+    if (_msgProcessing || _msgQueue.length === 0) return;
+    _msgProcessing = true;
+    let info = _msgQueue.shift();
+    _handleMessage(info);
+    _msgTimer = setTimeout(() => {
+        _msgProcessing = false;
+        _processQueue();
+    }, MSG_DELAY);
+}
+
+function _flushQueue() {
+    clearTimeout(_msgTimer);
+    _msgProcessing = false;
+    while (_msgQueue.length > 0) {
+        _handleMessage(_msgQueue.shift());
+    }
+}
+
+let _msgTimer = null;
+
 function receive_ws(event) {
     // twice because string inside string
     let info = JSON.parse(JSON.parse(event.data));
+
+    if (info.type === "invalid-session") {
+        clearGameCookies();
+        window.location.href = "/";
+        return;
+    }
+
+    learnUsernames(info);
+    if (info.type === "log") {
+        _msgQueue.push(info);
+        _processQueue();
+    } else {
+        // Flush pending log messages immediately before handling action messages
+        _flushQueue();
+        _handleMessage(info);
+    }
+}
+
+function _handleMessage(info) {
     let g = Alpine.store('gamestate');
     let mainBtn = document.getElementById('main-button');
     let sideBtn = document.getElementById('side-button');
@@ -39,7 +88,6 @@ function receive_ws(event) {
             setButtonActivity(sideBtn, false);
             break;
         case "log":
-            // logMessage(JSON.stringify(info.data));
             processLog(info.data);
             g.history.push(info.data);
             break;
@@ -106,26 +154,23 @@ function submit_option() {
 function submit_redirect_option() {
     let g = Alpine.store("gamestate");
     let players = document.getElementById('other-players').firstChild;
-    let pickset = new Set([]);
-    const regex = /Player /i;
+    let picked = [];
     for (let player of players.children) {
         if (player.classList.contains("is-focused")) {
-            pickset.add(player.innerHTML.replace(regex, ""));
+            picked.push({ id: parseInt(player.dataset.playerId), name: player.innerHTML });
         }
     }
-    console.log(pickset);
 
     let pickIndex = -1;
-    let pickArr = Array.from(pickset);
-    if (pickArr.length != 1) {
+    if (picked.length != 1) {
         logMessage(`Invalid redirection!`, 'is-warning');
         addNotification("Invalid Redirection! Pick Again", 'is-warning');
     } else {
-        pickIndex = parseInt(pickArr[0]);
+        pickIndex = picked[0].id;
         // send the option picked
         let msg = { userid: g.userid, type: "player-move", choice: pickIndex };
         send_ws(msg);
-        logMessage(`You selected Player ${Array.from(pickset)}`);
+
         // after sending your option, disable the buttons
         let submitter = document.getElementById('main-button');
         let yielder = document.getElementById('side-button');
@@ -169,7 +214,7 @@ function submit_card_option() {
         // send the option picked
         let msg = { userid: g.userid, type: "player-move", choice: pickIndex };
         send_ws(msg);
-        logMessage(`You selected ${Array.from(pickset)}`);
+
         // after sending your option, disable the buttons
         let submitter = document.getElementById('main-button');
         let yielder = document.getElementById('side-button');
@@ -201,7 +246,7 @@ function yield_option() {
         // send the option picked
         let msg = { userid: g.userid, choice: pickIndex };
         send_ws(msg);
-        logMessage(`You selected ${Array.from(pickset)}`);
+
         // after sending your option, disable the buttons
         let submitter = document.getElementById('main-button');
         let yielder = document.getElementById('side-button');
@@ -217,31 +262,23 @@ function setButtonActivity(button, active) {
     } else {
         button.classList.add("is-loading")
     }
+    if (button.id === 'side-button') {
+        Alpine.store('gamestate').sideButtonActive = active;
+    }
 }
 
 function makeEnemyPileWithInfo(ce, enemyPileSize) {
     let wrapper = document.createElement("div");
-    wrapper.style.display = "inline-block";
-    wrapper.style.textAlign = "center";
+    wrapper.className = "card-wrapper";
 
-    let depth = enemyPileSize > 0 ? Math.round((enemyPileSize / 12) * 8) : 0;
+    let depth = enemyPileSize > 0 ? (enemyPileSize / 12) * 0.5 : 0;
 
     let pile = document.createElement("div");
-    pile.className = "box has-background-danger-light";
-    pile.style.width = "90px";
-    pile.style.height = "110px";
-    pile.style.display = "flex";
-    pile.style.flexDirection = "column";
-    pile.style.alignItems = "center";
-    pile.style.justifyContent = "center";
-    pile.style.padding = "4px";
-    pile.style.borderRadius = "8px";
-    pile.style.border = "2px solid rgba(0,0,0,0.2)";
+    pile.className = "box has-background-danger-light game-card game-card-enemy";
     pile.style.boxShadow = depth > 0
-        ? `${depth}px ${depth}px 0px rgba(0,0,0,0.3), ${depth}px ${depth}px 0px -1px rgba(0,0,0,0.1)`
+        ? `${depth}rem ${depth}rem 0 rgba(0,0,0,0.3), ${depth}rem ${depth}rem 0 -0.0625rem rgba(0,0,0,0.1)`
         : "none";
-    pile.style.position = "relative";
-    pile.style.marginBottom = depth + "px";
+    pile.style.marginBottom = depth + "rem";
 
     let name = document.createElement("div");
     name.className = "has-text-weight-bold is-size-5";
@@ -254,9 +291,8 @@ function makeEnemyPileWithInfo(ce, enemyPileSize) {
     pile.appendChild(hp);
 
     let lbl = document.createElement("div");
-    lbl.className = "is-size-7";
+    lbl.className = "is-size-7 label-below";
     lbl.textContent = `${enemyPileSize} enemies left`;
-    lbl.style.marginTop = "4px";
 
     wrapper.appendChild(pile);
     wrapper.appendChild(lbl);
@@ -265,29 +301,17 @@ function makeEnemyPileWithInfo(ce, enemyPileSize) {
 
 function makePileVisual(label, count, maxCount, colorClass) {
     let wrapper = document.createElement("div");
-    wrapper.style.display = "inline-block";
-    wrapper.style.textAlign = "center";
-    wrapper.style.marginRight = "16px";
-    wrapper.style.marginBottom = "8px";
+    wrapper.className = "pile-wrapper";
 
-    // Shadow depth based on card count (0-8px)
-    let depth = maxCount > 0 ? Math.round((count / maxCount) * 8) : 0;
+    // Shadow depth based on card count (0-0.5rem)
+    let depth = maxCount > 0 ? (count / maxCount) * 0.5 : 0;
 
     let pile = document.createElement("div");
-    pile.className = `box ${colorClass}`;
-    pile.style.width = "70px";
-    pile.style.height = "90px";
-    pile.style.display = "flex";
-    pile.style.alignItems = "center";
-    pile.style.justifyContent = "center";
-    pile.style.padding = "4px";
-    pile.style.borderRadius = "8px";
-    pile.style.border = "2px solid rgba(0,0,0,0.2)";
+    pile.className = `box ${colorClass} game-card`;
     pile.style.boxShadow = depth > 0
-        ? `${depth}px ${depth}px 0px rgba(0,0,0,0.3), ${depth}px ${depth}px 0px -1px rgba(0,0,0,0.1)`
+        ? `${depth}rem ${depth}rem 0 rgba(0,0,0,0.3), ${depth}rem ${depth}rem 0 -0.0625rem rgba(0,0,0,0.1)`
         : "none";
-    pile.style.position = "relative";
-    pile.style.marginBottom = depth + "px";
+    pile.style.marginBottom = depth + "rem";
 
     let num = document.createElement("span");
     num.className = "is-size-3 has-text-weight-bold";
@@ -295,9 +319,8 @@ function makePileVisual(label, count, maxCount, colorClass) {
     pile.appendChild(num);
 
     let lbl = document.createElement("div");
-    lbl.className = "is-size-7";
+    lbl.className = "is-size-7 label-below";
     lbl.textContent = label;
-    lbl.style.marginTop = "4px";
 
     wrapper.appendChild(pile);
     wrapper.appendChild(lbl);
@@ -307,14 +330,9 @@ function makePileVisual(label, count, maxCount, colorClass) {
 function makePilesRow(game) {
     let res = document.createElement("div");
     res.className = "mb-4";
-    let hdr = document.createElement("h2");
-    hdr.className = "subtitle is-5";
-    hdr.textContent = "Piles";
-    res.appendChild(hdr);
 
     let row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.flexWrap = "wrap";
+    row.className = "pile-row";
     let totalCards = game.draw_pile_size + game.discard_pile_size;
     row.appendChild(makePileVisual("Draw", game.draw_pile_size, totalCards || 42, "has-background-info-light"));
     row.appendChild(makePileVisual("Discard", game.discard_pile_size, totalCards || 42, "has-background-warning-light"));
@@ -330,14 +348,23 @@ function makeOtherPlayerInfo(game) {
     hdr.textContent = "Players";
     res.appendChild(hdr);
 
-    let els = document.createElement("ul");
+    let table = document.createElement("table");
+    table.className = "table is-narrow is-size-6";
     for (let player of game.players) {
-        let el = document.createElement("li");
-        el.className = "is-size-6";
-        el.appendChild(document.createTextNode(`${getDisplayName(player)}: ${player.num_cards} cards`));
-        els.appendChild(el);
+        let row = document.createElement("tr");
+        if (player.id === game.active_player_id) {
+            row.classList.add("current-player");
+        }
+        let nameCell = document.createElement("td");
+        nameCell.textContent = getDisplayName(player);
+        let cardCell = document.createElement("td");
+        cardCell.className = "has-text-right";
+        cardCell.textContent = `${player.num_cards} cards`;
+        row.appendChild(nameCell);
+        row.appendChild(cardCell);
+        table.appendChild(row);
     }
-    res.appendChild(els);
+    res.appendChild(table);
     return res;
 }
 
@@ -350,83 +377,45 @@ function makeUsedCombos(combos) {
     res.appendChild(hdr);
 
     let list = document.createElement("div");
-    list.style.display = "flex";
-    list.style.flexDirection = "column";
-    list.style.alignItems = "center";
+    list.className = "combos-list";
     for (let combo of combos) {
-        let row = document.createElement("div");
-        row.style.display = "flex";
-        row.style.gap = "4px";
-        row.style.marginBottom = "4px";
-        row.style.justifyContent = "center";
+        let b = document.createElement("div");
+        b.className = "combo-card has-text-weight-bold is-size-7";
         for (let card of combo) {
-            let b = document.createElement("div");
-            b.style.width = "36px";
-            b.style.height = "48px";
-            b.style.display = "flex";
-            b.style.alignItems = "center";
-            b.style.justifyContent = "center";
-            b.style.borderRadius = "5px";
-            b.style.border = "1px solid rgba(0,0,0,0.2)";
-            b.style.backgroundColor = "#e8f0fe";
-            b.style.boxShadow = "1px 1px 0px rgba(0,0,0,0.1)";
-            b.className = "has-text-weight-bold is-size-7";
-            b.textContent = card.value;
-            row.appendChild(b);
+            let val = document.createElement("div");
+            val.textContent = card.value;
+            b.appendChild(val);
         }
-        list.appendChild(row);
+        list.appendChild(b);
     }
     res.appendChild(list);
     return res;
 }
 
 function updateBoard(game) {
-    let game_view = document.getElementById('game-view');
-    game_view.replaceChildren();
-    game_view.appendChild(makePilesRow(game));
-    game_view.appendChild(makeOtherPlayerInfo(game));
+    let piles_view = document.getElementById('piles-view');
+    piles_view.replaceChildren();
+    piles_view.appendChild(makePilesRow(game));
+
+    let players_view = document.getElementById('players-view');
+    players_view.replaceChildren();
+    players_view.appendChild(makeOtherPlayerInfo(game));
 
     let enemy_view = document.getElementById('enemy-view');
     enemy_view.replaceChildren();
     enemy_view.appendChild(makeEnemyPileWithInfo(game.current_enemy, game.enemy_pile_size));
-    if (game.used_combos && game.used_combos.length > 0) {
-        enemy_view.appendChild(makeUsedCombos(game.used_combos));
-    }
+
+    let combos_view = document.getElementById('combos-view');
+    combos_view.replaceChildren();
+    combos_view.appendChild(makeUsedCombos(game.used_combos || []));
 }
 
 function getCardButton(card, block) {
     let b = document.createElement("div");
-    b.style.width = "50px";
-    b.style.height = "68px";
-    b.style.display = "flex";
-    b.style.alignItems = "center";
-    b.style.justifyContent = "center";
-    b.style.borderRadius = "6px";
-    b.style.border = "2px solid rgba(0,0,0,0.2)";
-    b.style.cursor = "pointer";
-    b.style.userSelect = "none";
-    b.style.transition = "transform 0.15s, box-shadow 0.15s";
-    b.style.backgroundColor = "#e8f0fe";
-    b.style.color = "#363636";
-    b.style.boxShadow = "2px 2px 0px rgba(0,0,0,0.15)";
-    b.className = "has-text-weight-bold is-size-6";
+    b.className = "game-card game-card-selectable has-text-weight-bold is-size-6";
     b.textContent = card;
     b.addEventListener("click", () => {
-        if (b.classList.contains("is-focused")) {
-            b.classList.remove("is-focused");
-            b.style.backgroundColor = "#e8f0fe";
-            b.style.color = "#363636";
-            b.style.border = "2px solid rgba(0,0,0,0.2)";
-            b.style.transform = "";
-            b.style.boxShadow = "2px 2px 0px rgba(0,0,0,0.15)";
-        } else {
-            b.classList.add("is-focused");
-            b.style.backgroundColor = "#363636";
-            b.style.color = "white";
-            b.style.border = "2px solid #3273dc";
-            b.style.transform = "translateY(-8px)";
-            b.style.boxShadow = "3px 5px 4px rgba(0,0,0,0.3)";
-        }
+        b.classList.toggle("is-focused");
     });
     return b;
 }
@@ -451,6 +440,7 @@ function getPlayerButton(player, block) {
             b.classList.remove("is-link")
         }
     });
+    b.dataset.playerId = player.id;
     b.innerHTML = getDisplayName(player);
     return b;
 }
@@ -461,9 +451,7 @@ function updateCards(player) {
     target.replaceChildren();
 
     let bgroup = document.createElement("div");
-    bgroup.style.display = "flex";
-    bgroup.style.flexWrap = "wrap";
-    bgroup.style.gap = "8px";
+    bgroup.className = "cards-row";
     let cards = player.cards;
     for (let i = 0, len = cards.length; i < len; i++) {
         bgroup.appendChild(getCardButton(cards[i]));
@@ -534,8 +522,40 @@ function selectRedirect(data) {
     updateOtherPlayers(data.player, data.game);
 }
 
+function learnUsernames(data) {
+    let g = Alpine.store('gamestate');
+    function learnPlayer(p) {
+        if (p && p.id !== undefined && p.username) {
+            g.knownUsernames[p.id] = p.username;
+        }
+    }
+    if (!data || typeof data !== 'object') return;
+    learnPlayer(data.player);
+    learnPlayer(data.active_player);
+    if (Array.isArray(data.players)) {
+        for (let p of data.players) learnPlayer(p);
+    }
+    if (data.game && typeof data.game === 'object') {
+        learnPlayer(data.game.active_player);
+        if (Array.isArray(data.game.players)) {
+            for (let p of data.game.players) learnPlayer(p);
+        }
+    }
+    if (data.data && typeof data.data === 'object') {
+        learnUsernames(data.data);
+    }
+}
+
 function getDisplayName(player) {
-    return player.username || `Player ${player.id}`;
+    let g = Alpine.store('gamestate');
+    if (player.strategy === "player-webui") {
+        let name = player.username || g.knownUsernames[player.id];
+        if (name) return name;
+    }
+    if (player.strategy) {
+        return `Bot ${player.id} (${player.strategy})`;
+    }
+    return player.username || g.knownUsernames[player.id] || `Bot ${player.id}`;
 }
 
 function updateCurrentPlayerCards(game) {
@@ -573,11 +593,11 @@ function processLog(data) {
             logMessage(`${getDisplayName(data.player)} blocked with ${combo2}`, 'is-info');
             break;
         case 'REDIRECT':
-            let nextPlayerName = "Player " + data.next_playerid; // Fallback if username not available for next player
+            let nextPlayerName = "Bot " + data.next_playerid;
             if (data.game && data.game.players) {
                 const nextPlayer = data.game.players.find(p => p.id === data.next_playerid);
-                if (nextPlayer && nextPlayer.username) {
-                    nextPlayerName = nextPlayer.username;
+                if (nextPlayer) {
+                    nextPlayerName = getDisplayName(nextPlayer);
                 }
             }
             logMessage(`${getDisplayName(data.player)} redirected play to ${nextPlayerName}`, 'is-info');
@@ -597,16 +617,26 @@ function processLog(data) {
             break;
         case 'ENDGAME':
             endGameStatusUpdate();
-            logMessage("Game has ended", 'is-primary');
+            if (data.game && data.game.enemy_pile_size === 0 && (!data.game.current_enemy || data.game.current_enemy.hp <= 0)) {
+                g.playerShould = "Victory! All enemies defeated!";
+                logMessage("Victory! All enemies defeated!", 'is-success');
+            } else {
+                let endPlayer = data.player
+                    || (data.game && data.game.active_player)
+                    || (data.game && data.game.players && data.game.players.find(p => p.id === data.game.active_player_id));
+                let endPlayerName = endPlayer ? getDisplayName(endPlayer) : ("Bot " + (data.game ? data.game.active_player_id : "?"));
+                g.playerShould = `Defeat! ${endPlayerName} could not survive.`;
+                logMessage("Game has ended - Defeat!", 'is-danger');
+            }
             break;
         case 'POSTGAME':
             endGameStatusUpdate();
             logMessage("Game over!", 'is-primary');
-            // logMessage("Postgame: " + JSON.stringify(data.game));
             break;
         case 'FAILBLOCK':
             logMessage(`${data.enemy.value} attacked ${getDisplayName(data.player)} for ${data.damage}`, 'is-danger');
             logMessage(`${getDisplayName(data.player)} can block at most ${data.maxblock}!`, 'is-danger');
+            g.playerShould = `${getDisplayName(data.player)} failed to block ${data.enemy.value}'s attack of ${data.damage} (max block: ${data.maxblock})`;
             break;
         case 'FULLBLOCK':
             logMessage(`${data.enemy.value} is blocked by ${getDisplayName(data.player)}`, 'is-info');
@@ -621,10 +651,10 @@ function processLog(data) {
                     setButtonActivity(submitter, false);
                     setButtonActivity(yielder, false);
 
-                    let activePlayerName = "Player " + data.game.active_player_id;
-                    if (data.game.active_player && data.game.active_player.username) {
-                        activePlayerName = data.game.active_player.username;
-                    }
+                    let activePlayerName = data.game.active_player
+                        ? getDisplayName(data.game.active_player)
+                        : "Bot " + data.game.active_player_id;
+                    g.playerShould = `Waiting for ${activePlayerName}...`;
                     logMessage(`Wait for ${activePlayerName} to play..`);
                 } else {
                     updateCards(data.game.active_player);
@@ -690,17 +720,10 @@ function addNotification(content, subtype) {
     let notifHeight = trayHeight - (inset * 2);
 
     let res = document.createElement('div');
-    res.className = 'notification is-light is-size-5';
-    res.classList.add(subtype);
+    res.className = `notification is-light is-size-5 notif-overlay ${subtype}`;
     res.role = "alert";
-    res.style.position = 'absolute';
-    res.style.top = '10px';
-    res.style.left = '12px';
-    res.style.right = '8px';
-    res.style.height = notifHeight + 'px';
-    res.style.maxHeight = notifHeight + 'px';
-    res.style.margin = '0';
-    res.style.padding = '8px 30px 8px 12px';
+    res.style.height = (notifHeight / 16) + 'rem';
+    res.style.maxHeight = (notifHeight / 16) + 'rem';
 
     let delButton = document.createElement('button');
     delButton.classList.add('delete');
@@ -716,18 +739,17 @@ function addNotification(content, subtype) {
     let existing = tray.querySelectorAll('.notification');
     existing.forEach(n => { n.style.zIndex = '1'; });
     res.style.zIndex = '10';
-    res.style.animation = 'slideInFromLeft 400ms ease-out forwards';
+    res.classList.add('notif-slide-in');
     tray.appendChild(res);
     dismissOldNotifications(600);
 }
 
 function logMessage(content, subtype=null) {
     let g = Alpine.store('gamestate');
-    // add to log at the bottom
     let messages = document.getElementById('messages')
     let message = document.createElement('li')
     message.appendChild(document.createTextNode(content))
-    messages.appendChild(message)
+    messages.prepend(message)
     if (subtype != null) {
         setTimeout(() => {addNotification(content, subtype);}, 1000);
     }
@@ -806,7 +828,7 @@ function sideButtonText() {
             result = "Yield";
             break;
         case "ENDED":
-            result = "Download JSON";
+            result = g.noDownload ? "<hide>" : "Download JSON";
             break;
         default:
             result = "???";

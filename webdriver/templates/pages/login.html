@@ -3,23 +3,35 @@
 Regicide Login
 {% endblock %}
 
+{% block includes %}
+<link rel="stylesheet" href="/static/minimal.css">
+{% endblock %}
+
 {% block body %}
 <div class="container">
     <div class="columns is-centered">
-        <div class="column is-half">
-            <div class="card" style="margin-top: 50px;">
-                <div class="card-content">
-                    <p class="title is-4">Enter your name to play Regicide</p>
+        <div class="column is-one-third">
+            <div class="login-card page-top-spacing">
+                <div class="has-text-centered">
+                    {% if error %}
+                    <div class="notification is-danger">{{ error }}</div>
+                    {% endif %}
                     <form action="/login" method="post">
                         <div class="field">
                             <label class="label">Name</label>
-                            <div class="control">
-                                <input class="input" type="text" name="username" placeholder="Your Name" required>
+                            <div class="control centered-control">
+                                <input class="input narrow-input" type="text" name="username" placeholder="Your Name" required>
                             </div>
                         </div>
                         <div class="field">
+                            <label class="label">Password</label>
+                            <div class="control centered-control">
+                                <input class="input narrow-input" type="password" name="password" placeholder="Password" required>
+                            </div>
+                        </div>
+                        <div class="field has-text-centered">
                             <div class="control">
-                                <button class="button is-primary">Play</button>
+                                <button class="button is-primary is-medium">Play</button>
                             </div>
                         </div>
                     </form>

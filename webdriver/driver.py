@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import datetime
 import json
 import logging
@@ -90,6 +91,7 @@ class WebPlayerStrategy(BaseStrategy):
 
     @staticmethod
     async def comms_twoway(self, websocket, obj):
+        enrich_with_usernames(obj)
         print("sending", obj)
         await app.state.CTX.manager.send_dict(obj, websocket)
 
@@ -182,44 +184,66 @@ class WebPlayerStrategy(BaseStrategy):
         return option
 
 
+def enrich_player(player_dict):
+    if isinstance(player_dict, dict) and "id" in player_dict:
+        player_id = player_dict["id"]
+        if player_id < len(app.state.CTX.userids):
+            userid = app.state.CTX.userids[player_id]
+            username = app.state.CTX.usernames.get(userid)
+            if username:
+                player_dict["username"] = username
+
+
+def enrich_with_usernames(data):
+    if isinstance(data, dict):
+        if "player" in data and isinstance(data["player"], dict):
+            enrich_player(data["player"])
+        if "active_player" in data and isinstance(data["active_player"], dict):
+            enrich_player(data["active_player"])
+        if "players" in data and isinstance(data["players"], list):
+            for p in data["players"]:
+                enrich_player(p)
+        for key, value in data.items():
+            if key not in ("player", "active_player", "players"):
+                data[key] = enrich_with_usernames(value)
+    elif isinstance(data, list):
+        data = [enrich_with_usernames(item) for item in data]
+    return data
+
+
 class WebPlayerLog(JSONBaseLog):
-    def __init__(self, manager):
+    def __init__(self, manager, history_folder=None):
         super().__init__()
         self.manager = manager
         self.count = 0
         self.portal_provider = BlockingPortalProvider()
+        self.history = []
+        self.history_folder = history_folder
+
+    def startgame(self, game):
+        self.history.clear()
+        super().startgame(game)
+
+    def postgame(self, game):
+        super().postgame(game)
+        if self.history_folder:
+            os.makedirs(self.history_folder, exist_ok=True)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filepath = os.path.join(self.history_folder, f"game_{timestamp}.json")
+            with open(filepath, "w") as f:
+                json.dump(self.history, f, cls=RegiEncoder, indent=2)
 
     @staticmethod
     async def log_actual(manager, obj):
         result = {}
         result["type"] = "log"
 
-        # Enrich log data with usernames
-        def enrich_with_usernames(data):
-            if isinstance(data, dict):
-                if (
-                    "player" in data
-                    and isinstance(data["player"], dict)
-                    and "id" in data["player"]
-                ):
-                    player_id = data["player"]["id"]
-                    # This assumes player_id is the index in app.state.CTX.userids
-                    if player_id < len(app.state.CTX.userids):
-                        userid = app.state.CTX.userids[player_id]
-                        username = app.state.CTX.usernames.get(userid)
-                        if username:
-                            data["player"]["username"] = username
-                for key, value in data.items():
-                    data[key] = enrich_with_usernames(value)
-            elif isinstance(data, list):
-                data = [enrich_with_usernames(item) for item in data]
-            return data
-
         enriched_obj = enrich_with_usernames(obj)
         result["data"] = enriched_obj
         await manager.broadcast_dict(result)
 
     def log(self, obj):
+        self.history.append(obj)
         with self.portal_provider as portal:
             portal.call(WebPlayerLog.log_actual, self.manager, obj)
         self.count += 1
@@ -273,18 +297,42 @@ async def catchall_exception_handler(request: Request, exc: Exception):
 
 
 class Context:
-    def __init__(self, num_players, bots):
+    def __init__(
+        self,
+        num_players,
+        bots,
+        password,
+        skip_bots=False,
+        no_download=False,
+        history_folder=None,
+    ):
         self.manager = ConnectionManager(num_players, len(bots))
-        self.playerlog = WebPlayerLog(self.manager)
+        self.playerlog = WebPlayerLog(self.manager, history_folder=history_folder)
         self.game = GameState(self.playerlog)
         self.num_players = num_players
         self.strats = []
         self.bots = bots
+        self.password = password
+        self.skip_bots = skip_bots
+        self.no_download = no_download
         self.userids = []
         self.usernames = {}
         self.ALT_STARTED = False
         self.FUG_RESPONSE = None
         self.GLOB_THREAD = None
+        self.bot_options = list(get_strategy_map(rl_mods=False).keys())
+
+    @property
+    def needs_bot_selection(self):
+        if len(self.bots) > 0:
+            return False
+        if self.skip_bots and self.num_players >= 2:
+            return False
+        return True
+
+    def set_bots(self, bots):
+        self.bots = bots
+        self.manager.num_bots = len(bots)
 
     def load_game(self):
         # assert len(self.userids) == self.num_players
@@ -307,12 +355,16 @@ class Context:
         print("starting with", [x.__strat_name__ for x in self.strats])
         assert len(self.strats) >= 2
         assert len(self.strats) <= 4
+        if self.num_players == 1 and len(self.bots) > 0:
+            print("solo player with bots, skipping ready check")
+            self.strats[0].ready = True
         self.game.initialize()
-        t = 0
-        while t != self.num_players:
-            time.sleep(1)
-            t = sum(p.ready for p in self.strats[: self.num_players])
-            print(t, "players ready")
+        if not (self.num_players == 1 and len(self.bots) > 0):
+            t = 0
+            while t != self.num_players:
+                time.sleep(1)
+                t = sum(p.ready for p in self.strats[: self.num_players])
+                print(t, "players ready")
         self.game.start_loop()
 
     def end_game(self):
@@ -329,6 +381,10 @@ def game_loop():
     CTX = app.state.CTX
     CTX.ALT_STARTED = True
     while True:
+        while CTX.needs_bot_selection:
+            print("waiting for bot selection")
+            time.sleep(1)
+
         while CTX.num_players > len(CTX.strats):
             print("we are waiting for players")
             # print(CTX.num_players, CTX.strats)
@@ -365,14 +421,74 @@ def read_root(request: Request):
 
 
 @app.post("/login", response_class=RedirectResponse)
-async def login(request: Request, username: str = Form(...)):
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if password != app.state.CTX.password:
+        return templates.TemplateResponse(
+            "pages/login.html", {"request": request, "error": "Incorrect password."}
+        )
     userid = str(uuid4())
     app.state.CTX.userids.append(userid)
     app.state.CTX.usernames[userid] = username
-    response = RedirectResponse(url="/game", status_code=status.HTTP_302_FOUND)
+    if app.state.CTX.needs_bot_selection and len(app.state.CTX.userids) == 1:
+        redirect_url = "/select-bots"
+    elif app.state.CTX.needs_bot_selection:
+        redirect_url = "/wait-bots"
+    else:
+        redirect_url = "/game"
+    response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
     response.set_cookie(key="userid", value=userid)
     response.set_cookie(key="username", value=username)
     return response
+
+
+@app.get("/select-bots", response_class=HTMLResponse)
+def select_bots_page(
+    request: Request,
+    userid: Optional[str] = Cookie(None),
+):
+    if userid is None or userid not in app.state.CTX.userids:
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse(
+        "pages/select_bots.html",
+        {
+            "request": request,
+            "bot_options": app.state.CTX.bot_options,
+            "num_players": app.state.CTX.num_players,
+        },
+    )
+
+
+@app.get("/wait-bots", response_class=HTMLResponse)
+def wait_bots_page(
+    request: Request,
+    userid: Optional[str] = Cookie(None),
+):
+    if userid is None or userid not in app.state.CTX.userids:
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    if not app.state.CTX.needs_bot_selection:
+        return RedirectResponse(url="/game", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse(
+        "pages/wait_bots.html",
+        {"request": request},
+    )
+
+
+@app.get("/api/bots-ready", response_class=JSONResponse)
+def bots_ready():
+    return JSONResponse({"ready": not app.state.CTX.needs_bot_selection})
+
+
+@app.post("/select-bots", response_class=RedirectResponse)
+async def select_bots_submit(
+    request: Request,
+    userid: Optional[str] = Cookie(None),
+):
+    if userid is None or userid not in app.state.CTX.userids:
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    form = await request.form()
+    bots = form.getlist("bots")
+    app.state.CTX.set_bots(bots)
+    return RedirectResponse(url="/game", status_code=status.HTTP_302_FOUND)
 
 
 @app.get("/game", response_class=HTMLResponse)
@@ -381,12 +497,11 @@ def enter_custom(
     userid: Optional[str] = Cookie(None),
     username: Optional[str] = Cookie(None),
 ):
-    if userid is None or username is None:
-        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
-
-    if userid not in app.state.CTX.userids:
-        app.state.CTX.userids.append(userid)
-        app.state.CTX.usernames[userid] = username
+    if userid is None or username is None or userid not in app.state.CTX.userids:
+        response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+        response.delete_cookie("userid")
+        response.delete_cookie("username")
+        return response
 
     response = templates.TemplateResponse(
         "pages/index.html",
@@ -395,6 +510,7 @@ def enter_custom(
             "userid": userid,
             "username": username,
             "playerid": app.state.CTX.userids.index(userid),
+            "no_download": app.state.CTX.no_download,
         },
     )
     return response
@@ -441,13 +557,17 @@ async def process_data(data, websocket):
 @app.websocket("/ws/{userid}")
 async def websocket_endpoint(websocket: WebSocket, userid: str):
     print("got message from ", userid)
+    if userid not in app.state.CTX.userids:
+        await websocket.accept()
+        await websocket.send_json(json.dumps({"type": "invalid-session"}))
+        await websocket.close(code=1000)
+        return
     await app.state.CTX.manager.connect(websocket)
     try:
         while True:
             raw = await websocket.receive_text()
             await process_data(raw, websocket)
     except WebSocketDisconnect:
-        # FUG
         await app.state.CTX.manager.disconnect(websocket)
         username = app.state.CTX.usernames.get(userid, "Unknown Player")
         await app.state.CTX.manager.broadcast_string(f"Client {username} left the chat")
@@ -463,7 +583,9 @@ def make_CTX(app, d):
     if app.state.CTX is not None:
         return
     #
-    app.state.CTX = Context(d.num_players, d.bots)
+    app.state.CTX = Context(
+        d.num_players, d.bots, d.password, d.skip_bots, d.no_download, d.history_folder
+    )
     #
     print(
         f"\n\n\nTemporary files ignored\n",
@@ -486,6 +608,9 @@ def load_args():
         "-n", "--num-players", type=int, default=1, help="number of players"
     )
     parser.add_argument(
+        "--password", default="regi", help="password required to join the game"
+    )
+    parser.add_argument(
         "-b",
         "--add-bot",
         dest="bots",
@@ -493,12 +618,31 @@ def load_args():
         default=[],
         help="bot options: " + ",".join(strategy_map),
     )
+    parser.add_argument(
+        "--skip-bots",
+        dest="skip_bots",
+        action="store_true",
+        default=False,
+        help="skip bot selection when 2-4 human players are specified",
+    )
+    parser.add_argument(
+        "--no-download",
+        dest="no_download",
+        action="store_true",
+        default=False,
+        help="hide the Download JSON button at end of game",
+    )
+    parser.add_argument(
+        "--history-folder",
+        dest="history_folder",
+        default=None,
+        help="folder to save game history JSON files after each game",
+    )
     d = parser.parse_args()
     total_players = d.num_players + len(d.bots)
 
-    if total_players < 2:
-        print("ERROR: need to have at least 2 players, have only", total_players)
-        print("Use --add-bot to add a bot\n\n")
+    if d.skip_bots and d.num_players < 2:
+        print("ERROR --skip-bots requires at least 2 human players (-n 2 or more)\n\n")
         parser.print_help()
         sys.exit(1)
     if total_players > 4:
