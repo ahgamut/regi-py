@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "pybind11>=3", "python-multipart>=0.0.22", "fastapi>=0.116.1"]
+requires = ["setuptools>=61.0", "pybind11>=3", "python-multipart>=0.0.22", "fastapi>=0.116.1", "anyio>=4.10.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
