@@ -133,7 +133,7 @@ str_sub(sub4_duration_summaries_game$game.enemy_pile, start = 24, end = 24) <- "
 sub4_phase_count_summaries <- sub4 |>
   filter(event == "ENEMYKILL") |>
   group_by(game, team, sim) |>
-  mutate(kill_number = row_number()) |>
+  mutate(kill_number = row_number) |>
   left_join(sub4_team_members, by = "team")
 
 sub4_progress_summaries_game <- sub4_progress_df |>
@@ -145,15 +145,25 @@ sub4_progress_summaries_game <- sub4_progress_df |>
   mutate(game = reorder(factor(game), desc(mean_progress)))
 
 games_hardest9 <- tail(levels(sub4_progress_summaries_game$game), 9)
+games_hardest9_factor <- fct_inorder(factor(games_hardest9))
 
 kill_number_helper_df <- data.frame(kill_number = 1:12,
                                     kill_label = progress_labels[-1]) |>
   mutate(kill_label = factor(kill_label, levels = progress_labels[-1]))
 
+sub4_enemy_order_helper_df <- sub4_enemy_order |>
+  filter(game %in% games_hardest9) |>
+  arrange(factor(game, levels = games_hardest9)) |>
+  mutate(game = fct_inorder(game),
+         enemy_order = str_sub(game.enemy_pile, start = 1, end = 23),
+         enemy_order = fct_inorder(enemy_order))
+
 sub4_boxplots_df <- sub4_phase_count_summaries |>
   filter(game %in% games_hardest9) |>
   left_join(kill_number_helper_df, by = "kill_number") |>
-  mutate(game = factor(game, levels = games_hardest9)) 
+  left_join(sub4_enemy_order_helper_df, by = "game") |>
+  mutate(game = factor(game, levels = sub4_enemy_order_helper_df$game),
+         enemy_order = factor(enemy_order, levels = sub4_enemy_order_helper_df$enemy_order))
 
 sub4_phase_count_boxplots_game_worst <- sub4_boxplots_df |>
   ggplot(aes(x = kill_label,
@@ -165,5 +175,5 @@ sub4_phase_count_boxplots_game_worst <- sub4_boxplots_df |>
   theme_bw() +
   theme(panel.grid.minor.x = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1)) +
-  facet_wrap(~game)
+  facet_wrap(~enemy_order)
 ggsave("boxplots.png", plot = sub4_phase_count_boxplots_game_worst, width = 6, height = 4, units = "in", dpi = 1000)
