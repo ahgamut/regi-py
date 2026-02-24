@@ -10,8 +10,10 @@ import multiprocessing as mp
 from regi_py import JSONLog, DummyLog, GameState
 from regi_py import get_strategy_map
 from regi_py.strats import RandomStrategy
+from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
 
 STRATEGY_MAP = get_strategy_map()
+STRATEGY_MAP[MCTSExplorerStrategy.__strat_name__] = MCTSExplorerStrategy
 
 
 def create_teams(num_teams, num_players):
@@ -59,16 +61,13 @@ def save_single_game(output_folder, start_phase, team, i, j, k):
 
 
 def run_game_from_q(tid, output_folder, queue):
-    while True:
+    while not queue.empty():
         data = queue.get()
         start_phase, team, i, j, k = data
         try:
             save_single_game(output_folder, start_phase, team, i, j, k)
         except Exception as e:
             print(f"failed  {i, j, k} due to", e)
-
-        if queue.empty() and tid == 0:
-            return
 
 
 def save_config(mappings, output_folder):
@@ -101,7 +100,7 @@ def run_simulations(tid, mappings, output_folder, queue):
                 save_single_game(
                     output_folder, start_phases[i], teams[j], i + 1, j + 1, k + 1
                 )
-    run_game_from_q(tid, output_folder, queue)
+    # run_game_from_q(tid, output_folder, queue)
 
 
 def submain(mappings, output_folder, num_processes, queue_size):
@@ -113,15 +112,15 @@ def submain(mappings, output_folder, num_processes, queue_size):
         target=run_simulations, args=(0, mappings, output_folder, queue)
     )
     filler.start()
+    filler.join()
     #
-    for j in range(1, num_processes):
+    for j in range(num_processes):
         eater = mp.Process(target=run_game_from_q, args=(j, output_folder, queue))
         eater.start()
         processes.append(eater)
 
-    filler.join()
     for p in processes:
-        p.terminate()
+        p.join()
 
 
 def main():

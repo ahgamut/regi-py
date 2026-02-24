@@ -102,7 +102,7 @@ class MCTSNode:
 class MCTSExplorerStrategy(BaseStrategy):
     __strat_name__ = "mcts-explorer"
 
-    def __init__(self, iterations=2048, trim=True, weight=math.sqrt(2)):
+    def __init__(self, iterations=512, trim=True, weight=math.sqrt(2)):
         super(MCTSExplorerStrategy, self).__init__()
         self.iterations = iterations
         self.trim = trim
