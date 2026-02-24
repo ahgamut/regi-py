@@ -189,6 +189,102 @@ game <- left_join(game, strategy, join_by(game.active_player_id == id)) |>
 return(game)
 }
 
+# Function to read and parse a game JSON file
+parse_game_json_zip <- function(zip_path, json_path){
+# Read the raw game JSON file
+raw <- jsonlite::fromJSON(unz(zip_path, json_path), flatten = TRUE)
+
+# Flatten the combo column
+flattened_combos <- raw$combo |>
+  map(possibly(combo_flatten, otherwise = data.frame(value = NA, strength = NA), quiet = TRUE)) |>
+  bind_rows()
+
+# Create a new dataset called game
+# We will modify the game dataset until it has the form we want
+game <- bind_cols(raw, flattened_combos)
+  
+# Create 2 new columns (combo.value and combo.strenth)
+# as a result of flattening the combo list column
+game <- game |>
+  select(!combo) |>
+  relocate(all_of(c("value", "strength")), .after = "event") |>
+  rename(combo.value = value,
+         combo.strength = strength)
+
+# Update the player.cards and game.active_player.cards columns
+# to be strings instead of lists
+game <- game |>
+  mutate(player.cards = flatten_player.cards(player.cards = player.cards),
+         game.active_player.cards = flatten_player.cards(player.cards = game.active_player.cards))
+
+# Parse the combos used
+combos_used <- parse_combos_used(game$game.used_combos)
+
+# Create 2 new columns (used_combos.value and used_combos.strength)
+# as a result of parsing the game.used_combos column
+game <- bind_cols(game, combos_used)
+game <- game |>
+  select(!game.used_combos) |>
+  relocate(all_of(c("value", "strength")), .after = "game.status") |>
+  rename(used_combos.value = value,
+         used_combos.strength = strength)
+
+# Update the game.draw_pile, game.discard_pile, and game.enemy_pile columns
+# to be strings instead of lists
+game <- game |>
+  mutate(game.draw_pile = flatten_card_pile(game.draw_pile),
+         game.discard_pile = flatten_card_pile(game.discard_pile),
+        game.enemy_pile = flatten_card_pile(game.enemy_pile))
+
+# Parse the game.players column
+# Get first non-null element in the game.players column, which has player info
+is_null_player_info <- sapply(game$game.players, is.null)
+non_null_player_indices <- which(!is_null_player_info)
+player_info_index <- min(non_null_player_indices)
+player_info <- game$game.players[[player_info_index]]
+
+# Get the player strategies, which we will join with the rest of the data later
+strategy <- player_info |>
+  select(id, strategy)
+
+# Keep only id, alive, and num_cards for all non-null dataframes in the list
+game$game.players[non_null_player_indices] <- game$game.players[non_null_player_indices] |>
+  map(\(x) x |> select(id, alive, num_cards))
+
+# Create a new dataset for whether each player is alive and how many cards each player has
+game_players_pivot <- game |>
+  select(game.players) |>
+  mutate(row_id = 1:nrow(game)) |>
+  unnest(game.players) |>
+  pivot_wider(id_cols = row_id,
+              names_from = id,
+              names_sep = "_player_",
+              values_from = c(alive, num_cards))
+
+# Join the dataset with player information to the game dataset
+game <- game |>
+  mutate(row_id = 1:nrow(game)) |>
+  left_join(game_players_pivot, join_by("row_id")) |>
+  select(!c(row_id, game.players)) |>
+  relocate(starts_with(c("alive_player", "num_cards")), .after = "game.hand_size")
+
+# Join the game dataset with the strategy dataset
+game <- left_join(game, strategy, join_by(game.active_player_id == id)) |>
+  relocate(strategy, .after = "game.active_player_id")
+  
+# Keep only relevant events: 
+  # STARTGAME, ATTACK, DEFEND, ENEMYKILL, FULLBLOCK,
+  # FAILBLOCK, DECKEMPTY, ENDGAME, POSTGAME
+
+  game <- game |>
+    filter(event %in% c("STARTGAME", "ATTACK", "DEFEND",
+                        "ENEMYKILL", "FULLBLOCK", "FAILBLOCK",
+                        "DECKEMPTY", "ENDGAME", "POSTGAME"))
+
+# Return the parsed game JSON file
+return(game)
+}
+
 # test_game <- parse_game_json(json_path = "game_json/regi-1769630227033.json")
 # test_game2 <- parse_game_json(json_path = "game_json/regi-1769630521039.json")
 # win <- parse_game_json("game_json/first-win.json")
@@ -339,8 +435,8 @@ lineplot <- function(df, group, statistic, k = nrow(df), top = TRUE,
     labs(x = xlabel, y = ylabel) +
     theme_bw() +
     theme(panel.grid.major.y = element_blank(),
-        panel.grid.minor.x = element_blank(),
-        axis.text.x = element_text(angle = 45, hjust = 1))
+          panel.grid.minor.x = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1))
   return(lp)
 }
 
