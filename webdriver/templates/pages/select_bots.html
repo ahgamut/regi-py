@@ -1,0 +1,95 @@
+{% extends 'layouts/base.html' %}
+{% block title %}
+Select Bots
+{% endblock %}
+
+{% block includes %}
+<link rel="stylesheet" href="/static/minimal.css">
+<script>
+    window._serverData = {
+        botOptions: {{ bot_options | tojson }},
+        numPlayers: {{ num_players }},
+    };
+</script>
+{% endblock %}
+
+{% block body %}
+<div class="container page-top-spacing"
+     x-data="{
+        bots: [],
+        botOptions: window._serverData.botOptions,
+        numPlayers: window._serverData.numPlayers,
+        get minBots() { return Math.max(0, 2 - this.numPlayers) },
+        get maxBots() { return 4 - this.numPlayers },
+        get canSubmit() { return this.bots.length >= this.minBots && this.bots.length > 0 },
+        addBot(name) {
+            if (this.bots.length < this.maxBots) {
+                this.bots.push(name);
+            }
+        },
+        removeBot(index) {
+            this.bots.splice(index, 1);
+        }
+     }">
+    <div class="columns">
+        <div class="column is-one-third">
+            <div class="login-card scrollable-panel">
+                <h2 class="title is-5">Available Bots</h2>
+                <template x-for="(option, i) in botOptions" :key="i">
+                    <div class="field is-grouped mb-2">
+                        <span class="tag is-medium is-info bot-tag" x-text="option"></span>
+                        <button type="button" class="button is-small is-success ml-2"
+                                @click="addBot(option)"
+                                :disabled="bots.length >= maxBots">
+                            + Add
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+        <div class="column">
+            <div class="login-card">
+                <div class="has-text-centered">
+                    <h2 class="title is-4">Select Bots</h2>
+                    <p class="subtitle is-6">
+                        Players: <span x-text="numPlayers"></span> |
+                        Bots: <span x-text="bots.length"></span> / <span x-text="maxBots"></span>
+                    </p>
+                    <p class="mb-3" x-show="minBots > 0">
+                        <small>At least <span x-text="minBots"></span> bot(s) required</small>
+                    </p>
+                </div>
+
+                <div class="mb-4" x-show="bots.length > 0">
+                    <h3 class="title is-6">Selected Bots:</h3>
+                    <template x-for="(bot, i) in bots" :key="i">
+                        <div class="field is-grouped is-grouped-centered mb-1">
+                            <span class="tag is-medium is-primary bot-tag" x-text="bot"></span>
+                            <button type="button" class="button is-small is-danger ml-2" @click="removeBot(i)">Remove</button>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="has-text-centered mb-4" x-show="bots.length === 0">
+                    <p class="has-text-grey">No bots selected yet. Add bots from the list on the left.</p>
+                </div>
+
+                <form action="/select-bots" method="post">
+                    <template x-for="(bot, i) in bots" :key="'input-'+i">
+                        <input type="hidden" name="bots" :value="bot">
+                    </template>
+                    <div class="field has-text-centered">
+                        <div class="control">
+                            <button class="button is-primary is-medium"
+                                    type="submit"
+                                    :disabled="!canSubmit">
+                                Start Game
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

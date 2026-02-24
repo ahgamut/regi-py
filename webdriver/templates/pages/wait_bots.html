@@ -1,0 +1,36 @@
+{% extends 'layouts/base.html' %}
+{% block title %}
+Waiting for Bot Selection
+{% endblock %}
+
+{% block includes %}
+<link rel="stylesheet" href="/static/minimal.css">
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    <div class="columns is-centered">
+        <div class="column is-one-third">
+            <div class="login-card page-top-spacing"
+                 x-data="{ polling: null }"
+                 x-init="
+                    polling = setInterval(async () => {
+                        let resp = await fetch('/api/bots-ready', {credentials: 'include'});
+                        let data = await resp.json();
+                        if (data.ready) {
+                            clearInterval(polling);
+                            window.location.href = '/game';
+                        }
+                    }, 2000)
+                 ">
+                <div class="has-text-centered">
+                    <h2 class="title is-4">Waiting for Bot Selection</h2>
+                    <p class="subtitle is-6">The first player is choosing the bots for this game.</p>
+                    <progress class="progress is-primary" max="100"></progress>
+                    <p class="is-size-7 has-text-grey">You will be redirected automatically once bots are selected.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

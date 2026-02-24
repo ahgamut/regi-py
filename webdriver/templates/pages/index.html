@@ -19,6 +19,9 @@ document.addEventListener('alpine:init', () => {
         redirection: false,
         data: null,
         history: [],
+        knownUsernames: { {{ playerid }}: "{{ username }}" },
+        sideButtonActive: false,
+        noDownload: {{ 'true' if no_download else 'false' }},
     })
     init_ws()
 })
@@ -28,7 +31,7 @@ document.addEventListener('alpine:init', () => {
 
 {% block body %}
 <div class="container" x-data="{ activeTab: 'game' }" >
-    <div class="tabs is-boxed">
+    <div class="tabs is-boxed is-hidden-tablet">
         <ul>
             <li :class="{ 'is-active': activeTab === 'game' }">
                 <a @click="activeTab = 'game'">Game</a>
@@ -38,45 +41,46 @@ document.addEventListener('alpine:init', () => {
             </li>
         </ul>
     </div>
-    <div id="outputspot" class="card is-fullwidth" style="min-height: 400px; border: 1px solid black;" x-show="activeTab === 'game'">
+    <div id="outputspot" class="card is-fullwidth" :class="{ 'is-hidden-mobile': activeTab !== 'game' }">
         <h1 class="title" x-text="'Game State'"></h1>
-        <div id="game-overall" style="min-height: 320px; border: 1px solid black;">
-            <div class="columns is-vcentered">
-                <div class="column is-one-quarter" x-show="$store.gamestate.statusz == 'RUNNING'">
-                    <div id="game-view">
-                    </div>
+        <div id="game-overall">
+            <div class="columns is-multiline is-mobile">
+                <div class="column is-full-mobile is-3-tablet" x-show="$store.gamestate.statusz != 'LOADING'">
+                    <div id="piles-view"></div>
+                    <div id="players-view"></div>
                 </div>
-                <div class="column is-one-quarter has-text-centered" x-show="$store.gamestate.statusz == 'RUNNING'">
-                    <div id="enemy-view">
-                    </div>
+                <div class="column is-half-mobile is-1-tablet has-text-centered" x-show="$store.gamestate.statusz != 'LOADING'">
+                    <div id="enemy-view"></div>
                 </div>
-                <div class="column"  x-show="$store.gamestate.statusz == 'RUNNING'">
-                    <h1 id="player-should" class="subtitle" x-show="$store.gamestate.myTurn" x-text="$store.gamestate.playerShould"></h1>
+                <div class="column is-half-mobile is-2-tablet has-text-centered" x-show="$store.gamestate.statusz != 'LOADING'">
+                    <div id="combos-view"></div>
+                </div>
+                <div class="column is-full-mobile is-6-tablet" x-show="$store.gamestate.statusz != 'LOADING'">
                     <div x-show="!($store.gamestate.redirection)">
                         <h1 class="subtitle" x-text="'Your cards'" ></h1>
-                        <div id="player-cards">
-                        </div>
+                        <div id="player-cards"></div>
                     </div>
                     <div x-show="$store.gamestate.redirection">
                         <h1 class="subtitle" x-text="'Other Players'" ></h1>
-                        <div id="other-players">
-                        </div>
+                        <div id="other-players"></div>
                     </div>
+                    <h1 id="player-should" class="subtitle" x-text="$store.gamestate.playerShould"></h1>
+                </div>
+            </div>
+            <div id="action-row">
+                <div id="notif-bar">
+                    <div id="turn-message"></div>
+                </div>
+                <div id="submit-zone">
+                    <div id="main-button" class="control button is-large is-primary" x-on:click="mainButtonRedirect()" x-text="mainButtonText()"></div>
+                    <div id="side-button" class="control button is-large is-secondary" x-show="sideButtonText() != '<hide>' && $store.gamestate.sideButtonActive" x-on:click="sideButtonRedirect()" x-text="sideButtonText()"></div>
                 </div>
             </div>
         </div>
-        <div class="columns is-vcentered">
-            <div id="turn-message" class="column is-two-fifths"></div>
-            <div class="column is-one-fifth"></div>
-            <div id="submit-zone" class="column is-two-fifths">
-                <div id="main-button" class="control button is-large is-primary" x-on:click="mainButtonRedirect()" x-text="mainButtonText()"></div>
-                <div id="side-button" class="control button is-large is-secondary" x-show="sideButtonText() != '<hide>'" x-on:click="sideButtonRedirect()" x-text="sideButtonText()"></div>
-            </div>
-        </div>
     </div>
-    <div id="logging" class="card is-fullwidth" style="border: 1px solid black;" x-show="activeTab === 'log'">
+    <div id="logging" class="card is-fullwidth" :class="{ 'is-hidden-mobile': activeTab !== 'log' }">
         <h1 class="title" x-text="'Message Log'"></h1>
-        <div class="card-content" style="min-height: 400px; max-height: 500px; overflow-y: scroll;">
+        <div class="card-content log-content">
             <ul id='messages'>
             </ul>
         </div>
