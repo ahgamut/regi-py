@@ -386,11 +386,11 @@ return(game_diagram)
 # win_diagrams <- win_list |>
 #     map(\(x) diagram_game_phase(x))
 
-progress_breaks <- c(20, 40, 60, 80, 
+progress_breaks <- c(0, 20, 40, 60, 80, 
                      110, 140, 170, 200,
                     240, 280, 320, 360)
 
-progress_labels <- c("1st Jack", "2nd Jack", "3rd Jack", "4th Jack",
+progress_labels <- c("Start", "1st Jack", "2nd Jack", "3rd Jack", "4th Jack",
                      "1st Queen", "2nd Queen", "3rd Queen", "4th Queen",
                     "1st King", "2nd King", "3rd King", "Win")
 

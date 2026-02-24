@@ -151,14 +151,18 @@ big_mapping_json <- jsonlite::fromJSON(unz(glue::glue("{tempdir()}/big-sub4.zip"
 file_list_games <- file_list |>
   filter(!(Name %in% c("mp4/", "mp4/mappings.json"))) 
 
+set.seed(20260223)
+file_list_games_sample <- file_list_games |>
+  slice_sample(n = 10000)
+
 zip_path <- glue::glue("{tempdir()}/big-sub4.zip")
 
 tic()
-parsed_game_jsons <- file_list_games$Name |>
+parsed_game_jsons <- file_list_games_sample$Name |>
   map(possibly(\(x) parse_game_json_zip(zip_path, x), otherwise = NULL, quiet = FALSE))
 toc()
 
-sim_setup <- str_sub(file_list_games$Name, start = 5, end = 26)
+sim_setup <- str_sub(file_list_games_sample$Name, start = 5, end = 26)
 names(parsed_game_jsons) <- sim_setup
 
 good_games <- parsed_game_jsons |>
@@ -171,6 +175,10 @@ good_games_df <- good_games_df |>
          team = str_sub(id, start = 14, end = 16),
          sim = str_sub(id, start = 21, end = 22)) |>
   select(!id)
+
+# write.csv(good_games_df, file = glue::glue("{tempdir()}/big-sub4-sample10k-parsed.csv", row.names = FALSE))
+# box_ul(dir_id = 367580430905, 
+#          file = glue::glue("{tempdir()}/big-sub4-sample10k-parsed.csv"))
 
 enemy_order <- good_games_df |>
   filter(event == "STARTGAME") |>
@@ -209,7 +217,7 @@ progress_summaries_team_plot <- progress_summaries_team |>
 progress_summaries_team_plot_top10 <- progress_summaries_team_plot |>
   filter(team %in% head(levels(team), 10))
 
-ggplot(data = progress_summaries_team_plot_top10,
+progress_top10_plot <- ggplot(data = progress_summaries_team_plot_top10,
                             mapping = aes(x = value,
                                           y = team,
                                           group = team,
@@ -219,8 +227,13 @@ ggplot(data = progress_summaries_team_plot_top10,
     stat_summary(fun = "max", geom = "point", size = 3) + 
     stat_summary(fun = "min", geom = "point", size = 3) + 
     theme_bw()+
-    theme(legend.position = "none")+
-    expand_limits(x = 0)+
+    theme(legend.position = "none",
+          panel.grid.major.y = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1))+
+    scale_x_continuous(breaks = progress_breaks,
+                       labels = progress_labels,
+                       limits = c(0, 360)) + 
     scale_y_discrete(limits = rev) + 
     scale_color_viridis_d(option = "viridis", begin = 0, end = 0.85) +
     labs(x = "Progress", 
@@ -229,7 +242,7 @@ ggplot(data = progress_summaries_team_plot_top10,
 progress_summaries_team_plot_bottom10 <- progress_summaries_team_plot |>
   filter(team %in% tail(levels(team), 10))
 
-ggplot(data = progress_summaries_team_plot_bottom10,
+progress_bottom10_plot <- ggplot(data = progress_summaries_team_plot_bottom10,
                             mapping = aes(x = value,
                                           y = team,
                                           group = team,
@@ -239,8 +252,13 @@ ggplot(data = progress_summaries_team_plot_bottom10,
     stat_summary(fun = "max", geom = "point", size = 3) + 
     stat_summary(fun = "min", geom = "point", size = 3) + 
     theme_bw()+
-    theme(legend.position = "none")+
-    expand_limits(x = 0)+
+    theme(legend.position = "none",
+          panel.grid.major.y = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1))+
+    scale_x_continuous(breaks = progress_breaks,
+                       labels = progress_labels,
+                       limits = c(0, 360)) + 
     scale_y_discrete(limits = rev) +
     scale_color_viridis_d(option = "viridis", begin = 0, end = 0.85) +
     labs(x = "Progress", 
@@ -275,28 +293,35 @@ phase_count_summaries <- good_games_df |>
 str_sub(phase_count_summaries$game.enemy_pile, start = 12, end = 12) <- "\n"
 str_sub(phase_count_summaries$game.enemy_pile, start = 24, end = 24) <- "\n"
 
-phase_count_boxplots <- phase_count_summaries |>
-  ggplot(aes(x = kill_number,
-             y = game.phase_count,
-            group = kill_number)) +
-  geom_boxplot() +
-  labs(x = "Enemy Kill Number",
-       y = "Phase Number") +
-  theme_bw() +
-  theme(panel.grid.minor.x = element_blank())
+phase_count_summaries_worst <- phase_count_summaries |>
+  group_by(game) |>
+  mutate(mean_phase_count = mean(game.phase_count, na.rm = TRUE),
+         game = as.factor(game),
+         game = reorder(factor(game), desc(mean_phase_count))) |>
+  filter(game %in% tail(levels(game), 10))
 
-phase_count_boxplots_team <- phase_count_summaries |>
-  ggplot(aes(x = kill_number,
-             y = game.phase_count,
-             group = kill_number)) +
-  geom_boxplot() +
-  labs(x = "Enemy Kill Number",
-       y = "Phase Number") +
-  theme_bw() +
-  theme(panel.grid.minor.x = element_blank()) +
-  facet_wrap(~teammates)
+# phase_count_boxplots <- phase_count_summaries |>
+#   ggplot(aes(x = kill_number,
+#              y = game.phase_count,
+#             group = kill_number)) +
+#   geom_boxplot() +
+#   labs(x = "Enemy Kill Number",
+#        y = "Phase Number") +
+#   theme_bw() +
+#   theme(panel.grid.minor.x = element_blank())
 
-phase_count_boxplots_game <- phase_count_summaries |>
+# phase_count_boxplots_team <- phase_count_summaries |>
+#   ggplot(aes(x = kill_number,
+#              y = game.phase_count,
+#              group = kill_number)) +
+#   geom_boxplot() +
+#   labs(x = "Enemy Kill Number",
+#        y = "Phase Number") +
+#   theme_bw() +
+#   theme(panel.grid.minor.x = element_blank()) +
+#   facet_wrap(~teammates)
+
+phase_count_boxplots_game_worst <- phase_count_summaries_worst |>
   ggplot(aes(x = kill_number,
              y = game.phase_count,
             group = kill_number)) +
