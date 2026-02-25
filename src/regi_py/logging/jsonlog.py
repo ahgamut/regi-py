@@ -6,7 +6,7 @@ import json
 class RegiEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, GameState):
-            return dump_game(obj)
+            return dump_debug(obj)
         elif isinstance(obj, Player):
             return dump_player(obj)
         elif isinstance(obj, Enemy):
@@ -43,7 +43,7 @@ class JSONBaseLog(BaseLog):
         self.log({"event": "STARTGAME", "game": dump_debug(game)})
 
     def endgame(self, reason, game):
-        self.log({"event": "ENDGAME", "game": dump_game(game)})
+        self.log({"event": "ENDGAME", "game": dump_debug(game)})
 
     def postgame(self, game):
         self.log({"event": "POSTGAME", "game": dump_debug(game)})
@@ -123,7 +123,7 @@ class JSONBaseLog(BaseLog):
     ####
 
     def state(self, game):
-        self.log({"event": "STATE", "game": dump_game(game)})
+        self.log({"event": "STATE", "game": dump_debug(game)})
 
     def debug(self, game):
         self.log({"event": "DEBUG", "game": dump_debug(game)})
