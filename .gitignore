@@ -1,5 +1,7 @@
 
 *.pt
+*.zip
+*.csv
 weights
 *.json
 main
