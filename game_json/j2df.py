@@ -4,6 +4,7 @@ import glob
 import argparse
 import os
 import zipfile
+import hashlib
 
 IGNORE_EVENTS = ("STATE", "REPLENISH", "DRAWONE")
 
@@ -78,10 +79,8 @@ PLAYERINFO = [
     "game.players.3.strategy",
 ]
 
-# TODO (ahgamut): calculate SHA256 to use as game ID?
-# is each JSON file guaranteed to have only one game?
-# can team be constructed using just the ingame info?
 FILEMETA = [
+    "file",
     "game",
     "team",
     "sim",
@@ -153,8 +152,8 @@ def proc_colname(obj, name):
     return o0
 
 
-def proc_event(event, game, team, sim):
-    row = [game, team, sim]
+def proc_event(event, file, game, team, sim):
+    row = [file, game, team, sim]
     for colname in COLNAMES + PLAYERINFO:
         row.append(proc_colname(event, colname))
     return row
@@ -168,25 +167,69 @@ def get_metas(fname):
     if len(parts) < 3:
         parts = parts + padding[len(parts) :]
     g, t, s = parts[:3]
-    return g.replace("game", "g"), t.replace("team", "t"), s.replace("sim", "s")
+    return bname, s.replace("sim", "s")
+
+
+def team_fixed(objs, fname):
+    teams = set()
+    for o in objs:
+        if "game" in o:
+            if "players" in o["game"]:
+                t0 = [x["strategy"] for x in o["game"]["players"]]
+                t1 = "|".join(t0)
+                teams.add(t1)
+
+    teams = list(teams)
+    assert (
+        len(teams) == 1
+    ), f"events in {fname} don't have a fixed team {teams}. multiple games?"
+    return teams[0]
+
+
+def game_digest(objs):
+    raw = json.dumps(objs).encode("utf-8")
+    h = hashlib.blake2b(digest_size=32)
+    h.update(raw)
+    return h.hexdigest()
+
+
+def group_games(objs, fname):
+    count = 0
+    results = [{"events": []}]
+    for o in objs:
+        results[count]["events"].append(o)
+        if o.get("event", "STATE") == "POSTGAME":
+            results.append({"events": []})
+            count += 1
+
+    for g in results[:count]:
+        g["team"] = team_fixed(g["events"], fname)
+        g["game"] = game_digest(g["events"])
+
+    return results[:count]
 
 
 def proc_file(fname, z=None):
     print(f"processing {fname}")
-    game, team, sim = get_metas(fname)
+    bname, sim = get_metas(fname)
     if z is not None:
         try:
-            events = json.load(z.open(fname))
+            logs = json.load(z.open(fname))
         except Exception as e:
             print("skipped", fname, e)
             return []
     else:
-        events = json.load(open(fname))
+        logs = json.load(open(fname))
+
+    games = group_games(logs, bname)
     rows = []
-    for e in events:
-        if e.get("event", "STATE") in IGNORE_EVENTS:
-            continue
-        rows.append(proc_event(e, game, team, sim))
+    for g in games:
+        team = g["team"]
+        game = g["game"]
+        for e in g["events"]:
+            if e.get("event", "STATE") in IGNORE_EVENTS:
+                continue
+            rows.append(proc_event(e, bname, game, team, sim))
     return rows
 
 
