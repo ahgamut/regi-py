@@ -2,8 +2,22 @@ from regi_py.core import BaseStrategy
 from regi_py.core import RandomStrategy
 from regi_py.strats.phase_utils import *
 from regi_py.strats.sub_random import SubsetRandomStrategy
+
+#
 import random
 import math
+from dataclasses import dataclass
+from typing import Tuple, Optional
+
+
+@dataclass(slots=True)
+class MCTSNodeInfo:
+    phase: str
+    value: float
+    N0: int  # visits of this node
+    N1: Tuple[int]  # uses of combos from this node
+    combos: Tuple[str]
+    offset: int  # nonzero if a redirect happened, the offset from the current player
 
 
 class MCTSNode:
@@ -39,6 +53,22 @@ class MCTSNode:
 
     def is_terminal(self):
         return self.root_phase.game_endvalue != 0
+
+    def export(self):
+        combos = []
+        policy = []
+        for c in self.children:
+            combos.append(str(c.prev_combo))
+            policy.append(c.visits)
+
+        return MCTSNodeInfo(
+            phase=str(self.root_phase),
+            value=self.value,
+            N0=self.visits,
+            N1=tuple(policy),
+            combos=tuple(combos),
+            offset=0,  # zero means no redirect happened from this move
+        )
 
     @property
     def best_child_node(self):
@@ -89,7 +119,10 @@ class MCTSNode:
         s = enemy_hp_left(node.root_phase)
         e = enemy_hp_left(end_game)
         end_value = (s - e) / s
-        return end_value
+        # penalize games that are immediate losses (throwy)
+        if end_game.phase_count <= 2 and e > 0:
+            return -1
+        return float(e <= 0)
 
     @staticmethod
     def update(node, reward):
@@ -154,3 +187,39 @@ class MCTSExplorerStrategy(BaseStrategy):
     def getDefenseIndex(self, combos, player, damage, game):
         ind = self.process_phase(game.export_phaseinfo(), combos)
         return ind
+
+
+class MCTSSaverStrategy(MCTSExplorerStrategy):
+    __strat_name__ = "mcts-saver"
+
+    def __init__(self, iterations=512, trim=True, weight=math.sqrt(2)):
+        super(MCTSSaverStrategy, self).__init__(iterations, trim, weight)
+        self.history = []
+
+    def getRedirectIndex(self, player, game):
+        root_node = self.simulate_node(game.export_phaseinfo())
+        best_phase = root_node.best_next_phase
+        ct = -1
+        for i, p in enumerate(root_node.children):
+            if p.visits > ct and p.root_phase.active_player != player.id:
+                ct = p.visits
+                best_phase = p.root_phase
+        if best_phase.active_player != player.id:
+            next_player = best_phase.active_player
+        else:
+            offset = random.randint(1, game.num_players - 1)
+            # redirect because previous attack was JOKER
+            self.history[-1].offset = offset
+            next_player = (game.active_player + offset) % game.num_players
+        return next_player
+
+    def process_phase(self, phase, combos):
+        root_node = self.simulate_node(phase)
+        best_combo = root_node.best_combo
+        self.history.append(root_node.export())
+        # for i, x in enumerate(root_node.children):
+        #    print(x.prev_combo, x.visits / root_node.visits)
+        for ind, c in enumerate(combos):
+            if c.bitwise == best_combo.bitwise:
+                return ind
+        return -1

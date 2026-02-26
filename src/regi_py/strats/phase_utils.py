@@ -29,8 +29,8 @@ def defend_throwing(ind, game, combos, score_only=False):
         c_blk = c.base_defense
         c_dsc = len(c.parts)
         if c_dsc < num_discards and c_blk <= sel_blk:
-            lower_poss += 3
-    lower_prob = min(1.0, lower_poss / len(combos))
+            lower_poss += 0.5
+    lower_prob = min(0.99, lower_poss)
     if score_only:
         return lower_prob
     return random.random() <= lower_prob
