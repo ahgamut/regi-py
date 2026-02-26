@@ -119,10 +119,12 @@ class MCTSNode:
         s = enemy_hp_left(node.root_phase)
         e = enemy_hp_left(end_game)
         end_value = (s - e) / s
+        if e <= 0:
+            return 3
         # penalize games that are immediate losses (throwy)
-        if end_game.phase_count <= 2 and e > 0:
+        if end_game.phase_count <= 3:
             return -1
-        return float(e <= 0)
+        return end_game.phase_count / 50
 
     @staticmethod
     def update(node, reward):
