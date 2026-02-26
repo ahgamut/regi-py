@@ -28,7 +28,7 @@ def run_single_game(tid, i, num_bots, num_iterations):
     end_phase = game.export_phaseinfo()
     history = strat.history
     win = float(end_phase.game_endvalue == 1)
-    diff = (s0 - s1) / s0
+    diff = (360 - s1) / 360
     for info in history:
         info.value = diff
     print(f"{tid, i},{game.phase_count}p,{s0,s1},{dt:.4f}s,{win}")
