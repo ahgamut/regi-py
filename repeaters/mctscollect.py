@@ -10,7 +10,16 @@ import msgpack
 
 #
 from regi_py import JSONLog, DummyLog, GameState
-from regi_py.strats.mcts_explorer import MCTSSaverStrategy
+from regi_py.strats.mcts_explorer import MCTSSaverStrategy, MCTSNode
+
+
+def simulate_node(root_node, iterations):
+    for i in range(iterations):
+        node = MCTSNode.select(root_node)
+        if not node.is_terminal():
+            node = MCTSNode.expand(node)
+        reward = MCTSNode.simulate(node)
+        MCTSNode.update(node, reward)
 
 
 def run_single_game(tid, i, num_bots, num_iterations):
@@ -21,17 +30,25 @@ def run_single_game(tid, i, num_bots, num_iterations):
     for _ in range(num_bots):
         game.add_player(strat)
     game.initialize()
-    s0 = sum(max(x.hp, 0) for x in game.enemy_pile)
-    game.start_loop()
-    s1 = sum(max(x.hp, 0) for x in game.enemy_pile)
+    start_phase = game.export_phaseinfo()
+    #
+    history = []
+    node = MCTSNode(start_phase, trim=True, weight=1.414)
+    s0 = sum(max(x.hp, 0) for x in node.root_phase.enemy_pile)
+    while node.root_phase.game_endvalue == 0:
+        simulate_node(node, num_iterations)
+        history.append(node.export())
+        node = node.best_child_node
+        node.parent = None
+    history.append(node.export())
+    win = float(node.root_phase.game_endvalue == 1)
+    s1 = sum(max(x.hp, 0) for x in node.root_phase.enemy_pile)
+    #
     dt = time.time() - a
-    end_phase = game.export_phaseinfo()
-    history = strat.history
-    win = float(end_phase.game_endvalue == 1)
     diff = (360 - s1) / 360
     for info in history:
         info.value = diff
-    print(f"{tid, i},{game.phase_count}p,{s0,s1},{dt:.4f}s,{win}")
+    print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}")
     return history
 
 

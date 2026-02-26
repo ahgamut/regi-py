@@ -118,13 +118,19 @@ class MCTSNode:
         end_game, _ = quick_game_sim(node.root_phase, strat_klass=SubsetRandomStrategy)
         s = enemy_hp_left(node.root_phase)
         e = enemy_hp_left(end_game)
-        end_value = (s - e) / s
+        end_value = (360 - e) / 360
+        pacing = (s - e) / end_game.phase_count
+        reward = end_game.phase_count / 50
+        #
         if e <= 0:
             return 3
         # penalize games that are immediate losses (throwy)
         if end_game.phase_count <= 3:
             return -1
-        return end_game.phase_count / 50
+        # penalize games that are too slow-paced
+        if pacing < 3:
+            return reward / 2
+        return reward
 
     @staticmethod
     def update(node, reward):
