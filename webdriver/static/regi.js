@@ -548,7 +548,7 @@ function learnUsernames(data) {
 
 function getDisplayName(player) {
     let g = Alpine.store('gamestate');
-    if (player.strategy === "player-webui") {
+    if (player.strategy && player.strategy.startsWith("player-webui")) {
         let name = player.username || g.knownUsernames[player.id];
         if (name) return name;
     }

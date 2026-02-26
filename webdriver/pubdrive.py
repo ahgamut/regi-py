@@ -133,6 +133,7 @@ class WebPlayerStrategy(BaseStrategy):
 
     def __init__(self, userid, username, websocket, ctx):
         super().__init__()
+        self.__strat_name__ = f"player-webui-{username}"
         self.userid = userid
         self.username = username
         self.websocket = websocket
@@ -452,6 +453,11 @@ def read_root(request: Request):
 
 @app.post("/login", response_class=RedirectResponse)
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    if len(username) > 16 or len(password) > 16:
+        return templates.TemplateResponse(
+            "pages/login.html",
+            {"request": request, "error": "Username and password must be 16 characters or less."},
+        )
     if password != app.state.config["password"]:
         return templates.TemplateResponse(
             "pages/login.html", {"request": request, "error": "Incorrect password."}
