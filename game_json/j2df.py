@@ -187,8 +187,23 @@ def team_fixed(objs, fname):
 
 
 def game_digest(objs):
-    raw = json.dumps(objs).encode("utf-8")
-    h = hashlib.blake2b(digest_size=32)
+    start = None
+    for o in objs:
+        if o.get("event", "STATE") == "STARTGAME":
+            start = o.get("game", dict())
+            break
+    if start is None:
+        start = o[0].get("game", dict())
+
+    sub = []
+    for x0 in start.get("players", []):
+        sub.append(x0.get("cards", []))
+    sub.append(x0.get("draw_pile", []))
+    sub.append(x0.get("discard_pile", []))
+    sub.append(x0.get("enemy_pile", []))
+
+    raw = json.dumps(sub).encode("utf-8")
+    h = hashlib.blake2b(digest_size=16)
     h.update(raw)
     return h.hexdigest()
 
@@ -212,14 +227,14 @@ def group_games(objs, fname):
 def proc_file(fname, z=None):
     print(f"processing {fname}")
     bname, sim = get_metas(fname)
-    if z is not None:
-        try:
+    try:
+        if z is not None:
             logs = json.load(z.open(fname))
-        except Exception as e:
-            print("skipped", fname, e)
-            return []
-    else:
-        logs = json.load(open(fname))
+        else:
+            logs = json.load(open(fname))
+    except Exception as e:
+        print("skipped", fname, e)
+        return []
 
     games = group_games(logs, bname)
     rows = []
