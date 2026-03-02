@@ -90,21 +90,27 @@ def intify(s):
         return s
 
 
-def l1_list(lst):
-    return "|".join([str(x) for x in lst])
+def l1_list(lst, ch="|"):
+    return ch.join([str(x) for x in lst])
 
 
 def l2_list(lst):
-    l0 = [l1_list(x) for x in lst]
+    l0 = [l1_list(x, "&") for x in lst]
     return ";".join(l0)
 
 
 def proc_colname(obj, name):
     if "used_combos." in name:
-        if "used_combos" not in obj:
+        if "used_combos" not in obj.get("game", ""):
             return None
         key = name.split(".")[-1]
-        ll = [x[key] for x in obj["used_combos"]]
+        ll = []
+        if key == "value":
+            for x0 in obj["game"]["used_combos"]:
+                ll.append([x1[key] for x1 in x0])
+        else:
+            for x0 in obj["game"]["used_combos"]:
+                ll.append([x1[key] for x1 in x0])
         return l2_list(ll)
     elif "combo." in name:
         if "combo" not in obj:
