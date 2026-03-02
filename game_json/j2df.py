@@ -9,8 +9,6 @@ import hashlib
 IGNORE_EVENTS = ("STATE", "REPLENISH", "DRAWONE")
 
 COLNAMES = [
-    "alive_player_0",
-    "alive_player_1",
     "combo.strength",
     "combo.value",
     "damage",
@@ -43,9 +41,6 @@ COLNAMES = [
     "game.progress",
     "game.status",
     "maxblock",
-    "n_cards",
-    "num_cards_player_0",
-    "num_cards_player_1",
     "player.alive",
     "player.cards",
     "player.id",
@@ -57,26 +52,26 @@ COLNAMES = [
 ]
 
 PLAYERINFO = [
-    "game.players.0.alive",
-    "game.players.0.cards",
     "game.players.0.id",
-    "game.players.0.num_cards",
+    "game.players.0.alive",
     "game.players.0.strategy",
-    "game.players.1.alive",
-    "game.players.1.cards",
+    "game.players.0.num_cards",
+    "game.players.0.cards",
     "game.players.1.id",
-    "game.players.1.num_cards",
+    "game.players.1.alive",
     "game.players.1.strategy",
-    "game.players.2.alive",
-    "game.players.2.cards",
+    "game.players.1.num_cards",
+    "game.players.1.cards",
     "game.players.2.id",
-    "game.players.2.num_cards",
+    "game.players.2.alive",
     "game.players.2.strategy",
-    "game.players.3.alive",
-    "game.players.3.cards",
+    "game.players.2.num_cards",
+    "game.players.2.cards",
     "game.players.3.id",
-    "game.players.3.num_cards",
+    "game.players.3.alive",
     "game.players.3.strategy",
+    "game.players.3.num_cards",
+    "game.players.3.cards",
 ]
 
 FILEMETA = [
@@ -105,17 +100,7 @@ def l2_list(lst):
 
 
 def proc_colname(obj, name):
-    if "_player_0" in name:
-        if "game" not in obj:
-            return None
-        key = name.replace("_player_0", "")
-        return proc_colname(obj["game"]["players"][0], key)
-    elif "_player_1" in name:
-        if "game" not in obj:
-            return None
-        key = name.replace("_player_1", "")
-        return proc_colname(obj["game"]["players"][1], key)
-    elif "used_combos." in name:
+    if "used_combos." in name:
         if "used_combos" not in obj:
             return None
         key = name.split(".")[-1]
@@ -128,11 +113,15 @@ def proc_colname(obj, name):
         ll = [x[n1] for x in obj["combo"]]
         return l1_list(ll)
     elif "players." in name:
-        if "players" not in obj:
+        if "game" not in obj:
             return None
-        _, pid, key = name.split(".")
-        pid = intify(s)
-        return proc_colname(obj["players"][pid], key)
+        if "players" not in obj["game"]:
+            return None
+        _, _, pid, key = name.split(".")
+        pid = intify(pid)
+        if pid >= len(obj["game"]["players"]):
+            return None
+        return proc_colname(obj["game"]["players"][pid], key)
 
     subs = name.split(".")
     o0 = obj
