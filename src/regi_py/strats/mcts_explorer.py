@@ -121,12 +121,22 @@ class MCTSNode:
         end_value = (360 - e) / 360
         pacing = (s - e) / end_game.phase_count
         reward = end_game.phase_count / 50
-        #
-        if e <= 0:
-            return 3
         # penalize games that are immediate losses (throwy)
-        if end_game.phase_count <= 3:
+        if end_game.phase_count <= 3 and e > 0:
             return -1
+        # more if checkpoints are crossed
+        if s > 280 and e <= 220:
+            reward += end_value
+        if s > 220 and e <= 160:
+            reward += end_value
+        if s > 160 and e <= 120:
+            reward += end_value
+        if s > 120 and e <= 80:
+            reward += end_value
+        if s > 80 and e <= 40:
+            reward += end_value
+        if s > 40 and e <= 0:
+            reward += (3 * end_value)
         # penalize games that are too slow-paced
         if pacing < 3:
             return reward / 2
