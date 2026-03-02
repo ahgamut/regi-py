@@ -292,11 +292,11 @@ return(game)
 # Function to make a diagram of a Regicide game game phase
 # (i.e., one row of a parsed )
 diagram_game_phase <- function(turn){
-
+  # Add player strategy
   plotdf <- turn |>
   select(event, game.active_player_id, combo.value,
     game.phase_count, player.cards,
-    starts_with("num_cards_player"), used_combos.value,
+    matches("game\\.players\\..\\.num_cards"), used_combos.value,
     game.draw_pile_size, game.discard_pile_size,
     game.enemy_pile_size,
     game.current_enemy.value, game.current_enemy.hp
@@ -315,8 +315,8 @@ diagram_game_phase <- function(turn){
     `Current Enemy HP` = game.current_enemy.hp
   ) |>
   rename_with(
-    ~paste0("Number of Cards for Player ", str_sub(.x, 18)),
-    .cols = starts_with("num_cards_player")
+    ~paste0("Number of Cards for Player ", str_sub(.x, start = 14, end = 14)),
+    .cols = matches("game\\.players\\..\\.num_cards")
   ) |>
   mutate(across(
     c(`Game Phase Count`, `Tavern Deck Size`, `Discard Pile Size`, 
