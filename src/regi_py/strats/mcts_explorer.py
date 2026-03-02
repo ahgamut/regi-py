@@ -123,7 +123,13 @@ class MCTSNode:
         reward = end_game.phase_count / 50
         # penalize games that are immediate losses (throwy)
         if end_game.phase_count <= 3 and e > 0:
-            return -1
+            if s > 280:
+                return -1
+            if s > 220:
+                return -0.5
+            if s > 160:
+                return -0.25
+            return -0.125
         # more if checkpoints are crossed
         if s > 280 and e <= 220:
             reward += end_value
