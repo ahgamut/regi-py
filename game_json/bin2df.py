@@ -214,6 +214,7 @@ def argmax(lst):
     for i, x in enumerate(lst):
         if x > mvx:
             ind = i
+            mvx = x
     return ind
 
 def multi(game, cmb):
@@ -267,6 +268,7 @@ def phase_str_to_game_dct(info):
     if len(info["combos"]) > 0:
         selected_ind = int(argmax(info["N1"]))
         selected_combo = info["combos"][selected_ind]
+        # print(info["combos"], info["N1"], selected_ind, selected_combo)
         cmb = []
         for x in acp.cards:
             if str(x) in selected_combo:
@@ -285,11 +287,14 @@ def group_games(objs, fname):
     count = 0
     results = [{"events": []}]
     for o in objs:
-        r = phase_str_to_game_dct(o)
-        results[count]["events"].append(r)
-        if r["last"]:
-            results.append({"events": []})
-            count += 1
+        try:
+            r = phase_str_to_game_dct(o)
+            results[count]["events"].append(r)
+            if r["last"]:
+                results.append({"events": []})
+                count += 1
+        except Exception as e:
+            print("state loading error:", e)
 
     for g in results[:count]:
         g["game"] = game_digest(g["events"])
