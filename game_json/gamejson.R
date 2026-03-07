@@ -294,7 +294,7 @@ return(game)
 diagram_game_phase <- function(turn){
   # Add player strategy
   plotdf <- turn |>
-  select(event, game.active_player_id, combo.value,
+  select(event, game.active_player.id, game.active_player.strategy, combo.value,
     game.phase_count, player.cards,
     matches("game\\.players\\..\\.num_cards"), used_combos.value,
     game.draw_pile_size, game.discard_pile_size,
@@ -303,7 +303,8 @@ diagram_game_phase <- function(turn){
   ) |>
   rename(
     Event = event,
-    `Active Player ID` = game.active_player_id,
+    `Active Player ID` = game.active_player.id,
+    `Active Player Strategy` = game.active_player.strategy,
     `Cards Discarded` = combo.value,
     `Game Phase Count` = game.phase_count,
     `Player Hand` = player.cards,
@@ -327,7 +328,8 @@ diagram_game_phase <- function(turn){
    `Cards Discarded` = ifelse(Event == "DEFEND", `Cards Discarded`, NA)) |>
     relocate(starts_with("Number of Cards"), .after = everything()) |>
   pivot_longer(
-    cols = c(Event, `Active Player ID`, `Cards Discarded`,
+    cols = c(Event, `Active Player ID`, 
+    `Active Player Strategy`, `Cards Discarded`,
     `Game Phase Count`, `Player Hand`,
     `Cards Played`,
     `Tavern Deck Size`, `Discard Pile Size`,
@@ -342,25 +344,10 @@ diagram_game_phase <- function(turn){
     dplyr::case_when(labels %in% c("Cards Played", "Player Hand", "Cards Discarded") ~ glue::glue("{labels}:\n{value}"),
       .default = glue::glue("{labels}: {value}"))
     )
-  
-  # Add coordinates for diagram
-  if (nrow(plotdf) == 13) {
-    # 2 player game
+
     plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0),
-           y = c(9, 7.5, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5))
-  } else if (nrow(plotdf) == 14) {
-    # 3 player game
-    plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0),
-           y = c(9, 7.5, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5))
-  } else if (nrow(plotdf == 15)){
-    # 4 player game
-    plotdf <- plotdf |>
-    mutate(x = c(-2.25, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0, 0),
-           y = c(9, 7.5, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5, 4.5))
-  }
-  
+    mutate(x = c(-2.25, 2, 2, 2, -2.25, 2, -2.25, 0, 0, 0, -2.25, -2.25, 0, 0, 0, 0),
+           y = c(9, 7.5, 7, 5, 8.5, 5.5, 5.5, 7.5, 7, 6.5, 7.5, 7, 6, 5.5, 5, 4.5))
 
 game_diagram <- ggplot(data = plotdf, aes(x = x, y = y, label = plot_info)) +
   geom_text() +
