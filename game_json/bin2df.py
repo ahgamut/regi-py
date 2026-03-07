@@ -275,6 +275,8 @@ def phase_str_to_game_dct(info):
                 cmb.append(dump_card(x))
         r["combo"] = cmb
         dmg = sum(x["strength"] for x in cmb) * multi(game, cmb)
+        if event == "ATTACK":
+            data["used_combos"].append(cmb)
     if event == "ATTACK":
         r["damage"] = dmg
     else:
