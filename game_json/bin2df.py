@@ -266,7 +266,7 @@ def phase_str_to_game_dct(info):
 
     dmg = 0
     if len(info["combos"]) > 0:
-        selected_ind = int(argmax(info["N1"]))
+        selected_ind = info["sel_index"]
         selected_combo = info["combos"][selected_ind]
         # print(info["combos"], info["N1"], selected_ind, selected_combo)
         cmb = []

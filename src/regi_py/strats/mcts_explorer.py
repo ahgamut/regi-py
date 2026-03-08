@@ -17,23 +17,32 @@ class MCTSNodeInfo:
     N0: int  # visits of this node
     N1: Tuple[int]  # uses of combos from this node
     combos: Tuple[str]
+    sel_index: int  # index of combo selected at this node
     offset: int  # nonzero if a redirect happened, the offset from the current player
 
 
 class MCTSNode:
     def __init__(
-        self, root_phase, trim=False, parent=None, prev_combo=None, weight=math.sqrt(2)
+        self,
+        root_phase,
+        trim=False,
+        parent=None,
+        prev_combo=None,
+        prev_index=None,
+        weight=math.sqrt(2),
     ):
         self.root_phase = root_phase
         self.trim = trim
         self.parent = parent
         self.weight = weight
         self.prev_combo = prev_combo
+        self.prev_index = prev_index
         #
         self.next_phases = []
         self.next_combos = []
         self.rem_exp_ind = []
         self.children = []
+        self.childmap = dict()
         self.visits = 0
         self.value = 0.0
         self._load_expansion()
@@ -57,9 +66,18 @@ class MCTSNode:
     def export(self):
         combos = []
         policy = []
-        for c in self.children:
-            combos.append(str(c.prev_combo))
-            policy.append(c.visits)
+        for combo in self.next_combos:
+            c0 = str(combo)
+            combos.append(c0)
+            if c0 in self.childmap:
+                policy.append(self.childmap[c0].visits)
+            else:
+                policy.append(0)
+
+        if len(self.children) > 0:
+            sel_index = self.best_child_node.prev_index
+        else:
+            sel_index = 0
 
         return MCTSNodeInfo(
             phase=str(self.root_phase),
@@ -67,12 +85,19 @@ class MCTSNode:
             N0=self.visits,
             N1=tuple(policy),
             combos=tuple(combos),
+            sel_index=sel_index,
             offset=0,  # zero means no redirect happened from this move
         )
 
     @property
     def best_child_node(self):
-        return max(self.children, key=lambda n: n.visits)
+        ind = 0
+        mvx = self.children[0].visits
+        for i, x in enumerate(self.children):
+            if x.visits > mvx:
+                ind = i
+                mvx = x.visits
+        return self.children[ind]
 
     @property
     def best_combo(self):
@@ -104,9 +129,15 @@ class MCTSNode:
         phase = node.next_phases[i]
         combo = node.next_combos[i]
         new_node = MCTSNode(
-            phase, trim=node.trim, parent=node, prev_combo=combo, weight=node.weight
+            phase,
+            trim=node.trim,
+            parent=node,
+            prev_combo=combo,
+            prev_index=i,
+            weight=node.weight,
         )
         node.children.append(new_node)
+        node.childmap[str(combo)] = new_node
         return new_node
 
     @staticmethod
@@ -142,7 +173,7 @@ class MCTSNode:
         if s > 80 and e <= 40:
             reward += end_value
         if s > 40 and e <= 0:
-            reward += (3 * end_value)
+            reward += 3 * end_value
         # penalize games that are too slow-paced
         if pacing < 3:
             return reward / 2
@@ -240,7 +271,9 @@ class MCTSSaverStrategy(MCTSExplorerStrategy):
     def process_phase(self, phase, combos):
         root_node = self.simulate_node(phase)
         best_combo = root_node.best_combo
-        self.history.append(root_node.export())
+        info = root_node.export()
+        info.sel_index = root_node.best_child_node.prev_index
+        self.history.append(info)
         # for i, x in enumerate(root_node.children):
         #    print(x.prev_combo, x.visits / root_node.visits)
         for ind, c in enumerate(combos):

@@ -137,11 +137,17 @@ class PhaseRecorderStrategy(BaseStrategy):
             self.mark_combo(phase)
             self.prev_phase = phase
         if self.shortcut is not None:
-            ind = self.shortcut
+            subind = self.shortcut
             self.shortcut = None
+            bts = self.root_combos[subind].bitwise
+            for i, c in enumerate(combos):
+                if c.bitwise == bts:
+                    ind = i
+                    break
+            self.update_prev(subind)
         else:
             ind = random.choice(range(len(combos)))
-        self.update_prev(ind)
+            self.update_prev(ind)
         return ind
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
@@ -190,8 +196,10 @@ def get_expansion_at(root_phase, trim=False):
 
     next_phases = exp_strat.next_phases
     assert len(next_phases) == len(root_combos)
-    for x in next_phases:
+    # print(root_phase.player_cards[root_phase.active_player])
+    for i, x in enumerate(next_phases):
         assert x is not None
+        # print(root_combos[i], x.player_cards[x.active_player])
 
     return next_phases, root_combos
 

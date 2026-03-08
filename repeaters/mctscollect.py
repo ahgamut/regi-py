@@ -38,8 +38,10 @@ def run_single_game(tid, i, num_bots, num_iterations):
     while node.root_phase.game_endvalue == 0:
         simulate_node(node, num_iterations)
         history.append(node.export())
-        node = node.best_child_node
-        node.parent = None
+        child = node.best_child_node
+        # print(node.root_phase.player_cards, node.next_combos, history[-1].sel_index, child.prev_index, node.next_combos[child.prev_index], child.prev_combo, child.root_phase.player_cards)
+        child.parent = None
+        node = child
     history.append(node.export())
     win = float(node.root_phase.game_endvalue == 1)
     s1 = sum(max(x.hp, 0) for x in node.root_phase.enemy_pile)
@@ -64,7 +66,7 @@ def run_mcts_game(tid, num_games, num_bots, num_iterations, output_folder):
 
 
 def submain(num_games, num_bots, num_iterations, num_processes, output_folder):
-    mp.set_start_method("spawn", force=True)
+    mp.set_start_method("fork", force=True)
     processes = []
 
     #
