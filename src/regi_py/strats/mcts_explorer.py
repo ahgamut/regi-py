@@ -157,10 +157,10 @@ class MCTSNode:
             if s > 280:
                 return -1
             if s > 220:
-                return -0.5
+                return -0.75
             if s > 160:
                 return -0.25
-            return -0.125
+            return -0.0625
         # more if checkpoints are crossed
         if s > 280 and e <= 220:
             reward += end_value
@@ -175,7 +175,7 @@ class MCTSNode:
         if s > 40 and e <= 0:
             reward += 3 * end_value
         # penalize games that are too slow-paced
-        if pacing < 3:
+        if pacing < 2.1:
             return reward / 2
         return reward
 
