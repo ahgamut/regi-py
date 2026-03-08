@@ -5,6 +5,7 @@ import random
 import itertools
 import time
 import multiprocessing as mp
+import sys
 
 #
 from regi_py import JSONLog, DummyLog, GameState
@@ -14,11 +15,25 @@ from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
 
 STRATEGY_MAP = get_strategy_map()
 STRATEGY_MAP[MCTSExplorerStrategy.__strat_name__] = MCTSExplorerStrategy
+STRATEGY_MAP["mcts-128"] = lambda: MCTSExplorerStrategy(iterations=128)
+STRATEGY_MAP["mcts-256"] = lambda: MCTSExplorerStrategy(iterations=256)
+STRATEGY_MAP["mcts-384"] = lambda: MCTSExplorerStrategy(iterations=384)
+STRATEGY_MAP["mcts-32"] = lambda: MCTSExplorerStrategy(iterations=32)
+STRATEGY_MAP["mcts-64"] = lambda: MCTSExplorerStrategy(iterations=64)
 
 
 def create_teams(num_teams, num_players):
     bots = list(STRATEGY_MAP.keys())
-    default_bots = ("random", "damage", "brute", "preserve", "mcts-explorer")
+    default_bots = (
+        "random",
+        "damage",
+        "brute",
+        "preserve",
+        "mcts-32",
+        "mcts-64",
+        "mcts-128",
+        "mcts-256",
+    )
     default_teams = [tuple([x] * num_players) for x in default_bots]
 
     teams = set(default_teams)
@@ -55,9 +70,12 @@ def save_single_game(output_folder, start_phase, team, i, j, k):
     for bot in team:
         game.add_player(STRATEGY_MAP[bot]())
     game._init_string(start_phase)
+    s0 = sum(max(e.hp, 0) for e in game.enemy_pile)
     game.start_loop()
     dt = time.time() - a
-    print(f"game {i, team} ran for {game.phase_count} phases, {dt:.4f}s")
+    s1 = sum(max(e.hp, 0) for e in game.enemy_pile)
+    progress = s0 - s1
+    print(f"{i},{team},{game.phase_count}p,{dt:.4f}s,{progress}", file=sys.stderr)
 
 
 def run_game_from_q(tid, output_folder, queue):
@@ -84,14 +102,20 @@ def save_config(mappings, output_folder):
         json.dump(mappings, mfile, indent=4)
 
 
+def should_postpone(team):
+    for strat in team:
+        if "mcts-" in strat or "brute" in strat:
+            return True
+    return False
+
+
 def run_simulations(tid, mappings, output_folder, queue):
     ral = lambda x: range(len(x))
     start_phases = mappings["games"]
     teams = mappings["teams"]
     num_simulations = mappings["num_simulations"]
     for i, j in itertools.product(ral(start_phases), ral(teams)):
-        thr = "mcts-explorer" in teams[j]
-        thr = thr or "brute" in teams[j]
+        thr = should_postpone(teams[j])
         for k in range(num_simulations):
             if thr:
                 data = (start_phases[i], teams[j], i + 1, j + 1, k + 1)
@@ -104,7 +128,7 @@ def run_simulations(tid, mappings, output_folder, queue):
 
 
 def submain(mappings, output_folder, num_processes, queue_size):
-    mp.set_start_method("spawn", force=True)
+    mp.set_start_method("fork", force=True)
     queue = mp.Queue(maxsize=queue_size)
     processes = []
 

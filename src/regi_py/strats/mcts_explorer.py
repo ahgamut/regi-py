@@ -190,7 +190,7 @@ class MCTSNode:
 class MCTSExplorerStrategy(BaseStrategy):
     __strat_name__ = "mcts-explorer"
 
-    def __init__(self, iterations=512, trim=True, weight=math.sqrt(2)):
+    def __init__(self, iterations=64, trim=True, weight=math.sqrt(2)):
         super(MCTSExplorerStrategy, self).__init__()
         self.iterations = iterations
         self.trim = trim
@@ -247,7 +247,7 @@ class MCTSExplorerStrategy(BaseStrategy):
 class MCTSSaverStrategy(MCTSExplorerStrategy):
     __strat_name__ = "mcts-saver"
 
-    def __init__(self, iterations=512, trim=True, weight=math.sqrt(2)):
+    def __init__(self, iterations=64, trim=True, weight=math.sqrt(2)):
         super(MCTSSaverStrategy, self).__init__(iterations, trim, weight)
         self.history = []
 

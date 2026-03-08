@@ -7,6 +7,7 @@ import time
 import multiprocessing as mp
 import dataclasses
 import msgpack
+import sys
 
 #
 from regi_py import JSONLog, DummyLog, GameState
@@ -50,7 +51,7 @@ def run_single_game(tid, i, num_bots, num_iterations):
     diff = (360 - s1) / 360
     for info in history:
         info.value = diff
-    print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}")
+    print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     return history
 
 
