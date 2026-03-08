@@ -79,6 +79,7 @@ def save_single_game(output_folder, start_phase, team, i, j, k):
 
 
 def run_game_from_q(tid, output_folder, queue):
+    print(tid, "started running games in queue", file=sys.stderr)
     while not queue.empty():
         data = queue.get()
         start_phase, team, i, j, k = data
@@ -132,15 +133,12 @@ def submain(mappings, output_folder, num_processes, queue_size):
     queue = mp.Queue(maxsize=queue_size)
     processes = []
 
-    filler = mp.Process(
-        target=run_simulations, args=(0, mappings, output_folder, queue)
-    )
-    filler.start()
-    filler.join()
+    run_simulations(0, mappings, output_folder, queue)
     #
     for j in range(num_processes):
         eater = mp.Process(target=run_game_from_q, args=(j, output_folder, queue))
         eater.start()
+        time.sleep(5)
         processes.append(eater)
 
     for p in processes:
