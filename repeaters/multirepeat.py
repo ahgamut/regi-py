@@ -202,7 +202,7 @@ def main():
     parser.add_argument(
         "-o", "--output-folder", type=str, required=True, help="folder to store outputs"
     )
-    parser.add_argument("-q", "--queue-size", default=0, help="queue size")
+    parser.add_argument("-q", "--queue-size", default=0, type=int, help="queue size")
     parser.add_argument("--num-processes", default=2, type=int, help="num processes")
     d = parser.parse_args()
     if d.num_bots < 2 or d.num_bots > 4:
