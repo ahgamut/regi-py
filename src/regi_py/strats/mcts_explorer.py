@@ -193,6 +193,7 @@ class MCTSExplorerStrategy(BaseStrategy):
     def __init__(self, iterations=64, trim=True, weight=math.sqrt(2)):
         super(MCTSExplorerStrategy, self).__init__()
         self.iterations = iterations
+        self.__strat_name__ = f"mcts-{iterations}"
         self.trim = trim
         self.weight = weight
 

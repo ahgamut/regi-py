@@ -10,6 +10,11 @@ from regi_py.strats.phase_utils import *
 class BruteSamplingStrategy(BaseStrategy):
     __strat_name__ = "brute"
 
+    def __init__(self, iterations=128):
+        super(BruteSamplingStrategy, self).__init__()
+        self.__strat_name__ = f"brute-{iterations}"
+        self.iterations = iterations
+
     def setup(self, player, game):
         return 0
 
@@ -20,7 +25,7 @@ class BruteSamplingStrategy(BaseStrategy):
     def process_moves(self, game, combos):
         root_phase = game.export_phaseinfo()
         next_phases, next_combos = get_expansion_at(root_phase, trim=True)
-        B = 128
+        B = self.iterations
 
         N = len(next_combos)
         vals = [0] * N

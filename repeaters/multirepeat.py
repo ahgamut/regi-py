@@ -11,15 +11,22 @@ import sys
 from regi_py import JSONLog, DummyLog, GameState
 from regi_py import get_strategy_map
 from regi_py.strats import RandomStrategy
+from regi_py.strats import BruteSamplingStrategy
 from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
 
 STRATEGY_MAP = get_strategy_map()
-STRATEGY_MAP[MCTSExplorerStrategy.__strat_name__] = MCTSExplorerStrategy
+STRATEGY_MAP.pop("brute")
+#
 STRATEGY_MAP["mcts-128"] = lambda: MCTSExplorerStrategy(iterations=128)
 STRATEGY_MAP["mcts-256"] = lambda: MCTSExplorerStrategy(iterations=256)
 STRATEGY_MAP["mcts-384"] = lambda: MCTSExplorerStrategy(iterations=384)
 STRATEGY_MAP["mcts-32"] = lambda: MCTSExplorerStrategy(iterations=32)
 STRATEGY_MAP["mcts-64"] = lambda: MCTSExplorerStrategy(iterations=64)
+STRATEGY_MAP["brute-128"] = lambda: BruteSamplingStrategy(iterations=128)
+STRATEGY_MAP["brute-256"] = lambda: BruteSamplingStrategy(iterations=256)
+STRATEGY_MAP["brute-384"] = lambda: BruteSamplingStrategy(iterations=384)
+STRATEGY_MAP["brute-32"] = lambda: BruteSamplingStrategy(iterations=32)
+STRATEGY_MAP["brute-64"] = lambda: BruteSamplingStrategy(iterations=64)
 
 
 def create_teams(num_teams, num_players):
@@ -27,18 +34,28 @@ def create_teams(num_teams, num_players):
     default_bots = (
         "random",
         "damage",
-        "brute",
         "preserve",
         "mcts-32",
         "mcts-64",
         "mcts-128",
         "mcts-256",
+        "brute-32",
+        "brute-64",
+        "brute-128",
+        "brute-256",
     )
     default_teams = [tuple([x] * num_players) for x in default_bots]
 
     teams = set(default_teams)
     while len(teams) < (num_teams + len(default_teams)):
         team = tuple(random.choices(bots, k=num_players))
+        avoid = False
+        for x0 in teams:
+            if len(set(x0) & set(team)) >= 2:
+                avoid = True
+                break
+        if avoid:
+            continue
         teams.add(team)
     return list(teams)
 
@@ -75,18 +92,21 @@ def save_single_game(output_folder, start_phase, team, i, j, k):
     dt = time.time() - a
     s1 = sum(max(e.hp, 0) for e in game.enemy_pile)
     progress = s0 - s1
-    print(f"{i},{team},{game.phase_count}p,{dt:.4f}s,{progress}", file=sys.stderr)
+    t1 = "|".join(team)
+    print(f"{i},{t1},{game.phase_count}p,{dt:.4f}s,{progress}", file=sys.stderr)
 
 
-def run_game_from_q(tid, output_folder, queue):
+def run_game_from_q(tid, output_folder, queue, fill_event):
+    fill_event.wait()
     print(tid, "started running games in queue", file=sys.stderr)
-    while not queue.empty():
-        data = queue.get()
-        start_phase, team, i, j, k = data
-        try:
-            save_single_game(output_folder, start_phase, team, i, j, k)
-        except Exception as e:
-            print(f"failed  {i, j, k} due to", e)
+    while fill_event.is_set():
+        while not queue.empty():
+            data = queue.get()
+            start_phase, team, i, j, k = data
+            try:
+                save_single_game(output_folder, start_phase, team, i, j, k)
+            except Exception as e:
+                print(f"failed  {i, j, k} due to", e)
 
 
 def save_config(mappings, output_folder):
@@ -110,7 +130,7 @@ def should_postpone(team):
     return False
 
 
-def run_simulations(tid, mappings, output_folder, queue):
+def run_simulations(tid, mappings, output_folder, queue, fill_event):
     ral = lambda x: range(len(x))
     start_phases = mappings["games"]
     teams = mappings["teams"]
@@ -121,26 +141,36 @@ def run_simulations(tid, mappings, output_folder, queue):
             if thr:
                 data = (start_phases[i], teams[j], i + 1, j + 1, k + 1)
                 queue.put(data)
+                fill_event.set()
             else:
                 save_single_game(
                     output_folder, start_phases[i], teams[j], i + 1, j + 1, k + 1
                 )
-    # run_game_from_q(tid, output_folder, queue)
+
+    fill_event.clear()
 
 
 def submain(mappings, output_folder, num_processes, queue_size):
     mp.set_start_method("fork", force=True)
     queue = mp.Queue(maxsize=queue_size)
+    fill_event = mp.Event()
     processes = []
 
-    run_simulations(0, mappings, output_folder, queue)
+    prod = mp.Process(
+        target=run_simulations,
+        args=(0, mappings, output_folder, queue, fill_event),
+    )
+    processes.append(prod)
     #
     for j in range(num_processes):
-        eater = mp.Process(target=run_game_from_q, args=(j, output_folder, queue))
+        eater = mp.Process(
+            target=run_game_from_q,
+            args=(j, output_folder, queue, fill_event),
+        )
         eater.start()
-        time.sleep(5)
         processes.append(eater)
 
+    prod.start()
     for p in processes:
         p.join()
 

@@ -187,6 +187,9 @@ def get_expansion_at(root_phase, trim=False):
         exp_strat.root_combos = root_combos
         exp_strat.next_phases = [None] * len(root_combos)
 
+    if root_combos is None:
+        return [], []
+
     for i in range(len(root_combos)):
         exp_strat.shortcut = i
         tmp._init_phaseinfo(root_phase)
