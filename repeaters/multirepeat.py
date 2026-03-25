@@ -19,12 +19,12 @@ STRATEGY_MAP.pop("brute")
 #
 STRATEGY_MAP["mcts-128"] = lambda: MCTSExplorerStrategy(iterations=128)
 STRATEGY_MAP["mcts-256"] = lambda: MCTSExplorerStrategy(iterations=256)
-STRATEGY_MAP["mcts-384"] = lambda: MCTSExplorerStrategy(iterations=384)
+STRATEGY_MAP["mcts-16"] = lambda: MCTSExplorerStrategy(iterations=16)
 STRATEGY_MAP["mcts-32"] = lambda: MCTSExplorerStrategy(iterations=32)
 STRATEGY_MAP["mcts-64"] = lambda: MCTSExplorerStrategy(iterations=64)
 STRATEGY_MAP["brute-128"] = lambda: BruteSamplingStrategy(iterations=128)
 STRATEGY_MAP["brute-256"] = lambda: BruteSamplingStrategy(iterations=256)
-STRATEGY_MAP["brute-384"] = lambda: BruteSamplingStrategy(iterations=384)
+STRATEGY_MAP["brute-16"] = lambda: BruteSamplingStrategy(iterations=16)
 STRATEGY_MAP["brute-32"] = lambda: BruteSamplingStrategy(iterations=32)
 STRATEGY_MAP["brute-64"] = lambda: BruteSamplingStrategy(iterations=64)
 
@@ -35,10 +35,12 @@ def create_teams(num_teams, num_players):
         "random",
         "damage",
         "preserve",
+        "mcts-16",
         "mcts-32",
         "mcts-64",
         "mcts-128",
         "mcts-256",
+        "brute-16",
         "brute-32",
         "brute-64",
         "brute-128",
