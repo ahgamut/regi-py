@@ -39,7 +39,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py.strats import BaseStrategy
+from regi_py.strats import BaseStrategy, BruteSamplingStrategy
+from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
 from regi_py import get_strategy_map
 from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
 
@@ -80,7 +81,7 @@ class ConnectionManager:
 class WebPlayerStrategy(BaseStrategy):
     __strat_name__ = "player-webui"
 
-    def __init__(self, userid, username, websocket):
+    def __init__(self, userid, username, websocket, reco_klassname="brute-128"):
         super().__init__()
         self.__strat_name__ = f"player-webui-{username}"
         self.userid = userid
@@ -89,6 +90,10 @@ class WebPlayerStrategy(BaseStrategy):
         self.portal_provider = BlockingPortalProvider()
         self.response = None
         self.ready = False
+        if "mcts" in reco_klassname:
+            self.reco_bot = MCTSExplorerStrategy()
+        else:
+            self.reco_bot = BruteSamplingStrategy()
 
     @staticmethod
     async def comms_twoway(self, websocket, obj):
@@ -128,6 +133,7 @@ class WebPlayerStrategy(BaseStrategy):
             "combos": combos,
             "yield_allowed": yield_allowed,
             "game": game,
+            "reco": self.reco_bot.getRecommendedMoves(game.export_phaseinfo(), combos),
         }
         result = {"type": "select-attack", "data": data}
 
@@ -152,6 +158,7 @@ class WebPlayerStrategy(BaseStrategy):
             "combos": combos,
             "damage": damage,
             "game": game,
+            "reco": self.reco_bot.getRecommendedMoves(game.export_phaseinfo(), combos),
         }
         result = {"type": "select-defend", "data": data}
 
@@ -426,7 +433,10 @@ async def login(request: Request, username: str = Form(...), password: str = For
     if len(username) > 16 or len(password) > 16:
         return templates.TemplateResponse(
             "pages/login.html",
-            {"request": request, "error": "Username and password must be 16 characters or less."},
+            {
+                "request": request,
+                "error": "Username and password must be 16 characters or less.",
+            },
         )
     if password != app.state.CTX.password:
         return templates.TemplateResponse(

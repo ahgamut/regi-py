@@ -1,5 +1,6 @@
 from regi_py.core import BaseStrategy
 from regi_py.core import RandomStrategy
+from regi_py.strats.recommender import RecommenderMixin
 from regi_py.strats.phase_utils import *
 from regi_py.strats.sub_random import SubsetRandomStrategy
 
@@ -187,15 +188,16 @@ class MCTSNode:
             node = node.parent
 
 
-class MCTSExplorerStrategy(BaseStrategy):
+class MCTSExplorerStrategy(BaseStrategy, RecommenderMixin):
     __strat_name__ = "mcts-explorer"
 
-    def __init__(self, iterations=64, trim=True, weight=math.sqrt(2)):
+    def __init__(self, iterations=64, trim=True, weight=math.sqrt(2), num_recos=5):
         super(MCTSExplorerStrategy, self).__init__()
         self.iterations = iterations
         self.__strat_name__ = f"mcts-{iterations}"
         self.trim = trim
         self.weight = weight
+        self.num_recos = num_recos
 
     def setup(self, player, game):
         return 0
@@ -243,6 +245,16 @@ class MCTSExplorerStrategy(BaseStrategy):
     def getDefenseIndex(self, combos, player, damage, game):
         ind = self.process_phase(game.export_phaseinfo(), combos)
         return ind
+
+    def getRecommendedMoves(self, phase, combos):
+        root_node = self.simulate_node(phase)
+        info = root_node.export()
+        moves = info.combos
+        scores = info.N1
+        sinds = np.argsort(scores)[::-1]
+        nr = min(self.num_recos, len(scores))
+        recos = [moves[int(x)] for x in sinds[:nr]]
+        return recos
 
 
 class MCTSSaverStrategy(MCTSExplorerStrategy):
