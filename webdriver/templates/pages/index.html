@@ -64,6 +64,10 @@ document.addEventListener('alpine:init', () => {
                         <h1 class="subtitle" x-text="'Other Players'" ></h1>
                         <div id="other-players"></div>
                     </div>
+                    <div id="reco-wrapper">
+                        <button id="reco-toggle" class="button is-small is-warning is-outlined" onclick="toggleRecommendations()">Show Recommendations</button>
+                        <div id="reco-popup" style="display:none;"></div>
+                    </div>
                     <h1 id="player-should" class="subtitle" x-text="$store.gamestate.playerShould"></h1>
                 </div>
             </div>

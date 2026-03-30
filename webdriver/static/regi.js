@@ -116,6 +116,7 @@ function reset_game() {
     let g = Alpine.store('gamestate');
     document.getElementById('messages').replaceChildren();
     g.history = [];
+    clearRecommendations();
     let message = {userid: g.userid, type:'player-reset', choice:0};
     send_ws(message);
 }
@@ -142,8 +143,67 @@ function player_ready() {
 
 
 
+function updateRecommendations(reco) {
+    let wrapper = document.getElementById('reco-wrapper');
+    let container = document.getElementById('reco-popup');
+    let toggle = document.getElementById('reco-toggle');
+    if (!container || !wrapper) return;
+    container.replaceChildren();
+    container.style.display = 'none';
+    if (toggle) toggle.textContent = 'Show Recommendations';
+    if (!reco || reco.length === 0) {
+        return;
+    }
+    let header = document.createElement('div');
+    header.className = 'reco-header';
+    header.textContent = 'Recommendations';
+    container.appendChild(header);
+
+    let list = document.createElement('div');
+    list.className = 'reco-list';
+    for (let combo of reco) {
+        let comboEl = document.createElement('div');
+        comboEl.className = 'reco-combo';
+        for (let card of combo) {
+            let chip = document.createElement('span');
+            chip.className = 'reco-card';
+            chip.textContent = card.value;
+            comboEl.appendChild(chip);
+        }
+        list.appendChild(comboEl);
+    }
+    container.appendChild(list);
+    // Keep popup collapsed by default
+    container.style.display = 'none';
+    if (toggle) toggle.textContent = 'Show Recommendations';
+}
+
+function toggleRecommendations() {
+    let container = document.getElementById('reco-popup');
+    let toggle = document.getElementById('reco-toggle');
+    if (!container || !toggle) return;
+    if (container.style.display === 'none') {
+        container.style.display = '';
+        toggle.textContent = 'Hide Recommendations';
+    } else {
+        container.style.display = 'none';
+        toggle.textContent = 'Show Recommendations';
+    }
+}
+
+function clearRecommendations() {
+    let container = document.getElementById('reco-popup');
+    let toggle = document.getElementById('reco-toggle');
+    if (container) {
+        container.replaceChildren();
+        container.style.display = 'none';
+    }
+    if (toggle) toggle.textContent = 'Show Recommendations';
+}
+
 function submit_option() {
     let g = Alpine.store("gamestate");
+    clearRecommendations();
     if (g.redirection) {
         submit_redirect_option();
     } else {
@@ -489,6 +549,7 @@ function selectAttack(data) {
     // console.log(data);
     updateBoard(data.game);
     updateCards(data.player);
+    updateRecommendations(data.reco);
 }
 function selectDefend(data) {
     let g = Alpine.store('gamestate');
@@ -504,6 +565,7 @@ function selectDefend(data) {
     // console.log(data);
     updateBoard(data.game);
     updateCards(data.player);
+    updateRecommendations(data.reco);
 }
 function selectRedirect(data) {
     let g = Alpine.store('gamestate');
