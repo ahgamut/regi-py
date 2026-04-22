@@ -78,6 +78,26 @@ class ConnectionManager:
             await self.send_dict(message, connection)
 
 
+def validate_reco_bot(value):
+    parts = value.split("-", 1)
+    if len(parts) != 2 or parts[0] not in ("brute", "mcts"):
+        return False, "--reco-bot must be TYPE-N where TYPE is 'brute' or 'mcts' (e.g. brute-128)"
+    try:
+        int(parts[1])
+    except ValueError:
+        return False, "--reco-bot N must be an integer (e.g. brute-128)"
+    return True, None
+
+
+def make_reco_bot(reco_klassname):
+    parts = reco_klassname.split("-", 1)
+    reco_type = parts[0]
+    reco_param = int(parts[1])
+    if reco_type == "mcts":
+        return MCTSExplorerStrategy(reco_param)
+    return BruteSamplingStrategy(reco_param)
+
+
 class WebPlayerStrategy(BaseStrategy):
     __strat_name__ = "player-webui"
 
@@ -90,10 +110,7 @@ class WebPlayerStrategy(BaseStrategy):
         self.portal_provider = BlockingPortalProvider()
         self.response = None
         self.ready = False
-        if "mcts" in reco_klassname:
-            self.reco_bot = MCTSExplorerStrategy()
-        else:
-            self.reco_bot = BruteSamplingStrategy()
+        self.reco_bot = make_reco_bot(reco_klassname)
 
     @staticmethod
     async def comms_twoway(self, websocket, obj):
@@ -313,6 +330,7 @@ class Context:
         skip_bots=False,
         no_download=False,
         history_folder=None,
+        reco_bot="brute-128",
     ):
         self.manager = ConnectionManager(num_players, len(bots))
         self.playerlog = WebPlayerLog(self.manager, history_folder=history_folder)
@@ -323,6 +341,7 @@ class Context:
         self.password = password
         self.skip_bots = skip_bots
         self.no_download = no_download
+        self.reco_bot = reco_bot
         self.userids = []
         self.usernames = {}
         self.ALT_STARTED = False
@@ -415,6 +434,7 @@ def player_join(userid, username, websocket):
         userid,
         username,
         websocket,
+        reco_klassname=app.state.CTX.reco_bot,
     )
     app.state.CTX.strats.append(strat)
 
@@ -600,7 +620,8 @@ def make_CTX(app, d):
         return
     #
     app.state.CTX = Context(
-        d.num_players, d.bots, d.password, d.skip_bots, d.no_download, d.history_folder
+        d.num_players, d.bots, d.password, d.skip_bots, d.no_download, d.history_folder,
+        d.reco_bot,
     )
     #
     print(
@@ -654,6 +675,13 @@ def load_args():
         default=None,
         help="folder to save game history JSON files after each game",
     )
+    parser.add_argument(
+        "--reco-bot",
+        dest="reco_bot",
+        default="brute-128",
+        help="recommender bot as TYPE-N (e.g. brute-128, mcts-64). "
+             "TYPE is 'brute' or 'mcts', N is an integer parameter for the bot",
+    )
     d = parser.parse_args()
     total_players = d.num_players + len(d.bots)
 
@@ -663,6 +691,11 @@ def load_args():
         sys.exit(1)
     if total_players > 4:
         print("ERROR can't have more than 4 players!\n\n")
+        parser.print_help()
+        sys.exit(1)
+    valid, err = validate_reco_bot(d.reco_bot)
+    if not valid:
+        print(f"ERROR {err}\n\n")
         parser.print_help()
         sys.exit(1)
     return d
