@@ -48,11 +48,11 @@ void bind_enums(pybind11::object &m)
         .finalize();
 
     py::native_enum<Powers>(m, "SuitPower", "enum.Flag")
-        .value("DOUBLE_DAMAGE", Powers::CLUBS_DOUBLE)
-        .value("DRAW_CARDS", Powers::DIAMONDS_DRAW)
-        .value("REPLENISH", Powers::HEARTS_REPLENISH)
-        .value("BLOCK", Powers::SPADES_BLOCK)
-        .value("NERF", Powers::JOKER_NERF)
+        .value("CLUBS_DOUBLE", Powers::CLUBS_DOUBLE)
+        .value("DIAMONDS_DRAW", Powers::DIAMONDS_DRAW)
+        .value("HEARTS_REPLENISH", Powers::HEARTS_REPLENISH)
+        .value("SPADES_BLOCK", Powers::SPADES_BLOCK)
+        .value("JOKER_NERF", Powers::JOKER_NERF)
         .export_values()
         .finalize();
 
@@ -71,6 +71,24 @@ void bind_enums(pybind11::object &m)
         .value("ATTACK_FAILED", EndGameReason::ATTACK_FAILED)
         .value("REDIRECT_FAILED", EndGameReason::REDIRECT_FAILED)
         .value("PLAYER_DEAD", EndGameReason::PLAYER_DEAD)
+        .export_values()
+        .finalize();
+
+    py::native_enum<GameEvent>(m, "GameEvent", "enum.IntEnum")
+        .value("STARTGAME", GameEvent::STARTGAME)
+        .value("ENDGAME", GameEvent::ENDGAME)
+        .value("POSTGAME", GameEvent::POSTGAME)
+        .value("ATTACK", GameEvent::ATTACK)
+        .value("DEFEND", GameEvent::DEFEND)
+        .value("REDIRECT", GameEvent::REDIRECT)
+        .value("FAILBLOCK", GameEvent::FAILBLOCK)
+        .value("FULLBLOCK", GameEvent::FULLBLOCK)
+        .value("DRAWONE", GameEvent::DRAWONE)
+        .value("DECKEMPTY", GameEvent::DECKEMPTY)
+        .value("REPLENISH", GameEvent::REPLENISH)
+        .value("ENEMYKILL", GameEvent::ENEMYKILL)
+        .value("STATE", GameEvent::STATE)
+        .value("DEBUG", GameEvent::DEBUG)
         .export_values()
         .finalize();
 }

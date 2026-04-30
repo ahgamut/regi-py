@@ -15,6 +15,23 @@ namespace regi
         ENDED
     };
 
+    enum GameEvent {
+        STARTGAME,
+        ENDGAME,
+        POSTGAME,
+        ATTACK,
+        DEFEND,
+        REDIRECT,
+        FAILBLOCK,
+        FULLBLOCK,
+        DRAWONE,
+        DECKEMPTY,
+        REPLENISH,
+        ENEMYKILL,
+        STATE,
+        DEBUG
+    };
+
     enum EndGameReason
     {
         INVALID_START_PLAYER_COUNT,
