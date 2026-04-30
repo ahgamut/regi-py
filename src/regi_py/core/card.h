@@ -9,6 +9,11 @@ typedef std::int32_t i32;
 typedef std::uint32_t u32;
 typedef std::size_t u64;
 
+constexpr i32 TOTAL_SUIT_OPTIONS = 5;
+constexpr i32 TOTAL_ENTRY_OPTIONS = 14;
+constexpr i32 NONGLITCH_ENTRY_OPTIONS = 13;
+constexpr i32 MAX_CARDS_IN_GAME = 54;
+
 enum Suit : u16
 {
     GLITCH = 0,
@@ -51,6 +56,8 @@ struct Card
     Entry entry() const;
     Suit suit() const;
     i32 toIndex() const;
+    i32 toLocation() const;
+    bool fromLocation(i32);
     bool fromIndex(i32);
     bool operator<(const Card&) const;
     bool operator>(const Card&) const;

@@ -1,8 +1,5 @@
 #include <card.h>
 
-constexpr i32 TOTAL_SUIT_OPTIONS = 5;
-constexpr i32 TOTAL_ENTRY_OPTIONS = 14;
-
 static_assert(TOTAL_SUIT_OPTIONS == static_cast<i32>(SPADES) + 1);
 static_assert(TOTAL_ENTRY_OPTIONS == static_cast<i32>(KING) + 1);
 
@@ -38,9 +35,49 @@ i32 Card::toIndex() const
            (TOTAL_ENTRY_OPTIONS * static_cast<i32>(this->s));
 }
 
-bool Card::fromIndex(i32 ind) {
+bool Card::fromIndex(i32 ind)
+{
     i32 e0 = ind % TOTAL_ENTRY_OPTIONS;
     i32 s0 = ind / TOTAL_ENTRY_OPTIONS;
+    // valid entry?
+    if (e0 < 0 || e0 >= TOTAL_ENTRY_OPTIONS) return false;
+    // valid suit?
+    if (s0 < 0 || s0 >= TOTAL_SUIT_OPTIONS) return false;
+    // valid joker?
+    if (e0 == 0 && s0 != 0) return false;
+    this->e = static_cast<Entry>(e0);
+    this->s = static_cast<Suit>(s0);
+    return true;
+}
+
+i32 Card::toLocation() const
+{
+    if (this->s == Suit::GLITCH)
+    {
+        if (this->e == Entry::JOKER) { return 0; }
+        return -1;
+    }
+
+    i32 sp = static_cast<i32>(this->s) - 1;  // always >= 0
+    i32 ep = static_cast<i32>(this->e) - 1;  // always >= 0
+    i32 loc = 2 + sp * NONGLITCH_ENTRY_OPTIONS + ep;
+    if (loc < 2 || loc > MAX_CARDS_IN_GAME) { return -1; }
+    return loc;
+}
+
+bool Card::fromLocation(i32 loc)
+{
+    if (loc < 0 || loc >= MAX_CARDS_IN_GAME) return false;
+    if (loc < 2)
+    {
+        this->e = Entry::JOKER;
+        this->s = Suit::GLITCH;
+        return true;
+    }
+
+    i32 l2 = loc - 2;
+    i32 e0 = 1 + l2 % (NONGLITCH_ENTRY_OPTIONS);
+    i32 s0 = 1 + l2 / (NONGLITCH_ENTRY_OPTIONS);
     // valid entry?
     if (e0 < 0 || e0 >= TOTAL_ENTRY_OPTIONS) return false;
     // valid suit?

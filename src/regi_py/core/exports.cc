@@ -2,6 +2,7 @@
 #include <console.h>
 #include <dfsel.h>
 #include <phaseinfo.h>
+#include <location.h>
 //
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -89,6 +90,20 @@ void bind_enums(pybind11::object &m)
         .value("ENEMYKILL", GameEvent::ENEMYKILL)
         .value("STATE", GameEvent::STATE)
         .value("DEBUG", GameEvent::DEBUG)
+        .export_values()
+        .finalize();
+
+    py::native_enum<CardLocation>(m, "CardLocation", "enum.IntEnum")
+        .value("NOT_IN_GAME", CardLocation::NOT_IN_GAME)
+        .value("WITH_PLAYER_1", CardLocation::WITH_PLAYER_1)
+        .value("WITH_PLAYER_2", CardLocation::WITH_PLAYER_2)
+        .value("WITH_PLAYER_3", CardLocation::WITH_PLAYER_3)
+        .value("WITH_PLAYER_4", CardLocation::WITH_PLAYER_4)
+        .value("IN_DRAW_PILE", CardLocation::IN_DRAW_PILE)
+        .value("IN_DISCARD_PILE", CardLocation::IN_DISCARD_PILE)
+        .value("IN_USED_PILE", CardLocation::IN_USED_PILE)
+        .value("IN_ENEMY_PILE", CardLocation::IN_ENEMY_PILE)
+        .value("MAX_LOCATIONS", CardLocation::MAX_LOCATIONS)
         .export_values()
         .finalize();
 }
@@ -435,6 +450,33 @@ void bind_gamestate(pybind11::object &m)
              });
 }
 
+void bind_location(pybind11::object &m)
+{
+    py::class_<LocationInfo, std::shared_ptr<LocationInfo>>(m, "LocationInfo",
+                                                            py::buffer_protocol())
+        .def_static("from_phase", &LocationInfo::fromPhaseInfo)
+        .def_static("fromPhaseInfo", &LocationInfo::fromPhaseInfo)
+        .def_static("from_game", &LocationInfo::fromGameState)
+        .def_static("fromGameState", &LocationInfo::fromGameState)
+        .def_property_readonly("num_jokers", &LocationInfo::getNumJokers)
+        .def_property_readonly("num_players", &LocationInfo::getNumPlayers)
+        .def_property_readonly("valid", &LocationInfo::getValid)
+        .def("pairwise", &LocationInfo::pairwise)
+        .def_buffer(
+            [](LocationInfo &info) -> py::buffer_info
+            {
+                return py::buffer_info(                          //
+                    info.getData(),                              //
+                    sizeof(float),                               //
+                    py::format_descriptor<float>::format(),      //
+                    2,                                           //
+                    {info.rows, info.cols},                      //
+                    {sizeof(float) * info.cols, sizeof(float)},  //
+                    /*readonly*/ true                            //
+                );
+            });
+}
+
 PYBIND11_MODULE(core, m)
 {
     m.doc() = "c++ module for regicide game mechanics";
@@ -444,5 +486,6 @@ PYBIND11_MODULE(core, m)
     bind_player(m);
     bind_log(m);
     bind_phaseinfo(m);
+    bind_location(m);
     bind_gamestate(m);
 }
