@@ -33,6 +33,13 @@ namespace regi
 
         void set(i32 i, i32 j) { this->data[i * cols + j] = 1; }
         float get(i32 i, i32 j) const { return this->data[i * cols + j]; }
+        float rowSum(i32 i) const
+        {
+            float sum = 0;
+            for (int j = 0; j < cols; ++j) { sum += this->data[i * cols + j]; }
+            return sum;
+        }
+
         void setCard(const Card &, CardLocation);
 
        public:
@@ -47,6 +54,9 @@ namespace regi
         i32 getNumJokers() const { return numJokers; };
         i32 getNumPlayers() const { return numPlayers; };
         float *getData() const { return data; };
+        bool nextOK(const LocationInfo &) const;
+        //
+        void validate();
         //
         static std::shared_ptr<LocationInfo> fromPhaseInfo(const PhaseInfo &);
         static std::shared_ptr<LocationInfo> fromGameState(const GameState &);

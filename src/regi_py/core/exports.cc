@@ -461,6 +461,7 @@ void bind_location(pybind11::object &m)
         .def_property_readonly("num_jokers", &LocationInfo::getNumJokers)
         .def_property_readonly("num_players", &LocationInfo::getNumPlayers)
         .def_property_readonly("valid", &LocationInfo::getValid)
+        .def("next_ok", &LocationInfo::nextOK)
         .def("pairwise", &LocationInfo::pairwise)
         .def_buffer(
             [](LocationInfo &info) -> py::buffer_info
