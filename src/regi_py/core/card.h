@@ -12,7 +12,10 @@ typedef std::size_t u64;
 constexpr i32 TOTAL_SUIT_OPTIONS = 5;
 constexpr i32 TOTAL_ENTRY_OPTIONS = 14;
 constexpr i32 NONGLITCH_ENTRY_OPTIONS = 13;
-constexpr i32 MAX_CARDS_IN_GAME = 54;
+/* yield is  0
+ * joker is  1,2
+ * suits are 3-54 */
+constexpr i32 MAX_CARDS_IN_GAME = 55;
 
 enum Suit : u16
 {
