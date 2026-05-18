@@ -29,7 +29,14 @@ class LocationCheck:
         return res
 
 
-def get_keepyness(hand_locs, info):
+def get_keepyness_before(hand_locs):
+    arr = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
+    for ind in hand_locs:
+        arr[ind] = 1
+    return arr
+
+
+def get_keepyness_after(hand_locs, info):
     arr = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
     if len(info.N1) != 0:
         played_locs = LocationCheck.get_locs_in_combo(

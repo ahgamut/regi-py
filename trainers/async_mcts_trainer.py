@@ -28,8 +28,10 @@ from regi_py.rl import (
 
 
 def run_epoch(model, data, optimizer):
+    for k, v in data.items():
+        data[k] = v.to(model.device)
     y_hat, v_hat = model(data)
-    loss = model.calculate_loss(data["y"], data["value"], y_hat, v_hat)
+    loss = model.calculate_loss(data["y1"], data["value"], y_hat, v_hat)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
@@ -84,8 +86,8 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
     log2 = EndGameLog()
 
     newer_better = 0
-    old_strat = NetDirectStrategy(old_model)
-    new_strat = NetDirectStrategy(new_model)
+    old_strat = PUCTExplorerStrategy(old_model, iterations=128)
+    new_strat = PUCTExplorerStrategy(new_model, iterations=128)
 
     for s in range(num_simulations):
         game1 = GameState(log1)
@@ -165,14 +167,16 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
         num_workers=0,
     )
     while ep < params.num_episodes:
-        if queue.qsize() >= 1:
+        while queue.qsize() >= 1:
             try:
                 dataset.add_game(bench_model, queue.get())
+                if len(dataset) > params.memory_size:
+                    break
             except Exception as e:
                 print(f"P{tid} error loading sample:", e)
                 traceback.print_exc()
                 continue
-        if len(dataset) < params.memory_size:
+        if len(dataset) < params.batch_size:
             time.sleep(1)
             continue
 
@@ -194,15 +198,15 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             ep,
             new_model=bench_model,
             old_model=shared_model,
-            num_simulations=16,
-            threshold=0.1,
+            num_simulations=10,
+            threshold=0.5,
         ):
             print("episode", ep, "updated model", file=sys.stderr)
             shared_model.load_state_dict(train_model.state_dict())
             # test_model(ep, shared_model, params.num_simulations)
             ep += 1
 
-    torch.save(shared_model.state_dict(), f"./weights/model_{model.__mname__}_end.pt")
+    torch.save(shared_model.state_dict(), f"./weights/model_{shared_model.__mname__}_end.pt")
 
 
 def simulate_node(root_node, iterations):
@@ -264,7 +268,7 @@ def explorer(tid, shared_model, queue, device, params):
                 count += 1
         except Exception as e:
             print(tid, "unable to explore game", count)
-            # traceback.print_exc()
+            traceback.print_exc()
 
 
 def submain(params):

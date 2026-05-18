@@ -34,13 +34,16 @@ class KeepyPUCTNode(MCTSNode):
 
         #
         y_hat, v_hat = self.net.predict(root_phase)
-        self.value += v_hat
-        preds = 1 / (1.0 + y_hat)
+        preds = 1 - y_hat
+        self.value = v_hat
         self.next_priors = np.zeros(len(self.next_combos), dtype=np.float32)
         for i, combo in enumerate(self.next_combos):
             wt = sum(preds[card.location] for card in combo.parts)
             self.next_priors[i] = wt
-        self.next_priors /= (1.0 + np.sum(self.next_priors))
+
+        if len(self.next_combos) != 0:
+            self.next_priors = 1e-2 + normalize_probs(self.next_priors)
+            self.next_priors = normalize_probs(self.next_priors)
 
     @property
     def ucb1(self):
@@ -71,6 +74,21 @@ class KeepyPUCTNode(MCTSNode):
         self.children.append(new_node)
         self.childmap[str(combo)] = new_node
         return new_node
+
+    def simulate(self):
+        end_value = self.root_phase.game_endvalue
+        if end_value == 1:
+            return 3.0
+        if end_value == -1:
+            e = enemy_hp_left(self.root_phase)
+            if e > 280:
+                return -1
+            if e > 220:
+                return -0.75
+            if e > 160:
+                return -0.25
+            return -0.0625
+        return self.value
 
 
 class PUCTExplorerStrategy(BaseStrategy):
@@ -154,14 +172,13 @@ class NetDirectStrategy(BaseStrategy):
 
     def process_phase(self, phase, combos):
         y_hat, v_hat = self.net.predict(phase)
-        throw = 0 - y_hat
         best_ind = 0
-        best_score = 100
+        best_score = y_hat[0]
         for ind, combo in enumerate(combos):
             if len(combo.parts) == 0:
-                score = throw[0]
+                score = y_hat[0]
             else:
-                score = sum(throw[card.location] for card in combo.parts)
+                score = sum(y_hat[card.location] for card in combo.parts)
             if score < best_score:
                 best_ind = ind
                 best_score = score

@@ -5,7 +5,7 @@ import torch.nn as nn
 class LinearBlock(nn.Module):
     def __init__(self, shapes):
         super(LinearBlock, self).__init__()
-        self.ac = nn.LeakyReLU(0.05)
+        self.ac = nn.ReLU()
         self.nets = []
         for i in range(0, len(shapes) - 1):
             self.nets.append(
@@ -26,7 +26,7 @@ class LinearBlock(nn.Module):
 class Conv1dBlock(nn.Module):
     def __init__(self, shapes, channels, paddings):
         super(Conv1dBlock, self).__init__()
-        self.ac = nn.LeakyReLU(0.05)
+        self.ac = nn.ReLU()
         self.nets = []
         self.feeds = []
         for i in range(0, len(channels) - 1):
@@ -57,7 +57,7 @@ class Conv1dBlock(nn.Module):
 class Conv2dBlock(nn.Module):
     def __init__(self, shapes, channels, paddings):
         super(Conv2dBlock, self).__init__()
-        self.ac = nn.LeakyReLU(0.05)
+        self.ac = nn.ReLU()
         self.nets = []
         self.feeds = []
         for i in range(0, len(channels) - 1):
