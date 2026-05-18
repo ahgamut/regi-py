@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import time
+import traceback
 
 #
 import torch
@@ -16,30 +17,23 @@ from regi_py.core import PhaseInfo
 from regi_py import GameState, DummyLog, CXXConsoleLog
 from regi_py import get_strategy_map
 from regi_py.strats import RandomStrategy
-from regi_py.rl import BatchedMCTS, MCTS, MC2Model, MC1Model, MCTSTesterStrategy
+from regi_py.rl import (
+    BasicNet,
+    PUCTExplorerStrategy,
+    NetDirectStrategy,
+    KeepyPUCTNode,
+    PUCTDataset,
+    PUCTDataLoader,
+)
 
 
-def MCTSLoss(lprob, v, lprob_hat, v_hat):
-    n = v.shape[0]
-    # loss1 = nn.functional.mse_loss(v, v_hat)
-    loss1 = nn.functional.mse_loss(v, v_hat)
-    # loss2 = nn.functional.mse_loss(prob, prob_hat)
-    loss2 = nn.functional.kl_div(
-        input=lprob_hat, target=lprob, reduction="batchmean", log_target=True
-    )
-    # loss2 = torch.sum(lprob.exp() * lprob_hat) / n
-    return loss1, loss2
-
-
-def run_epoch(model, batch, optimizer):
-    states, lprob, v = batch
-    lprob_hat, v_hat = model(states)
-    loss1, loss2 = MCTSLoss(lprob, v, lprob_hat, v_hat)
-    loss = loss1 + loss2
+def run_epoch(model, data, optimizer):
+    y_hat, v_hat = model(data)
+    loss = model.calculate_loss(data["y"], data["value"], y_hat, v_hat)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    return loss1.item(), loss2.item()
+    return loss.item()
 
 
 def total_enemy_hp(game):
@@ -72,63 +66,37 @@ def test_model(episode, model, num_simulations):
         game = GameState(log)
         num_players = random.randint(2, 4)
         for i in range(num_players):
-            game.add_player(MCTSTesterStrategy(model))
+            game.add_player(PUCTExplorerStrategy(model))
         game.initialize()
         e0 = total_enemy_hp(game)
         game.start_loop()
         e1 = total_enemy_hp(game)
         diffe.append(log.diffe())
     print("test games:", diffe, file=sys.stderr)
-    torch.save(model.state_dict(), f"./weights/model_{episode}.pt")
+    torch.save(model.state_dict(), f"./weights/model_{model.__mname__}_{episode}.pt")
     print("episode", episode, "saved model", file=sys.stderr)
 
 
-@dataclass(slots=True)
-class PresetGame:
-    phase: PhaseInfo
-    best: int
-
-def make_preset_games(num_games):
-    preset_games = []
-    log = DummyLog()
-    for _ in range(num_games):
-        game = GameState(log)
-        num_players = random.randint(2, 4)
-        for i in range(num_players):
-            game.add_player(RandomStrategy())
-        game.initialize()
-        preset_games.append(PresetGame(game.export_phaseinfo(), 0))
-    return preset_games
-
-
-def improved_gameplay(
-    episode, new_model, old_model, num_simulations, threshold=0.6, preset_games=None
-):
+def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=0.6):
     new_model.eval()
     old_model.eval()
     log1 = EndGameLog()
     log2 = EndGameLog()
 
     newer_better = 0
+    old_strat = NetDirectStrategy(old_model)
+    new_strat = NetDirectStrategy(new_model)
 
     for s in range(num_simulations):
         game1 = GameState(log1)
         game2 = GameState(log2)
         #
-        if preset_games is None:
-            num_players = random.randint(2, 4)
-            for i in range(num_players):
-                game1.add_player(MCTSTesterStrategy(old_model))
-                game2.add_player(MCTSTesterStrategy(new_model))
-            game1.initialize()
-            game2._init_phaseinfo(game1.export_phaseinfo())
-        else:
-            num_players = preset_games[s].phase.num_players
-            for i in range(num_players):
-                game1.add_player(MCTSTesterStrategy(old_model))
-                game2.add_player(MCTSTesterStrategy(new_model))
-            game1._init_phaseinfo(preset_games[s].phase)
-            game2._init_phaseinfo(preset_games[s].phase)
+        num_players = random.randint(2, 4)
+        for i in range(num_players):
+            game1.add_player(old_strat)
+            game2.add_player(new_strat)
+        game1.initialize()
+        game2._init_phaseinfo(game1.export_phaseinfo())
         #
         game1.start_loop()
         game2.start_loop()
@@ -136,16 +104,9 @@ def improved_gameplay(
         diff1 = log1.e0 - log1.e1
         diff2 = log2.e0 - log2.e1
         #
-        if preset_games is None:
-            if diff2 >= diff1 and diff2 != 0:
-                # print(f"old: {diff1}, new: {diff2} => new is better")
-                newer_better += 1
-        else:
-            if diff2 >= preset_games[s].best and diff2 != 0:
-                print(f"old: {preset_games[s].best}, new: {diff2} => new is better", file=sys.stderr)
-                newer_better += 1
-                preset_games[s].best = diff2
-            pass
+        if diff2 > diff1 and diff2 != 0:
+            print(f"{s} old: {diff1}, new: {diff2} => new is better")
+            newer_better += 1
 
     nb_ratio = newer_better / num_simulations
     print(f"{episode} newer better in {100*nb_ratio:.4f}% of games", file=sys.stderr)
@@ -172,55 +133,60 @@ def get_split_optimizer(model):
     return optimizer
 
 
+def infinite(loader):
+    while True:
+        for batch in loader:
+            yield batch
+
+
 def trainer(tid, shared_model, queue, train_device, test_device, params):
     print(f"P{tid} on {train_device} to train")
     torch.set_num_threads(params.num_threads)
     with torch.device(train_device):
-        train_model = MC2Model()
+        train_model = BasicNet()
         train_model.device = train_device
         train_model.load_state_dict(shared_model.state_dict())
         train_model = train_model.to(train_device)
         train_model.train()
-        loss_fn = MCTSLoss
         optimizer = get_split_optimizer(train_model)
 
     with torch.device(test_device):
-        bench_model = MC2Model()
+        bench_model = BasicNet()
         bench_model.device = test_device
         bench_model.load_state_dict(shared_model.state_dict())
         bench_model = bench_model.to(test_device)
         bench_model.eval()
 
-    preset_games = make_preset_games(32)
-    ep = -1
-    samples = []
-    prev_best = 0
+    ep = 0
+    dataset = PUCTDataset(maxsize=params.memory_size)
+    loader = PUCTDataLoader(
+        dataset=dataset,
+        batch_size=params.batch_size,
+        num_workers=0,
+    )
     while ep < params.num_episodes:
-        if queue.qsize() >= params.memory_size:
-            samples.clear()
-            ep += 1
+        if queue.qsize() >= 1:
             try:
-                while len(samples) < params.memory_size:
-                    samples.append(queue.get())
+                dataset.add_game(bench_model, queue.get())
             except Exception as e:
                 print(f"P{tid} error loading sample:", e)
+                traceback.print_exc()
                 continue
-        elif len(samples) < params.memory_size:
+        if len(dataset) < params.memory_size:
             time.sleep(1)
             continue
 
-        losses1 = []
-        losses2 = []
+        losses = []
+        ldr = infinite(loader)
         for e in range(params.epochs):
-            batch = train_model.tensorify(samples, params.batch_size)
-            loss1, loss2 = run_epoch(train_model, batch, optimizer)
-            losses1.append(loss1)
-            losses2.append(loss2)
+            batch = next(ldr)
+            loss = run_epoch(train_model, batch, optimizer)
+            losses.append(loss)
 
         print(
             "episode",
             ep,
-            f"loss1={np.mean(losses1)}, loss2={np.mean(losses2)}",
+            f"loss={np.mean(losses)}",
             file=sys.stderr,
         )
         bench_model.load_state_dict(train_model.state_dict())
@@ -228,42 +194,77 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
             ep,
             new_model=bench_model,
             old_model=shared_model,
-            num_simulations=32,
-            threshold=0.05,
-            preset_games=preset_games,
+            num_simulations=16,
+            threshold=0.1,
         ):
             print("episode", ep, "updated model", file=sys.stderr)
             shared_model.load_state_dict(train_model.state_dict())
-            if (ep - prev_best) >= params.test_every:
-                test_model(ep, shared_model, params.num_simulations)
-                prev_best = ep
+            # test_model(ep, shared_model, params.num_simulations)
+            ep += 1
 
-    torch.save(shared_model.state_dict(), "./weights/model_end.pt")
+    torch.save(shared_model.state_dict(), f"./weights/model_{model.__mname__}_end.pt")
+
+
+def simulate_node(root_node, iterations):
+    for i in range(iterations):
+        node = KeepyPUCTNode.select(root_node)
+        if not node.is_terminal():
+            node = node.expand()
+        reward = node.simulate()
+        KeepyPUCTNode.update(node, reward)
+
+
+def run_single_game(tid, i, net, num_bots, num_iterations):
+    a = time.time()
+    log = DummyLog()
+    strat = RandomStrategy()
+    game = GameState(log)
+    for _ in range(num_bots):
+        game.add_player(strat)
+    game.initialize()
+    start_phase = game.export_phaseinfo()
+    #
+    history = []
+    node = KeepyPUCTNode(start_phase, net=net, prior=1.0, trim=True, weight=1.414)
+    s0 = sum(max(x.hp, 0) for x in node.root_phase.enemy_pile)
+    while node.root_phase.game_endvalue == 0:
+        simulate_node(node, num_iterations)
+        history.append(node.export())
+        child = node.best_child_node
+        child.parent = None
+        node = child
+    history.append(node.export())
+    win = float(node.root_phase.game_endvalue == 1)
+    s1 = sum(max(x.hp, 0) for x in node.root_phase.enemy_pile)
+    #
+    dt = time.time() - a
+    diff = (360 - s1) / 360
+    for info in history:
+        info.value = diff
+    # print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
+    return history
 
 
 def explorer(tid, shared_model, queue, device, params):
     print(f"P{tid} on {device} to explore")
     torch.set_num_threads(params.num_threads)
-    small_N = params.memory_size // (params.num_processes - 1)
-    mcts = MCTS(
-        net=shared_model,
-        N=small_N,
-        batch_size=params.batch_size,
-        randomize=False,
-    )
+    count = 0
     while True:
-        mcts.clear_examples()
-        mcts.reset_game()
-        mcts.sim_game_full(sims=params.num_simulations)
-        examples = mcts.get_examples()
-        for x in examples:
-            queue.put(x)
-        diffe = total_enemy_hp(examples[0].phase) - total_enemy_hp(examples[-1].phase)
-        if len(examples) > 0:
-            print(
-                f"P{tid},q={queue.qsize()},t={len(examples)},e={examples[-1].value:.4f},dmg={diffe}",
-                file=sys.stderr,
+        num_bots = random.randint(2, 4)
+        try:
+            examples = run_single_game(
+                tid,
+                count,
+                net=shared_model,
+                num_bots=num_bots,
+                num_iterations=params.num_simulations,
             )
+            if len(examples) > 1:
+                queue.put(examples)
+                count += 1
+        except Exception as e:
+            print(tid, "unable to explore game", count)
+            # traceback.print_exc()
 
 
 def submain(params):
@@ -278,7 +279,7 @@ def submain(params):
     test_device = "cpu"
 
     with torch.device(test_device):
-        shared_model = MC2Model()
+        shared_model = BasicNet()
         if os.path.isfile(params.weights_path):
             shared_model.load_state_dict(
                 torch.load(
@@ -289,7 +290,7 @@ def submain(params):
         shared_model.eval()
 
     shared_model.share_memory()
-    exp_queue = mp.Queue(maxsize=params.memory_size)
+    exp_queue = mp.Queue(maxsize=params.queue_size)
     processes = []
 
     p_trainer = mp.Process(
@@ -329,6 +330,7 @@ def main():
         "--num-threads", default=1, type=int, help="threads per process"
     )
     parser.add_argument("--test-every", default=1, type=int, help="test every k epochs")
+    parser.add_argument("--queue-size", default=64, type=int, help="queue size")
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")

@@ -124,31 +124,29 @@ class MCTSNode:
             node = max(node.children, key=lambda n: n.ucb1)
         return node
 
-    @staticmethod
-    def expand(node):
-        i = node.rem_exp_ind.pop()
-        phase = node.next_phases[i]
-        combo = node.next_combos[i]
+    def expand(self):
+        i = self.rem_exp_ind.pop()
+        phase = self.next_phases[i]
+        combo = self.next_combos[i]
         new_node = MCTSNode(
             phase,
-            trim=node.trim,
+            trim=self.trim,
             parent=node,
             prev_combo=combo,
             prev_index=i,
-            weight=node.weight,
+            weight=self.weight,
         )
-        node.children.append(new_node)
-        node.childmap[str(combo)] = new_node
+        self.children.append(new_node)
+        self.childmap[str(combo)] = new_node
         return new_node
 
-    @staticmethod
-    def simulate(node):
-        end_value = node.root_phase.game_endvalue
+    def simulate(self):
+        end_value = self.root_phase.game_endvalue
         if end_value != 0:
             return float(end_value == 1)
 
-        end_game, _ = quick_game_sim(node.root_phase, strat_klass=SubsetRandomStrategy)
-        s = enemy_hp_left(node.root_phase)
+        end_game, _ = quick_game_sim(self.root_phase, strat_klass=SubsetRandomStrategy)
+        s = enemy_hp_left(self.root_phase)
         e = enemy_hp_left(end_game)
         end_value = (360 - e) / 360
         pacing = (s - e) / end_game.phase_count
@@ -223,8 +221,8 @@ class MCTSExplorerStrategy(BaseStrategy, RecommenderMixin):
         for i in range(self.iterations):
             node = MCTSNode.select(root_node)
             if not node.is_terminal():
-                node = MCTSNode.expand(node)
-            reward = MCTSNode.simulate(node)
+                node = node.expand()
+            reward = node.simulate()
             MCTSNode.update(node, reward)
         return root_node
 

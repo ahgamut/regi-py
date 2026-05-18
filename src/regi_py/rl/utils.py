@@ -1,6 +1,5 @@
 from regi_py.core import *
 from regi_py.logging import DummyLog
-from regi_py.rl.utils import *
 from regi_py.strats.phase_utils import *
 
 #
@@ -11,6 +10,37 @@ import numpy as np
 import random
 import sys
 import time
+
+
+class LocationCheck:
+
+    CARD_STRINGS = ["yield"] + [
+        str(Card.from_location(i)) for i in range(1, MAX_CARDS_IN_GAME)
+    ]
+
+    @classmethod
+    def get_locs_in_combo(cls, locs, combo_str):
+        res = set()
+        for loc in locs:
+            if cls.CARD_STRINGS[loc] in combo_str:
+                res.add(loc)
+        if len(res) == 0 or "yield" in combo_str:
+            res.add(0)
+        return res
+
+
+def get_keepyness(hand_locs, info):
+    arr = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
+    if len(info.N1) != 0:
+        played_locs = LocationCheck.get_locs_in_combo(
+            hand_locs, info.combos[info.sel_index]
+        )
+        kept_locs = hand_locs - played_locs
+    else:
+        kept_locs = hand_locs
+    for ind in kept_locs:
+        arr[ind] = 1
+    return arr
 
 
 def normalize_probs(arr):

@@ -18,8 +18,8 @@ def simulate_node(root_node, iterations):
     for i in range(iterations):
         node = MCTSNode.select(root_node)
         if not node.is_terminal():
-            node = MCTSNode.expand(node)
-        reward = MCTSNode.simulate(node)
+            node = node.expand()
+        reward = node.simulate()
         MCTSNode.update(node, reward)
 
 
