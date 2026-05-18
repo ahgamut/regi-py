@@ -31,7 +31,14 @@ namespace regi
         i32 numPlayers;
         bool valid;
 
-        void set(i32 i, i32 j) { this->data[i * cols + j] = 1; }
+       public:
+        static constexpr i32 rows = MAX_CARDS_IN_GAME;
+        static constexpr i32 cols = MAX_LOCATIONS;
+        //
+        LocationInfo();
+        ~LocationInfo();
+        //
+        void set(i32 i, i32 j, float v = 1.0) { this->data[i * cols + j] = v; }
         float get(i32 i, i32 j) const { return this->data[i * cols + j]; }
         float rowSum(i32 i) const
         {
@@ -41,22 +48,14 @@ namespace regi
         }
 
         void setCard(const Card &, LocationStatus);
-
-       public:
-        static constexpr i32 rows = MAX_CARDS_IN_GAME;
-        static constexpr i32 cols = MAX_LOCATIONS;
-        //
-        LocationInfo();
-        ~LocationInfo();
-        //
+        void setProbs(i32, float *);
         void setYield();
         void setJokers();
         void setCards(const std::vector<Card> &, LocationStatus j);
         void setCards(const std::vector<Enemy> &, LocationStatus j);
         void setSurroundings(const std::vector<Card> &,  //
                              const std::vector<Card> &,  //
-                             const std::vector<Enemy> &,
-                             const std::vector<Combo> &);
+                             const std::vector<Enemy> &, const std::vector<Combo> &);
         void validate();
         //
         std::vector<std::pair<Card, LocationStatus>> pairwise() const;
@@ -70,6 +69,7 @@ namespace regi
         //
         static std::shared_ptr<LocationInfo> fromPhaseInfo(const PhaseInfo &);
         static std::shared_ptr<LocationInfo> fromGameState(const GameState &);
+        static std::shared_ptr<LocationInfo> fromActivePlayer(const PhaseInfo &, i32);
     };
 } /* namespace regi */
 

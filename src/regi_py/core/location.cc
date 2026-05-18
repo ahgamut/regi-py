@@ -174,6 +174,90 @@ namespace regi
         return result;
     };
 
+    static i32 relativeID(const PhaseInfo &p, i32 activeID, i32 i)
+    {
+        i32 r = (activeID + i) % p.numPlayers;
+        return r;
+    }
+
+    static void fillProbs(const PhaseInfo &p, i32 activeID, float *table)
+    {
+        float outsideCount = 0.0f;
+        i32 n;
+        //
+        table[IN_DRAW_PILE] = static_cast<float>(p.drawPile.size());
+        table[IN_DISCARD_PILE] = static_cast<float>(p.discardPile.size());
+        switch (p.numPlayers)
+        {
+            case 4:
+                table[WITH_PLAYER_4] = static_cast<float>(
+                    p.player_cards[relativeID(p, activeID, 3)].size());
+            // fallthrough
+            case 3:
+                table[WITH_PLAYER_3] = static_cast<float>(
+                    p.player_cards[relativeID(p, activeID, 2)].size());
+            // fallthrough
+            case 2:
+                table[WITH_PLAYER_2] = static_cast<float>(
+                    p.player_cards[relativeID(p, activeID, 1)].size());
+                break;
+        }
+        //
+        for (n = 0; n < MAX_LOCATIONS; ++n) { outsideCount += table[n]; }
+        for (n = 0; n < MAX_LOCATIONS; ++n) { table[n] /= outsideCount; }
+    }
+
+    void LocationInfo::setProbs(i32 i, float *table)
+    {
+        i32 j;
+        if (rowSum(i) <= 0.0)
+        {
+            for (j = 0; j < MAX_LOCATIONS; ++j) { set(i, j, table[j]); }
+        }
+    }
+
+    std::shared_ptr<LocationInfo> LocationInfo::fromActivePlayer(const PhaseInfo &p,
+                                                                 i32 activeID)
+    {
+        i32 i;
+        float table[MAX_LOCATIONS] = {0.0};
+        //
+        std::shared_ptr<LocationInfo> result = std::make_shared<LocationInfo>();
+        result->numJokers = 0;
+        result->numPlayers = p.numPlayers;
+
+        // for the active player
+        // they know their own cards
+        result->setCards(p.player_cards[activeID], LocationStatus::WITH_PLAYER_1);
+        // they know what cards are in the used pile
+        for (auto &q : p.usedPile)
+        {
+            result->setCards(q.parts, LocationStatus::IN_USED_PILE);
+        }
+        // they know all alive enemies are in the enemy pile
+        if (p.enemyPile.size() > 0)
+        {
+            result->setCards(p.enemyPile, LocationStatus::IN_ENEMY_PILE);
+        }
+
+        // everything else can be anywhere, so
+        // assign uniform probabilities for unknown cards
+        fillProbs(p, activeID, table);
+
+        // set joker count explicitly
+        if (result->numPlayers >= 2)
+        {
+            result->numJokers = result->numPlayers - 2;
+            for (i = 1; i < 1 + result->numJokers; ++i) { result->setProbs(i, table); }
+            for (; i < 3; ++i) { result->set(i, 0); }
+        }
+
+        for (i = 3; i < MAX_CARDS_IN_GAME; ++i) { result->setProbs(i, table); }
+        result->setYield();
+        // no validation
+        return result;
+    };
+
     LocationInfo::LocationInfo()
     {
         /* TODO: (ahgamut) new */
