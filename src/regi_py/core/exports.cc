@@ -106,6 +106,18 @@ void bind_enums(pybind11::object &m)
         .value("MAX_LOCATIONS", LocationStatus::MAX_LOCATIONS)
         .export_values()
         .finalize();
+
+    m.attr("MAX_CARDS_IN_GAME") = MAX_CARDS_IN_GAME;
+}
+
+static Card ctorFromLocation(i32 loc)
+{
+    Card c;
+    if (!c.fromLocation(loc))
+    {
+        throw std::runtime_error("unable to load card from location");
+    }
+    return c;
 }
 
 void bind_cards(pybind11::object &m)
@@ -115,6 +127,8 @@ void bind_cards(pybind11::object &m)
         .def_property_readonly("suit", &Card::suit)
         .def_property_readonly("strength", &Card::strength)
         .def_property_readonly("index", &Card::toIndex)
+        .def_property_readonly("location", &Card::toLocation)
+        .def_static("from_location", ctorFromLocation)
         .def(
             "__eq__", [](const Card &c1, const Card &c2) { return c1 == c2; },
             py::is_operator())
@@ -135,6 +149,7 @@ void bind_cards(pybind11::object &m)
         .def_property_readonly("suit", &Enemy::suit)
         .def_property_readonly("strength", &Enemy::strength)
         .def_property_readonly("index", &Enemy::toIndex)
+        .def_property_readonly("location", &Enemy::toLocation)
         .def("__repr__", &stringify<Enemy>)
         .def("__str__", &stringify<Enemy>);
 

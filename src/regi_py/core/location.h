@@ -12,15 +12,15 @@ namespace regi
     enum LocationStatus : i32
     {
         NOT_IN_GAME = 0,
-        WITH_PLAYER_1,
-        WITH_PLAYER_2,
-        WITH_PLAYER_3,
-        WITH_PLAYER_4,
-        IN_DRAW_PILE,
-        IN_DISCARD_PILE,
-        IN_USED_PILE,
-        IN_ENEMY_PILE,
-        MAX_LOCATIONS
+        WITH_PLAYER_1 = 1,
+        WITH_PLAYER_2 = 2,
+        WITH_PLAYER_3 = 3,
+        WITH_PLAYER_4 = 4,
+        IN_DRAW_PILE = 5,
+        IN_DISCARD_PILE = 6,
+        IN_USED_PILE = 7,
+        IN_ENEMY_PILE = 8,
+        MAX_LOCATIONS = 9
     };
 
     class LocationInfo
