@@ -29,7 +29,13 @@ function _processQueue() {
     if (_msgProcessing || _msgQueue.length === 0) return;
     _msgProcessing = true;
     let info = _msgQueue.shift();
-    _handleMessage(info);
+    try {
+        _handleMessage(info);
+    } catch (err) {
+        // A throw here must not leave _msgProcessing stuck true, otherwise the
+        // queue freezes and later messages (e.g. ENDGAME) are never handled.
+        console.error("error handling message", info, err);
+    }
     _msgTimer = setTimeout(() => {
         _msgProcessing = false;
         _processQueue();
@@ -40,7 +46,11 @@ function _flushQueue() {
     clearTimeout(_msgTimer);
     _msgProcessing = false;
     while (_msgQueue.length > 0) {
-        _handleMessage(_msgQueue.shift());
+        try {
+            _handleMessage(_msgQueue.shift());
+        } catch (err) {
+            console.error("error handling message", err);
+        }
     }
 }
 
@@ -342,12 +352,13 @@ function makeEnemyPileWithInfo(ce, enemyPileSize) {
 
     let name = document.createElement("div");
     name.className = "has-text-weight-bold is-size-5";
-    name.textContent = ce.value;
+    // On victory there is no current enemy (the last one was just defeated).
+    name.textContent = ce ? ce.value : "None";
     pile.appendChild(name);
 
     let hp = document.createElement("div");
     hp.className = "is-size-6";
-    hp.textContent = `${ce.hp} HP`;
+    hp.textContent = ce ? `${ce.hp} HP` : "defeated";
     pile.appendChild(hp);
 
     let lbl = document.createElement("div");
