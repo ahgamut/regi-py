@@ -52,7 +52,7 @@ class BruteSamplingStrategy(BaseStrategy, RecommenderMixin):
         moves, scores = self.process_moves(root_phase, combos)
         best = int(np.argmax(scores))
 
-        best_move = next_combos[best]
+        best_move = moves[best]
         for ind, c in enumerate(combos):
             if c.bitwise == best_move.bitwise:
                 return ind
