@@ -483,14 +483,14 @@ void bind_location(pybind11::object &m)
         .def_buffer(
             [](LocationInfo &info) -> py::buffer_info
             {
-                return py::buffer_info(                          //
-                    info.getData(),                              //
-                    sizeof(float),                               //
-                    py::format_descriptor<float>::format(),      //
-                    2,                                           //
-                    {info.rows, info.cols},                      //
-                    {sizeof(float) * info.cols, sizeof(float)},  //
-                    /*readonly*/ true                            //
+                return py::buffer_info(                      //
+                    info.getData(),                          //
+                    sizeof(u32),                             //
+                    py::format_descriptor<u32>::format(),    //
+                    2,                                       //
+                    {info.rows, info.cols},                  //
+                    {sizeof(u32) * info.cols, sizeof(u32)},  //
+                    /*readonly*/ true                        //
                 );
             });
 }

@@ -26,7 +26,7 @@ namespace regi
     class LocationInfo
     {
        private:
-        float *data;
+        u32 *data;
         i32 numJokers;
         i32 numPlayers;
         bool valid;
@@ -38,17 +38,17 @@ namespace regi
         LocationInfo();
         ~LocationInfo();
         //
-        void set(i32 i, i32 j, float v = 1.0) { this->data[i * cols + j] = v; }
-        float get(i32 i, i32 j) const { return this->data[i * cols + j]; }
-        float rowSum(i32 i) const
+        void set(i32 i, i32 j, u32 v = 1U) { this->data[i * cols + j] = v; }
+        u32 get(i32 i, i32 j) const { return this->data[i * cols + j]; }
+        u32 rowSum(i32 i) const
         {
-            float sum = 0;
+            u32 sum = 0;
             for (int j = 0; j < cols; ++j) { sum += this->data[i * cols + j]; }
             return sum;
         }
 
         void setCard(const Card &, LocationStatus);
-        void setProbs(i32, float *);
+        void setUnknowns(i32, u32 *);
         void setYield();
         void setJokers();
         void setCards(const std::vector<Card> &, LocationStatus j);
@@ -64,7 +64,7 @@ namespace regi
         bool getValid() const { return valid; };
         i32 getNumJokers() const { return numJokers; };
         i32 getNumPlayers() const { return numPlayers; };
-        float *getData() const { return data; };
+        u32 *getData() const { return data; };
         bool nextOK(const LocationInfo &) const;
         //
         static std::shared_ptr<LocationInfo> fromPhaseInfo(const PhaseInfo &);

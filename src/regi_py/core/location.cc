@@ -39,8 +39,8 @@ namespace regi
     bool LocationInfo::validJokers() const
     {
         // check joker count summary;
-        float nj2 = this->get(1, LocationStatus::NOT_IN_GAME) +
-                    this->get(2, LocationStatus::NOT_IN_GAME);
+        u32 nj2 = this->get(1, LocationStatus::NOT_IN_GAME) +
+                  this->get(2, LocationStatus::NOT_IN_GAME);
         if (numJokers + nj2 > 2) return false;
         // check if number of jokers is valid
         if (numPlayers == 2 && numJokers != 0) return false;
@@ -126,7 +126,7 @@ namespace regi
     std::vector<std::pair<Card, LocationStatus>> LocationInfo::pairwise() const
     {
         i32 i, j;
-        float m;
+        u32 m;
         std::vector<std::pair<Card, LocationStatus>> res;
         res.resize(MAX_CARDS_IN_GAME - 1);
         for (i = 1; i < MAX_CARDS_IN_GAME; ++i)
@@ -180,37 +180,33 @@ namespace regi
         return r;
     }
 
-    static void fillProbs(const PhaseInfo &p, i32 activeID, float *table)
+    static void fillUnknowns(const PhaseInfo &p, i32 activeID, u32 *table)
     {
-        float outsideCount = 0.0f;
         i32 n;
         //
-        table[IN_DRAW_PILE] = static_cast<float>(p.drawPile.size());
-        table[IN_DISCARD_PILE] = static_cast<float>(p.discardPile.size());
+        table[IN_DRAW_PILE] = static_cast<u32>(p.drawPile.size());
+        table[IN_DISCARD_PILE] = static_cast<u32>(p.discardPile.size());
         switch (p.numPlayers)
         {
             case 4:
-                table[WITH_PLAYER_4] = static_cast<float>(
+                table[WITH_PLAYER_4] = static_cast<u32>(
                     p.player_cards[relativeID(p, activeID, 3)].size());
             // fallthrough
             case 3:
-                table[WITH_PLAYER_3] = static_cast<float>(
+                table[WITH_PLAYER_3] = static_cast<u32>(
                     p.player_cards[relativeID(p, activeID, 2)].size());
             // fallthrough
             case 2:
-                table[WITH_PLAYER_2] = static_cast<float>(
+                table[WITH_PLAYER_2] = static_cast<u32>(
                     p.player_cards[relativeID(p, activeID, 1)].size());
                 break;
         }
-        //
-        for (n = 0; n < MAX_LOCATIONS; ++n) { outsideCount += table[n]; }
-        for (n = 0; n < MAX_LOCATIONS; ++n) { table[n] /= outsideCount; }
     }
 
-    void LocationInfo::setProbs(i32 i, float *table)
+    void LocationInfo::setUnknowns(i32 i, u32 *table)
     {
         i32 j;
-        if (rowSum(i) <= 0.0)
+        if (rowSum(i) == 0)
         {
             for (j = 0; j < MAX_LOCATIONS; ++j) { set(i, j, table[j]); }
         }
@@ -220,7 +216,7 @@ namespace regi
                                                                  i32 activeID)
     {
         i32 i;
-        float table[MAX_LOCATIONS] = {0.0};
+        u32 table[MAX_LOCATIONS] = {0};
         //
         std::shared_ptr<LocationInfo> result = std::make_shared<LocationInfo>();
         result->numJokers = 0;
@@ -242,17 +238,19 @@ namespace regi
 
         // everything else can be anywhere, so
         // assign uniform probabilities for unknown cards
-        fillProbs(p, activeID, table);
+        fillUnknowns(p, activeID, table);
 
         // set joker count explicitly
         if (result->numPlayers >= 2)
         {
             result->numJokers = result->numPlayers - 2;
-            for (i = 1; i < 1 + result->numJokers; ++i) { result->setProbs(i, table); }
+            for (i = 1; i < 1 + result->numJokers; ++i) { result->setUnknowns(i, table); }
             for (; i < 3; ++i) { result->set(i, 0); }
+        } else {
+            for (i = 1; i < 3; ++i) { result->set(i, 0); }
         }
 
-        for (i = 3; i < MAX_CARDS_IN_GAME; ++i) { result->setProbs(i, table); }
+        for (i = 3; i < MAX_CARDS_IN_GAME; ++i) { result->setUnknowns(i, table); }
         result->setYield();
         // no validation
         return result;
@@ -261,11 +259,11 @@ namespace regi
     LocationInfo::LocationInfo()
     {
         /* TODO: (ahgamut) new */
-        data = new float[rows * cols];
+        data = new u32[rows * cols];
         numJokers = 0;
         numPlayers = 0;
         valid = false;
-        for (i32 x = 0; x < rows * cols; ++x) { data[x] = 0.0; }
+        for (i32 x = 0; x < rows * cols; ++x) { data[x] = 0; }
     };
 
     LocationInfo::~LocationInfo() { delete[] data; };
