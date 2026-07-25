@@ -131,7 +131,7 @@ class MCTSNode:
         new_node = MCTSNode(
             phase,
             trim=self.trim,
-            parent=node,
+            parent=self,
             prev_combo=combo,
             prev_index=i,
             weight=self.weight,
@@ -140,13 +140,14 @@ class MCTSNode:
         self.childmap[str(combo)] = new_node
         return new_node
 
-    def simulate(self):
+    def simulate(self, active_perspective):
         end_value = self.root_phase.game_endvalue
         if end_value != 0:
             return float(end_value == 1)
 
-        end_game, _ = quick_game_sim(self.root_phase, strat_klass=SubsetRandomStrategy)
-        s = enemy_hp_left(self.root_phase)
+        imagined_root_phase = PhaseInfo.randomize_from(self.root_phase, active_perspective)
+        end_game, _ = quick_game_sim(imagined_root_phase, strat_klass=SubsetRandomStrategy)
+        s = enemy_hp_left(imagined_root_phase)
         e = enemy_hp_left(end_game)
         end_value = (360 - e) / 360
         pacing = (s - e) / end_game.phase_count
@@ -217,12 +218,13 @@ class MCTSExplorerStrategy(BaseStrategy, RecommenderMixin):
 
     def simulate_node(self, phase):
         root_node = MCTSNode(phase, trim=self.trim, weight=self.weight)
+        root_active_player = phase.active_player
 
         for i in range(self.iterations):
             node = MCTSNode.select(root_node)
             if not node.is_terminal():
                 node = node.expand()
-            reward = node.simulate()
+            reward = node.simulate(root_active_player)
             MCTSNode.update(node, reward)
         return root_node
 
