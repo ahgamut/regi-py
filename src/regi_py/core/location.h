@@ -49,7 +49,7 @@ namespace regi
 
         void setCard(const Card &, LocationStatus);
         void setUnknowns(i32, u32 *);
-        void setYield();
+        void setYield(i32, bool);
         void setJokers();
         void setCards(const std::vector<Card> &, LocationStatus j);
         void setCards(const std::vector<Enemy> &, LocationStatus j);
@@ -59,7 +59,6 @@ namespace regi
         void validate();
         //
         std::vector<std::pair<Card, LocationStatus>> pairwise() const;
-        bool validYield() const;
         bool validJokers() const;
         bool getValid() const { return valid; };
         i32 getNumJokers() const { return numJokers; };
@@ -69,7 +68,7 @@ namespace regi
         //
         static std::shared_ptr<LocationInfo> fromPhaseInfo(const PhaseInfo &);
         static std::shared_ptr<LocationInfo> fromGameState(const GameState &);
-        static std::shared_ptr<LocationInfo> fromActivePlayer(const PhaseInfo &, i32);
+        static std::shared_ptr<LocationInfo> fromCurrentPlayer(const PhaseInfo &, i32);
     };
 } /* namespace regi */
 

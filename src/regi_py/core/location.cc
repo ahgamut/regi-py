@@ -17,15 +17,15 @@ namespace regi
         {0, 0, 0, 0, 0, 1, 1, 0, 1}  /* IN_ENEMY_PILE */
     };
 
-    void LocationInfo::setYield()
+    void LocationInfo::setYield(i32 playerid, bool allowed)
     {
-        /* a yield "card" is not technically in the game */
-        this->set(0, static_cast<i32>(LocationStatus::NOT_IN_GAME));
-    }
-
-    bool LocationInfo::validYield() const
-    {
-        return this->get(0, static_cast<i32>(LocationStatus::NOT_IN_GAME)) > 0;
+        if (allowed) {
+            /* if playerid was allowed to yield, they have a yield "card" */
+            this->set(0, 1 + playerid);
+        } else {
+            /* otherwise a yield "card" is not technically in the game */
+            this->set(0, static_cast<i32>(LocationStatus::NOT_IN_GAME));
+        }
     }
 
     void LocationInfo::setJokers()
@@ -81,7 +81,6 @@ namespace regi
         setCards(discardPile, LocationStatus::IN_DISCARD_PILE);
         setCards(enemyPile, LocationStatus::IN_ENEMY_PILE);
         for (auto &q : usedPile) setCards(q.parts, LocationStatus::IN_USED_PILE);
-        setYield();
         setJokers();
     }
 
@@ -89,13 +88,12 @@ namespace regi
     {
         if (numPlayers < 2 || numPlayers > 4) return;
         if (!validJokers()) return;
-        if (!validYield()) return;
         for (int i = 0; i < rows; ++i)
         {
             // every card has a location wrt the game
-            if (rowSum(i) < 1) return;
+            if (rowSum(i) == 0) return;
             // non-jokers have to be in the game
-            if (i > 1 && this->get(i, LocationStatus::NOT_IN_GAME) != 0) return;
+            if (i > 2 && this->get(i, LocationStatus::NOT_IN_GAME) != 0) return;
         }
         valid = true;
     }
@@ -105,7 +103,7 @@ namespace regi
         if (!this->valid) return false;
         if (!next.valid) return false;
         int i, j1, j2;
-        for (i = 0; i < rows; ++i)
+        for (i = 1; i < rows; ++i) // not checking yields
         {
             for (j1 = 0; j1 < cols; ++j2)
             {
@@ -156,6 +154,7 @@ namespace regi
             result->setCards(p.player_cards[i], static_cast<LocationStatus>(i + 1));
         }
         result->setSurroundings(p.drawPile, p.discardPile, p.enemyPile, p.usedPile);
+        result->setYield(p.activePlayerID, p.pastYieldsInARow < (p.numPlayers - 1));
         result->validate();
         return result;
     };
@@ -170,17 +169,20 @@ namespace regi
             result->setCards(g.players[i].cards, static_cast<LocationStatus>(i + 1));
         }
         result->setSurroundings(g.drawPile, g.discardPile, g.enemyPile, g.usedPile);
+        result->setYield(g.activePlayerID, g.pastYieldsInARow < (g.players.size() - 1));
         result->validate();
         return result;
     };
 
-    static i32 relativeID(const PhaseInfo &p, i32 activeID, i32 i)
+    static i32 relativeID(const PhaseInfo &p, i32 currentID, i32 i)
     {
-        i32 r = (activeID + i) % p.numPlayers;
+        i32 r = (currentID + i);
+        while (r < 0) { r += p.numPlayers; }
+        r = r % p.numPlayers;
         return r;
     }
 
-    static void fillUnknowns(const PhaseInfo &p, i32 activeID, u32 *table)
+    static void fillUnknowns(const PhaseInfo &p, i32 currentID, u32 *table)
     {
         i32 n;
         //
@@ -189,16 +191,16 @@ namespace regi
         switch (p.numPlayers)
         {
             case 4:
-                table[WITH_PLAYER_4] = static_cast<u32>(
-                    p.player_cards[relativeID(p, activeID, 3)].size());
+                table[WITH_PLAYER_4] =
+                    static_cast<u32>(p.player_cards[relativeID(p, currentID, 3)].size());
             // fallthrough
             case 3:
-                table[WITH_PLAYER_3] = static_cast<u32>(
-                    p.player_cards[relativeID(p, activeID, 2)].size());
+                table[WITH_PLAYER_3] =
+                    static_cast<u32>(p.player_cards[relativeID(p, currentID, 2)].size());
             // fallthrough
             case 2:
-                table[WITH_PLAYER_2] = static_cast<u32>(
-                    p.player_cards[relativeID(p, activeID, 1)].size());
+                table[WITH_PLAYER_2] =
+                    static_cast<u32>(p.player_cards[relativeID(p, currentID, 1)].size());
                 break;
         }
     }
@@ -212,8 +214,8 @@ namespace regi
         }
     }
 
-    std::shared_ptr<LocationInfo> LocationInfo::fromActivePlayer(const PhaseInfo &p,
-                                                                 i32 activeID)
+    std::shared_ptr<LocationInfo> LocationInfo::fromCurrentPlayer(const PhaseInfo &p,
+                                                                 i32 currentID)
     {
         i32 i;
         u32 table[MAX_LOCATIONS] = {0};
@@ -224,7 +226,7 @@ namespace regi
 
         // for the active player
         // they know their own cards
-        result->setCards(p.player_cards[activeID], LocationStatus::WITH_PLAYER_1);
+        result->setCards(p.player_cards[currentID], LocationStatus::WITH_PLAYER_1);
         // they know what cards are in the used pile
         for (auto &q : p.usedPile)
         {
@@ -238,20 +240,26 @@ namespace regi
 
         // everything else can be anywhere, so
         // assign uniform probabilities for unknown cards
-        fillUnknowns(p, activeID, table);
+        fillUnknowns(p, currentID, table);
 
         // set joker count explicitly
         if (result->numPlayers >= 2)
         {
             result->numJokers = result->numPlayers - 2;
-            for (i = 1; i < 1 + result->numJokers; ++i) { result->setUnknowns(i, table); }
+            for (i = 1; i < 1 + result->numJokers; ++i)
+            {
+                result->setUnknowns(i, table);
+            }
             for (; i < 3; ++i) { result->set(i, 0); }
-        } else {
+        }
+        else
+        {
             for (i = 1; i < 3; ++i) { result->set(i, 0); }
         }
 
         for (i = 3; i < MAX_CARDS_IN_GAME; ++i) { result->setUnknowns(i, table); }
-        result->setYield();
+        result->setYield(relativeID(p, currentID, p.activePlayerID - currentID),
+                         p.pastYieldsInARow < (p.numPlayers - 1));
         // no validation
         return result;
     };
