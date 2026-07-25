@@ -34,6 +34,7 @@ class BruteSamplingStrategy(BaseStrategy, RecommenderMixin):
 
         for i in range(N):
             for b in range(B):
+                next_phases[i]._randomize(root_phase.active_player)
                 val_cur[b] = quick_game_value(
                     next_phases[i], strat_klass=RandomStrategy, relative_diff=True
                 )
