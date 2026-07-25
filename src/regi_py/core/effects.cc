@@ -177,7 +177,6 @@ namespace regi
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
 
-
         Combo curcombo = usedPile.back();
         u32 cpow = (curcombo.getPowers() & (~epow));
         i32 cval = (curcombo.getBaseDamage());
@@ -237,6 +236,9 @@ namespace regi
         while (gameRunning())
         {
             log.state(*this);
+            PhaseInfo p;
+            this->loadPhaseInfoForExport(p);
+            this->history.emplace_back(std::move(p));
             onePhase();
         }
         status = GameStatus::ENDED;
@@ -246,7 +248,10 @@ namespace regi
     void GameState::onePhase()
     {
         i32 tp = totalPlayers();
-        if (activePlayerID < 0 || activePlayerID >= tp) { gameOver(INVALID_START_PLAYER_COUNT); }
+        if (activePlayerID < 0 || activePlayerID >= tp)
+        {
+            gameOver(INVALID_START_PLAYER_COUNT);
+        }
         Player &player = players[activePlayerID];
         i32 curID = activePlayerID;
         //
@@ -273,7 +278,8 @@ namespace regi
         {
             defensePhase(player, enemyPile.front());
             // next player attack iff game is still running
-            if (gameRunning()) {
+            if (gameRunning())
+            {
                 activePlayerID += 1;
                 activePlayerID %= tp;
                 currentPhaseIsAttack = true;

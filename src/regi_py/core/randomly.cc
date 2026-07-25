@@ -11,6 +11,7 @@ namespace regi
         initEnemy();
         initDraw();
         initHandSize();
+        initHistory();
         discardPile.clear();
         usedPile.clear();
         // starting at a random point in the game

@@ -5,6 +5,7 @@
 #include <enemy.h>
 #include <player.h>
 #include <utils.h>
+#include <phaseinfo.h>
 
 namespace regi
 {
@@ -51,6 +52,7 @@ namespace regi
        private:
         BaseLog &log;
         i32 handSize;
+        void initHistory();
         void initHandSize();
         void initPlayers();
         void initDraw();
@@ -62,6 +64,7 @@ namespace regi
         i32 activePlayerID;
         i32 pastYieldsInARow;
         i32 phaseCount;
+        std::vector<PhaseInfo> history;
         std::vector<Player> players;
         std::vector<Card> drawPile;    /* cards that can be drawn */
         std::vector<Enemy> enemyPile;  /* enemies still left to KO */

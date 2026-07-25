@@ -198,6 +198,7 @@ namespace regi
 
     void GameState::initPhaseInfo(const PhaseInfo &info)
     {
+        initHistory();
         // metadata
         // gameHasEnded is for later analysis
         activePlayerID = info.activePlayerID;

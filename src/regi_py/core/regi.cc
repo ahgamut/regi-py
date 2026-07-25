@@ -127,6 +127,10 @@ namespace regi
         }
     }
 
+    void GameState::initHistory() {
+        history.clear();
+    }
+
     void GameState::init()
     {
         pastYieldsInARow = 0;
@@ -135,6 +139,7 @@ namespace regi
         initDraw();
         initHandSize();
         initPlayers();
+        initHistory();
         activePlayerID = 0;
         currentPhaseIsAttack = true;
         log.startgame(*this);
