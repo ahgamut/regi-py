@@ -328,7 +328,6 @@ namespace regi
 
         /* --- SHUFFLE START --- */
         shuffle(unknowns, 0, unknowns.size());
-        if (enemyPile.size() > 1) { shuffle(enemyPile, 1, enemyPile.size()); }
         /* --- SHUFFLE END --- */
 
         u32 count = 0;
