@@ -16,7 +16,7 @@ namespace regi
        public:
         std::vector<Card> parts;
         Combo();
-        bool valid(bool);
+        bool valid(bool) const;
         void loadDetails();
         u32 getPowers() const;
         i32 getBaseDamage() const;

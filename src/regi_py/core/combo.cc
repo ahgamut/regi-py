@@ -5,7 +5,7 @@ namespace regi
 
     Combo::Combo() : baseDmg(0), powers(0), bitrep(0) {};
 
-    bool Combo::valid(bool yieldAllowed)
+    bool Combo::valid(bool yieldAllowed) const
     {
         if (parts.size() == 0)
         {
@@ -31,14 +31,21 @@ namespace regi
         }
 
         /* numeric combo: all entries are same, but different suits
-         * cannot have ACE, sum must be less than or equal to 10 */
+         * can have ACE, sum must be less than or equal to 10 */
         i32 sum = 0;
         sum += static_cast<i32>(parts[0].entry());
+        u32 suitFlags = (1 << parts[0].suit());
         for (i32 i = 1; i < parts.size(); ++i)
         {
-            sum += static_cast<i32>(parts[i].entry());
-            if (parts[i].entry() == ACE) return false;
             if (parts[i].entry() != parts[0].entry()) return false;
+            if (parts[0].entry() == ACE && parts.size() > 2) return false;
+            if (suitFlags & (1 << parts[i].suit()))
+            {
+                /* cannot have dupe of the same suit / same entry */
+                return false;
+            }
+            suitFlags |= (1 << parts[i].suit());
+            sum += static_cast<i32>(parts[i].entry());
         }
         return sum <= 10;
     }
@@ -87,8 +94,6 @@ namespace regi
     }
 
     u32 Combo::getBitrep() const { return this->bitrep; }
-    void Combo::setBitrep(u32 br) {
-        this->bitrep = br;
-    }
+    void Combo::setBitrep(u32 br) { this->bitrep = br; }
 } /* namespace regi */
 

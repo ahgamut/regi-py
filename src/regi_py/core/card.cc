@@ -58,8 +58,8 @@ i32 Card::toLocation() const
         return -1;
     }
 
-    i32 sp = static_cast<i32>(this->s) - 1;  // always >= 0
-    i32 ep = static_cast<i32>(this->e) - 1;  // always >= 0
+    i32 sp = static_cast<i32>(this->s) - 1;  // sp always >= 0
+    i32 ep = static_cast<i32>(this->e) - 1;  // ep always >= 0
     i32 loc = 3 + sp * NONGLITCH_ENTRY_OPTIONS + ep;
     if (loc < 3 || loc > MAX_CARDS_IN_GAME) { return -1; }
     return loc;
