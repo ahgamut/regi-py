@@ -348,14 +348,6 @@ void bind_log(pybind11::object &m)
         .def(py::init<>());
 }
 
-void loadPhaseInfoOrFail(PhaseInfo &info, std::string s)
-{
-    if (!info.loadFromString(s))
-    {
-        throw std::runtime_error("unable to load info from string: " + s);
-    }
-}
-
 void bind_phaseinfo(pybind11::object &m)
 {
     py::class_<PhaseInfo>(m, "PhaseInfo")

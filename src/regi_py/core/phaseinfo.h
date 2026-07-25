@@ -31,5 +31,7 @@ namespace regi
         bool loadFromString(std::string);
         std::string toString() const;
     };
+
+    void loadPhaseInfoOrFail(PhaseInfo &, std::string);
 } /* namespace regi */
 #endif

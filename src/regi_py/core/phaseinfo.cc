@@ -282,4 +282,13 @@ namespace regi
         info.usedPile.clear();
         std::copy(usedPile.begin(), usedPile.end(), std::back_inserter(info.usedPile));
     }
+
+    void loadPhaseInfoOrFail(PhaseInfo &info, std::string s)
+    {
+        if (!info.loadFromString(s))
+        {
+            throw std::runtime_error("unable to load info from string: " + s);
+        }
+    }
+
 } /* namespace regi */
