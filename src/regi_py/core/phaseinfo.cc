@@ -305,8 +305,11 @@ namespace regi
         return psize;
     }
 
-    void PhaseInfo::randomize()
+    void PhaseInfo::randomize(i32 currentID)
     {
+        if (currentID < 0) {
+            currentID = this->activePlayerID;
+        }
         /* randomize cards that the active player cannot see,
          * to simulate potential gamestates/futures */
         std::vector<Card> unknowns;
@@ -316,7 +319,7 @@ namespace regi
         /* active player cannot see others' cards (cheating) */
         for (i32 i = 0; i < numPlayers; ++i)
         {
-            if (i == activePlayerID) continue;
+            if (i == currentID) continue;
             std::copy(player_cards[i].begin(), player_cards[i].end(),
                       std::back_inserter(unknowns));
         }
@@ -332,7 +335,7 @@ namespace regi
         count = addBackReshuffled(discardPile, unknowns, count);
         for (i32 i = 0; i < numPlayers; ++i)
         {
-            if (i == activePlayerID) continue;
+            if (i == currentID) continue;
             count = addBackReshuffled(player_cards[i], unknowns, count);
         }
         count = addBackReshuffled(drawPile, unknowns, count);

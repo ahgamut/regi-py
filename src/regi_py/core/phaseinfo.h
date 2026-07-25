@@ -29,7 +29,7 @@ namespace regi
 
         PhaseInfo() {};
         bool loadFromString(std::string);
-        void randomize();
+        void randomize(i32);
         std::string toString() const;
     };
 
