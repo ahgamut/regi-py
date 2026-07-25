@@ -358,6 +358,14 @@ void bind_phaseinfo(pybind11::object &m)
                         loadPhaseInfoOrFail(info, s);
                         return info;
                     })
+        .def_static("randomize_from",
+                    [](const PhaseInfo &other)
+                    {
+                        PhaseInfo info(other);
+                        info.randomize();
+                        return info;
+                    })
+        .def("_randomize", &PhaseInfo::randomize)
         .def_readonly("num_players", &PhaseInfo::numPlayers)
         .def_readonly("game_endvalue", &PhaseInfo::gameHasEnded)
         .def_readonly("active_player", &PhaseInfo::activePlayerID)

@@ -2,6 +2,7 @@
 #include <regi.h>
 #include <algorithm>
 #include <iterator>
+#include <utils.h>
 
 // shoddy, but I'm checking bounds everywhere
 #pragma GCC diagnostic ignored "-Wsign-compare"
@@ -289,6 +290,52 @@ namespace regi
         {
             throw std::runtime_error("unable to load info from string: " + s);
         }
+    }
+
+    static u32 addBackReshuffled(std::vector<Card> &pile, std::vector<Card> &unknowns,
+                                 u32 count)
+    {
+        u32 psize = pile.size();
+        if (psize != 0)
+        {
+            pile.clear();
+            std::copy(unknowns.begin() + count, unknowns.begin() + count + psize,
+                      std::back_inserter(pile));
+        }
+        return psize;
+    }
+
+    void PhaseInfo::randomize()
+    {
+        /* randomize cards that the active player cannot see,
+         * to simulate potential gamestates/futures */
+        std::vector<Card> unknowns;
+
+        /* active player cannot see the draw pile (cheating) */
+        std::copy(drawPile.begin(), drawPile.end(), std::back_inserter(unknowns));
+        /* active player cannot see others' cards (cheating) */
+        for (i32 i = 0; i < numPlayers; ++i)
+        {
+            if (i == activePlayerID) continue;
+            std::copy(player_cards[i].begin(), player_cards[i].end(),
+                      std::back_inserter(unknowns));
+        }
+        /* assume active player cannot see the discard pile */
+        std::copy(discardPile.begin(), discardPile.end(), std::back_inserter(unknowns));
+
+        /* --- SHUFFLE START --- */
+        shuffle(unknowns, 0, unknowns.size());
+        if (enemyPile.size() > 1) { shuffle(enemyPile, 1, enemyPile.size()); }
+        /* --- SHUFFLE END --- */
+
+        u32 count = 0;
+        count = addBackReshuffled(discardPile, unknowns, count);
+        for (i32 i = 0; i < numPlayers; ++i)
+        {
+            if (i == activePlayerID) continue;
+            count = addBackReshuffled(player_cards[i], unknowns, count);
+        }
+        count = addBackReshuffled(drawPile, unknowns, count);
     }
 
 } /* namespace regi */
