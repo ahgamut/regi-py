@@ -3,6 +3,7 @@
 #include <dfsel.h>
 #include <phaseinfo.h>
 #include <location.h>
+#include <combotable.h>
 //
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -104,6 +105,33 @@ void bind_enums(pybind11::object &m)
         .value("IN_USED_PILE", LocationStatus::IN_USED_PILE)
         .value("IN_ENEMY_PILE", LocationStatus::IN_ENEMY_PILE)
         .value("MAX_LOCATIONS", LocationStatus::MAX_LOCATIONS)
+        .export_values()
+        .finalize();
+
+    py::native_enum<PlayedStatus>(m, "PlayedStatus", "enum.IntEnum")
+        .value("PLAYED_SELF", PlayedStatus::PLAYED_SELF)
+        .value("PLAYED_2_AC", PlayedStatus::PLAYED_2_AC)
+        .value("PLAYED_2_AD", PlayedStatus::PLAYED_2_AD)
+        .value("PLAYED_2_AH", PlayedStatus::PLAYED_2_AH)
+        .value("PLAYED_2_AS", PlayedStatus::PLAYED_2_AS)
+        .value("PLAYED_2_2C", PlayedStatus::PLAYED_2_2C)
+        .value("PLAYED_2_2D", PlayedStatus::PLAYED_2_2D)
+        .value("PLAYED_2_2H", PlayedStatus::PLAYED_2_2H)
+        .value("PLAYED_2_3C", PlayedStatus::PLAYED_2_3C)
+        .value("PLAYED_2_3D", PlayedStatus::PLAYED_2_3D)
+        .value("PLAYED_2_3H", PlayedStatus::PLAYED_2_3H)
+        .value("PLAYED_2_4C", PlayedStatus::PLAYED_2_4C)
+        .value("PLAYED_2_4D", PlayedStatus::PLAYED_2_4D)
+        .value("PLAYED_2_4H", PlayedStatus::PLAYED_2_4H)
+        .value("PLAYED_2_5C", PlayedStatus::PLAYED_2_5C)
+        .value("PLAYED_2_5D", PlayedStatus::PLAYED_2_5D)
+        .value("PLAYED_2_5H", PlayedStatus::PLAYED_2_5H)
+        .value("PLAYED_3_2C_2D", PlayedStatus::PLAYED_3_2C_2D)
+        .value("PLAYED_3_2H_2S", PlayedStatus::PLAYED_3_2H_2S)
+        .value("PLAYED_3_3C_3D", PlayedStatus::PLAYED_3_3C_3D)
+        .value("PLAYED_3_3H_3S", PlayedStatus::PLAYED_3_3H_3S)
+        .value("PLAYED_4_2C_2D_2H", PlayedStatus::PLAYED_4_2C_2D_2H)
+        .value("MAX_PLAYED_STATUS", PlayedStatus::MAX_PLAYED_STATUS)
         .export_values()
         .finalize();
 
@@ -495,6 +523,33 @@ void bind_location(pybind11::object &m)
             });
 }
 
+void bind_combotable(pybind11::object &m)
+{
+    py::class_<ComboTable, std::shared_ptr<ComboTable>>(m, "ComboTable",
+                                                        py::buffer_protocol())
+        .def_static("from_phase", &ComboTable::fromPhaseInfo)
+        .def_static("fromPhaseInfo", &ComboTable::fromPhaseInfo)
+        .def_static("from_game", &ComboTable::fromGameState)
+        .def_static("fromGameState", &ComboTable::fromGameState)
+        .def_static("all_entries", &ComboTable::allViableEntries)
+        .def("add_combo", &ComboTable::setComboEntry)
+        .def("add_used_pile", &ComboTable::fromUsedPile)
+        .def("as_used_pile", &ComboTable::getAsUsedPile)
+        .def_buffer(
+            [](ComboTable &table) -> py::buffer_info
+            {
+                return py::buffer_info(                       //
+                    table.getData(),                          //
+                    sizeof(u32),                              //
+                    py::format_descriptor<u32>::format(),     //
+                    2,                                        //
+                    {table.rows, table.cols},                 //
+                    {sizeof(u32) * table.cols, sizeof(u32)},  //
+                    /*readonly*/ true                         //
+                );
+            });
+}
+
 PYBIND11_MODULE(core, m)
 {
     m.doc() = "c++ module for regicide game mechanics";
@@ -505,5 +560,6 @@ PYBIND11_MODULE(core, m)
     bind_log(m);
     bind_phaseinfo(m);
     bind_location(m);
+    bind_combotable(m);
     bind_gamestate(m);
 }
