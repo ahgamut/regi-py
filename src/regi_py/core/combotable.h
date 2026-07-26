@@ -73,14 +73,18 @@ namespace regi
         void clearAllCardEntries(const Card &);
         void fromUsedPile(const std::vector<Combo> &pile);
         //
-        bool fillComboEntry(const Card &, const PlayedStatus, Combo &) const;
         std::vector<Combo> getAsUsedPile() const;
         //
         u32 *getData() const { return data; };
         //
+        static bool fillComboEntry(const Card &, const PlayedStatus, Combo &);
+        static Combo createComboFromTableEntry(i32, i32);
         static std::shared_ptr<ComboTable> fromPhaseInfo(const PhaseInfo &);
         static std::shared_ptr<ComboTable> fromGameState(const GameState &);
         static std::shared_ptr<ComboTable> allViableEntries();
+        static std::shared_ptr<ComboTable> emptyTable();
     };
+
+    
 } /* namespace regi */
 #endif

@@ -12,7 +12,7 @@ namespace regi
     }
 
     bool ComboTable::fillComboEntry(const Card &card, PlayedStatus s,
-                                    Combo &combo) const
+                                    Combo &combo)
     {
         combo.parts.clear();
         bool valid = false;
@@ -274,7 +274,7 @@ namespace regi
             for (j = 0; j < cols; ++j)
             {
                 if (this->data[i * cols + j] == 0) continue;
-                if (!this->fillComboEntry(card, static_cast<PlayedStatus>(j), combo))
+                if (!fillComboEntry(card, static_cast<PlayedStatus>(j), combo))
                     continue;
                 res.push_back(combo);
             }
@@ -310,12 +310,30 @@ namespace regi
             card.fromLocation(i);
             for (j = 0; j < result->cols; ++j)
             {
-                if (!result->fillComboEntry(card, static_cast<PlayedStatus>(j), combo))
+                if (!fillComboEntry(card, static_cast<PlayedStatus>(j), combo))
                     continue;
                 result->set(i, static_cast<PlayedStatus>(j));
             }
         }
         return result;
+    }
+
+    std::shared_ptr<ComboTable> ComboTable::emptyTable()
+    {
+        std::shared_ptr<ComboTable> result = std::make_shared<ComboTable>();
+        return result;
+    }
+
+    Combo ComboTable::createComboFromTableEntry(i32 loc, i32 pst) {
+        Combo res;
+        Card c;
+        PlayedStatus s;
+        //
+        if (pst < 0 || pst >= MAX_PLAYED_STATUS) return res;
+        if (!c.fromLocation(loc)) return res;
+        s = static_cast<PlayedStatus>(pst);
+        fillComboEntry(c, s, res);
+        return res;
     }
 
 } /* namespace regi */
