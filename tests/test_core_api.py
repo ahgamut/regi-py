@@ -205,16 +205,17 @@ class CapturingLog(DummyLog):
         self.end_reason = reason
 
 
-@pytest.mark.parametrize("num_players", [1, 5])
-def test_invalid_player_count_ends_game(num_players):
-    # Only 2-4 players are valid; 1 or 5+ is an invalid setup. initialize() ends the
-    # game cleanly with a reason. (NOTE: _init_random() with an invalid count hangs,
-    # so error paths must go through initialize().)
+@pytest.mark.parametrize("init_method", ["initialize", "_init_random"])
+@pytest.mark.parametrize("num_players", [1, 5, 6])
+def test_invalid_player_count_ends_game(num_players, init_method):
+    # Only 2-4 players are valid; 1 or 5+ is an invalid setup. Both init paths must
+    # end the game cleanly with a reason and must NOT hang (regression: an unset
+    # handSize used to loop forever when drawing hands for an invalid count).
     log = CapturingLog()
     game = GameState(log)
     for _ in range(num_players):
         game.add_player(RandomStrategy())
-    status = game.initialize()
+    status = getattr(game, init_method)()
     assert status == GameStatus.ENDED
     assert log.end_reason == EndGameReason.INVALID_START_PLAYER_SETUP
 

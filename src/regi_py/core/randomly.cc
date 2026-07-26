@@ -10,7 +10,10 @@ namespace regi
         phaseCount = 0;
         initEnemy();
         initDraw();
+        /* invalid player count ends the game here; bail before using handSize */
+        if (status == GameStatus::ENDED) { return; }
         initHandSize();
+        if (status == GameStatus::ENDED) { return; }
         initHistory();
         discardPile.clear();
         usedPile.clear();

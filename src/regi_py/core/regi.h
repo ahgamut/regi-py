@@ -75,6 +75,7 @@ namespace regi
         GameState(BaseLog &l) : log(l)
         {
             status = GameStatus::LOADING;
+            handSize = 0;
             activePlayerID = 0;
             currentPhaseIsAttack = false;
         };

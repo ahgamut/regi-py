@@ -137,7 +137,11 @@ namespace regi
         phaseCount = 0;
         initEnemy();
         initDraw();
+        /* initDraw ends the game on an invalid player count; bail before
+         * drawing hands with an unset handSize (which would loop forever). */
+        if (status == GameStatus::ENDED) { return; }
         initHandSize();
+        if (status == GameStatus::ENDED) { return; }
         initPlayers();
         initHistory();
         activePlayerID = 0;
