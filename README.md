@@ -16,6 +16,26 @@ python3 -m pip install -e .
 ```
 
 
+## Building and testing
+
+The package ships a C++ extension (`regi_py.core`) that must be compiled for your
+interpreter. Build it in-place and run the test suite with:
+
+```sh
+# from a fresh virtualenv
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install "pybind11>=3"
+python -m pip install -e .[dev] --no-build-isolation   # builds the extension + test deps
+pytest -q
+```
+
+Re-run `pip install -e . --no-build-isolation` after any change to the C++ sources
+under `src/regi_py/core/` to rebuild the extension before testing.
+
+The `pytorch` training code (`regi_py.rl`, `trainers/`) and the web app
+(`webdriver/`) are exercised separately; their tests skip automatically when those
+dependencies are unavailable.
+
 ## Viewing a basic simulation
 
 Run the `driver.py` to see a basic command-line simulation of the game, where

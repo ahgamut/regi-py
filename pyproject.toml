@@ -19,6 +19,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[project.optional-dependencies]
+# test/dev tooling; install with `pip install -e .[dev]`
+dev = ["pytest>=7", "numpy>=1.21"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
