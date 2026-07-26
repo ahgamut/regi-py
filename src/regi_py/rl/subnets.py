@@ -83,3 +83,35 @@ class Conv2dBlock(nn.Module):
             else:
                 x = y
         return x
+
+
+class WidthCrossAttention(nn.Module):
+    def __init__(self, channels, heads=4):
+        super().__init__()
+        assert channels % heads == 0
+        self.h = heads
+        self.dk = channels // heads
+        self.q = nn.Linear(channels, channels)
+        self.k = nn.Linear(channels, channels)
+        self.v = nn.Linear(channels, channels)
+        self.proj = nn.Linear(channels, channels)
+
+    def forward(self, a, b):
+        # a: (N, C, H, y1)  b: (N, C, H, y2)  -> (N, C, H, y1)
+        N, C, H, y1 = a.shape
+        y2 = b.shape[-1]
+
+        a = a.permute(0, 2, 3, 1).reshape(N * H, y1, C)  # queries
+        b = b.permute(0, 2, 3, 1).reshape(N * H, y2, C)  # keys/vals
+
+        q = self.q(a).view(N * H, y1, self.h, self.dk).transpose(1, 2)
+        k = self.k(b).view(N * H, y2, self.h, self.dk).transpose(1, 2)
+        v = self.v(b).view(N * H, y2, self.h, self.dk).transpose(1, 2)
+
+        scores = (q @ k.transpose(-2, -1)) / self.dk**0.5  # (.., y1, y2)
+        attn = scores.softmax(dim=-1)
+        out = attn @ v  # (.., y1, dk)
+
+        out = out.transpose(1, 2).reshape(N * H, y1, C)
+        out = self.proj(out)
+        return out.reshape(N, H, y1, C).permute(0, 3, 1, 2)  # (N, C, H, y1)

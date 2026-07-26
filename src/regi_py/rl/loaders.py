@@ -1,7 +1,43 @@
-from torch.utils.data import IterableDataset
-from torch.utils.data import DataLoader
 import torch
 import random
+
+
+from torch.utils.data import IterableDataset
+from torch.utils.data import DataLoader
+from torch.utils.data import TensorDataset, ConcatDataset
+
+
+class ShardBuffer:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.current_size = 0
+        self.shards = []  # list[TensorDataset]
+
+    def add(self, dct):
+        ds = TensorDataset(
+            dct["location"],
+            dct["used_pile"],
+            dct["value"],
+            dct["keepyness"],
+            dct["atk_probs"],
+            dct["attacking"],
+        )
+        if self.current_size + len(ds) < self.capacity:
+            self.current_size += len(ds)
+            self.shards.append(ds)
+            return None
+        else:
+            i = random.randrange(len(self.shards))
+            old = self.shards[i]
+            self.shards[i] = ds
+            self.current_size += len(ds) - len(old)
+            return old
+
+    def dataset(self):
+        return ConcatDataset(self.shards)
+
+    def __len__(self):
+        return self.current_size
 
 
 class PUCTDataset(IterableDataset):
@@ -37,3 +73,7 @@ def collate_dict(objs):
 class PUCTDataLoader(DataLoader):
     def __init__(self, **kwargs):
         super().__init__(collate_fn=collate_dict, **kwargs)
+
+
+class AZDataLoader(DataLoader):
+    pass

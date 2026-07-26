@@ -1,82 +1,186 @@
 from regi_py.core import PhaseInfo
 from regi_py.core import LocationInfo
-from regi_py.strats.mcts_explorer import MCTSNodeInfo
+from regi_py.core import MAX_CARDS_IN_GAME
+from regi_py.rl.az_explorer import AZNodeInfo
 from regi_py.rl.utils import *
-from regi_py.rl.subnets import LinearBlock
+from regi_py.rl.subnets import (
+    LinearBlock,
+    Conv1dBlock,
+    Conv2dBlock,
+    WidthCrossAttention,
+)
 
 #
 import torch
 import torch.nn as nn
 
-def focal_loss(probs, targets, gamma=2.0, alpha=0.25):
-    bce = nn.functional.binary_cross_entropy(probs, targets, reduction='none')
-    p_t = probs * targets + (1 - probs) * (1 - targets)
-    loss = ((1 - p_t) ** gamma) * bce
-    alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
-    loss = alpha_t * loss
-    return loss.mean()
+
+class ValueNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net1 = Conv2dBlock(channels=(64, 8, 1), shapes=(3, 1), paddings=(1, 0))
+        self.net2 = nn.Linear(in_features=495, out_features=1)
+        self.ac = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.net1(x).reshape(x.shape[0], -1)
+        x = self.net2(x)
+        x = self.ac(x)
+        return x
+
+
+class KeepyNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net1 = Conv2dBlock(channels=(64, 8, 1), shapes=(3, 1), paddings=(1, 0))
+        self.net2 = nn.Linear(in_features=495, out_features=MAX_CARDS_IN_GAME)
+        self.ac = nn.Tanh()
+
+    def forward(self, x):
+        x = self.net1(x).reshape(x.shape[0], -1)
+        x = self.net2(x)
+        x = self.ac(x)
+        return x
+
+
+class ActionNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        n = MAX_CARDS_IN_GAME
+        self.ac = nn.Softmax2d()
+        self.net1 = Conv2dBlock(channels=(64, 16, 4), shapes=(3, 1), paddings=(1, 0))
+        self.net2 = Conv1dBlock(
+            channels=(n, n, n, n), shapes=(7, 7, 3), paddings=(0, 0, 0)
+        )
+        self.wca = WidthCrossAttention(channels=MAX_CARDS_IN_GAME, heads=5)
+
+    def forward(self, x0, k):
+        x = self.net1(x0)
+        x = x.reshape(x0.shape[0], MAX_CARDS_IN_GAME, -1)
+        x = self.net2(x)
+        x = x.reshape(x.shape[0], MAX_CARDS_IN_GAME, 1, MAX_PLAYED_STATUS)
+        k2 = k.reshape(x.shape[0], MAX_CARDS_IN_GAME, 1, 1)
+        x = self.wca(x, k2).reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
+        x = self.ac(x)
+        return x
+
+
+class CombineNet(nn.Module):
+    def __init__(self, channels=32, reduction=4):
+        super().__init__()
+        self.wca = WidthCrossAttention(channels=channels, heads=4)
+        self.net = Conv2dBlock(
+            channels=(channels, 64, 64, 64, 64, 64),
+            shapes=(1, 3, 3, 3, 3),
+            paddings=(0, 1, 1, 1, 1),
+        )
+
+    def forward(self, x1, x2):
+        y1 = self.wca(x1, x2)
+        y2 = self.net(y1)
+        return y2
+
 
 class BasicNet(nn.Module):
     __mname__ = "basic"
+
     def __init__(self):
         super().__init__()
         self.device = "cpu"
+        self.max_history = 8
         #
-        self.atkdef = nn.Embedding(num_embeddings=2, embedding_dim=32)
-        self.net1 = LinearBlock(shapes=(9, 9, 12))
-        self.net2 = nn.Bilinear(12, 32, 16)
-        self.net3 = LinearBlock(shapes=(16, 16, 16, 16, 1))
-        self.ac1 = nn.Softmax(dim=1)
+        self.loc_net = Conv2dBlock(
+            channels=(self.max_history, 32),
+            shapes=(1,),
+            paddings=(0,),
+        )
+        self.usp_net = Conv2dBlock(
+            channels=(self.max_history, 32),
+            shapes=(1,),
+            paddings=(0,),
+        )
 
-        self.net4a = LinearBlock(shapes=(12, 12, 12, 12, 1))
-        self.net4b = LinearBlock(shapes=(55, 8, 1))
-        self.ac2 = nn.Sigmoid()
+        self.combiner = CombineNet(channels=32)
+        self.v_net = ValueNet()
+        self.k_net = KeepyNet()
+        self.a_net = ActionNet()
 
     def forward(self, data):
-        y00 = self.net1(data["x"])
-        v0 = self.net4a(y00).reshape(y00.shape[0], -1)
-        v1 = self.ac2(self.net4b(v0))
+        x1 = self.loc_net(data["location"])
+        x2 = self.usp_net(data["used_pile"])
+        x = self.combiner(x1, x2)
+        v = self.v_net(x)
+        k = self.k_net(x)
+        a = self.a_net(x, k)
+        return v, k, a
 
-        y01 = self.atkdef(data["attack"]).unsqueeze(1).expand(-1, y00.shape[1], -1)
-        y1 = self.net2(y00, y01)
-        y2 = self.net3(y1)
-        y3 = self.ac1(data["y0"] * y2.reshape(y2.shape[0], -1))
-        return y3, v1
-
-    def calculate_loss(self, y, v, y_hat, v_hat):
-        loss1 = focal_loss(y_hat, y)
+    def calculate_loss(self, y, y_hat, phase_atk):
+        v, k, a = y
+        v_hat, k_hat, a_hat = y_hat
+        loss1a = torch.sum(-a * torch.log(a_hat), dim=(-2, -1))
+        loss1 = torch.mean(loss1a * phase_atk)
         loss2 = nn.functional.mse_loss(v_hat, v)
-        return loss1 + loss2
+        loss3 = nn.functional.mse_loss(k_hat * k, k)
+        return loss1 + loss2 + loss3
 
-    def predict(self, obj):
-        info = MCTSNodeInfo(phase=str(obj), N0=0, value=0, N1=[], combos=[], sel_index=-1, offset=0)
-        data = self.tensorify([info])
-        y_hat0, v_hat0 = self.forward(data[0])
-        y_hat = y_hat0.detach().cpu().numpy()[0]
-        v_hat = v_hat0.detach().cpu().numpy()[0]
-        return y_hat, v_hat
+    def predict(self, history, perspective=None):
+        data = BasicNet.tensorify_phases(history, perspective, self.max_history)
+        v_hat0, k_hat0, a_hat0 = self.forward(data)
+        v_hat = float(v_hat0.detach().cpu().numpy()[0, 0])
+        k_hat = k_hat0.detach().cpu().numpy()[0, :]
+        a_hat = a_hat0.detach().cpu().numpy()[0, 0, :, :]
+        return v_hat, k_hat, a_hat
 
-    def tensorify(self, infos):
-        results = []
-        for info in infos:
-            phase = PhaseInfo.from_string(info.phase)
-            locat = LocationInfo.from_active(phase, phase.active_player)
-            x = np.array(locat, dtype=np.float32)
-            #
-            cards_before = set(int(l) for l in x[:, 1].nonzero()[0])
-            cards_before.add(0)  # yield
-            y0 = get_keepyness_before(cards_before)
-            y1 = get_keepyness_after(cards_before, info)
-            #
-            results.append(
-                {
-                    # x is 1, 55, 9
-                    "x": torch.from_numpy(x).unsqueeze(0),
-                    # y is 1, 55
-                    "y0": torch.from_numpy(y0).unsqueeze(0),
-                    "y1": torch.from_numpy(y1).unsqueeze(0),
-                    "value": torch.FloatTensor([info.value]).unsqueeze(0),
-                    "attack": torch.LongTensor([phase.phase_attacking]),
-                }
+    @staticmethod
+    def tensorify_phases(history, perspective=None, window=8):
+        result = {
+            "location": torch.zeros((1, window, MAX_CARDS_IN_GAME, MAX_LOCATIONS)),
+            "used_pile": torch.zeros((1, window, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)),
+        }
+        if perspective is None:
+            perspective = history[-1].active_player
+        #
+        for j in range(window):
+            phase = history[j]
+            loca0 = np.array(
+                LocationInfo.from_current(phase, perspective), dtype=np.float32
             )
-        return results
+            locat = loca0 / loca0.sum(axis=1, keepdims=True)
+            table = np.array(ComboTable.from_phase(phase), dtype=np.float32)
+            result["location"][0, j] = torch.from_numpy(locat)
+            result["used_pile"][0, j] = torch.from_numpy(table)
+        return result
+
+    @staticmethod
+    def tensorify_training(infos):
+        N = len(infos)
+        window = len(infos[0].history)
+        result = {
+            "location": torch.zeros((N, window, MAX_CARDS_IN_GAME, MAX_LOCATIONS)),
+            "used_pile": torch.zeros((N, window, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)),
+            "value": torch.zeros((N, 1)),
+            "keepyness": torch.ones((N, MAX_CARDS_IN_GAME)),
+            "atk_probs": torch.zeros((N, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)),
+            "attacking": torch.zeros((N, 1)),
+        }
+        #
+        for i in range(N):
+            info = infos[i]
+            cur_phase = info.history[-1]
+            result["value"][i, 0] = info.value
+            result["attacking"][i, 0] = cur_phase.phase_attacking
+            result["keepyness"][i, :] = torch.from_numpy(info.keepyness)
+            result["atk_probs"][i, 0] = torch.from_numpy(info.atk_probs)
+            #
+            perspective = cur_phase.active_player
+            for j in range(window, 0, -1):
+                phase = info.history[-j]
+                loca0 = np.array(
+                    LocationInfo.from_current(phase, perspective), dtype=np.float32
+                )
+                locat = loca0 / loca0.sum(axis=1, keepdims=True)
+                table = np.array(ComboTable.from_phase(phase), dtype=np.float32)
+                result["location"][i, -j] = torch.from_numpy(locat)
+                result["used_pile"][i, -j] = torch.from_numpy(table)
+
+        return result
