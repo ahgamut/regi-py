@@ -15,6 +15,7 @@ but its cell is ``(0, PLAYED_SELF)`` and ``make_combo(0, 0)`` carries the yield
 *card* (``bitwise == 1``).  Both directions here normalize yield to ``bitwise 0``
 -- the identity a played yield actually has -- so ``1`` is never a key.
 """
+
 import numpy as np
 
 from .core import ComboTable

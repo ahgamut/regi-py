@@ -145,8 +145,12 @@ class MCTSNode:
         if end_value != 0:
             return float(end_value == 1)
 
-        imagined_root_phase = PhaseInfo.randomize_from(self.root_phase, active_perspective)
-        end_game, _ = quick_game_sim(imagined_root_phase, strat_klass=SubsetRandomStrategy)
+        imagined_root_phase = PhaseInfo.randomize_from(
+            self.root_phase, active_perspective
+        )
+        end_game, _ = quick_game_sim(
+            imagined_root_phase, strat_klass=SubsetRandomStrategy
+        )
         s = enemy_hp_left(imagined_root_phase)
         e = enemy_hp_left(end_game)
         end_value = (360 - e) / 360

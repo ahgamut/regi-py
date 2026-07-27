@@ -16,20 +16,41 @@ from .strats import STRATEGY_LIST as strat1
 
 __all__ = [
     # enums / constants
-    "Suit", "Entry", "SuitPower", "GameStatus", "EndGameReason",
+    "Suit",
+    "Entry",
+    "SuitPower",
+    "GameStatus",
+    "EndGameReason",
     # value objects
-    "Card", "Enemy", "Combo", "Player", "PhaseInfo",
-    "LocationInfo", "ComboTable",
+    "Card",
+    "Enemy",
+    "Combo",
+    "Player",
+    "PhaseInfo",
+    "LocationInfo",
+    "ComboTable",
     # engine
-    "GameState", "Game", "seed",
+    "GameState",
+    "Game",
+    "seed",
     # bitwise helpers
-    "cards_bitwise", "cell_of_bitwise", "bitwise_of_cell", "bitwise_to_cell_map",
+    "cards_bitwise",
+    "cell_of_bitwise",
+    "bitwise_of_cell",
+    "bitwise_to_cell_map",
     # logging
-    "BaseLog", "CXXConsoleLog", "JSONBaseLog", "JSONLog", "DummyLog",
-    "RegiEncoder", "JSONArrayWriter", "write_json_array",
+    "BaseLog",
+    "CXXConsoleLog",
+    "JSONBaseLog",
+    "JSONLog",
+    "DummyLog",
+    "RegiEncoder",
+    "JSONArrayWriter",
+    "write_json_array",
     # helpers
     "get_strategy_map",
 ]
+
 
 def get_strategy_map(rl_mods=False):
     all_strats = strat1

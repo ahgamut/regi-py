@@ -85,9 +85,7 @@ class AlphaZeroNode(MCTSNode):
         avail = ComboTable.empty()
         avail.add_used_pile(self.next_combos)
         loc, pst = np.array(avail).nonzero()
-        cell = {
-            ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)
-        }
+        cell = {ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)}
         for i, combo in enumerate(self.next_combos):
             lp = cell.get(combo.bitwise)
             if lp is None:
@@ -220,9 +218,7 @@ class NetDirectStrategy(BaseStrategy):
         avail = ComboTable.empty()
         avail.add_used_pile(combos)
         loc, pst = np.array(avail).nonzero()
-        cell = {
-            ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)
-        }
+        cell = {ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)}
         for i, combo in enumerate(combos):
             lp = cell.get(combo.bitwise)
             if lp is not None:

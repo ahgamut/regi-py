@@ -3,6 +3,7 @@
 The dict schema is defined once in :mod:`regi_py.serialize`; this module just
 exposes the historical names used by the JSON logs and the dataframe builders.
 """
+
 from regi_py.serialize import (
     CARD_FIELDS,
     ENEMY_FIELDS,

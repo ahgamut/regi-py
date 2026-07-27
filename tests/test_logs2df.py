@@ -5,6 +5,7 @@ byte-identical to the historical hardcoded lists), exercises the JSON path
 end-to-end on a real JSONLog, and guards the two bugs the merge fixes: the
 game_digest ``x0`` pile leak and the recommender ``NotImplemented`` misuse.
 """
+
 import os
 import sys
 
@@ -24,18 +25,46 @@ import logs2df  # noqa: E402
 
 # historical, R-facing column order (must stay stable for the analysis scripts)
 _HIST_COLNAMES = [
-    "combo.strength", "combo.value", "damage", "enemy.hp", "enemy.strength",
-    "enemy.value", "event", "fullblock", "game.active_player.alive",
-    "game.active_player.cards", "game.active_player.id",
-    "game.active_player.num_cards", "game.active_player.strategy",
-    "game.active_player_id", "game.current_block", "game.current_enemy.hp",
-    "game.current_enemy.strength", "game.current_enemy.value",
-    "game.discard_pile", "game.discard_pile_size", "game.draw_pile",
-    "game.draw_pile_size", "game.enemy_pile", "game.enemy_pile_size",
-    "game.hand_size", "game.num_players", "game.past_yields",
-    "game.phase_attacking", "game.phase_count", "game.progress", "game.status",
-    "maxblock", "player.alive", "player.cards", "player.id", "player.num_cards",
-    "player.strategy", "strategy", "used_combos.strength", "used_combos.value",
+    "combo.strength",
+    "combo.value",
+    "damage",
+    "enemy.hp",
+    "enemy.strength",
+    "enemy.value",
+    "event",
+    "fullblock",
+    "game.active_player.alive",
+    "game.active_player.cards",
+    "game.active_player.id",
+    "game.active_player.num_cards",
+    "game.active_player.strategy",
+    "game.active_player_id",
+    "game.current_block",
+    "game.current_enemy.hp",
+    "game.current_enemy.strength",
+    "game.current_enemy.value",
+    "game.discard_pile",
+    "game.discard_pile_size",
+    "game.draw_pile",
+    "game.draw_pile_size",
+    "game.enemy_pile",
+    "game.enemy_pile_size",
+    "game.hand_size",
+    "game.num_players",
+    "game.past_yields",
+    "game.phase_attacking",
+    "game.phase_count",
+    "game.progress",
+    "game.status",
+    "maxblock",
+    "player.alive",
+    "player.cards",
+    "player.id",
+    "player.num_cards",
+    "player.strategy",
+    "strategy",
+    "used_combos.strength",
+    "used_combos.value",
 ]
 _HIST_PLAYERINFO = [
     f"game.players.{pid}.{f}"

@@ -1,4 +1,5 @@
 """Smoke tests: the extension imports and a game can be played to completion."""
+
 from regi_py.core import GameState, GameStatus
 
 

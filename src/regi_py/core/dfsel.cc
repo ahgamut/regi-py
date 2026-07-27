@@ -4,11 +4,10 @@
 
 namespace regi
 {
-    i32 Strategy::provideRedirect(const Player &player, const GameState &g) {
+    i32 Strategy::provideRedirect(const Player &player, const GameState &g)
+    {
         i32 ind = getRedirectIndex(player, g);
-        if (ind < 0 || ind > g.totalPlayers() || ind == g.activePlayerID) {
-            return -1;
-        }
+        if (ind < 0 || ind > g.totalPlayers() || ind == g.activePlayerID) { return -1; }
         return ind;
     }
 
@@ -27,7 +26,7 @@ namespace regi
             // if combo is valid, accumulate,
             // and try extending the combo
             combos.push_back(cur);
-        for (i32 j = i + 1; j < cards.size(); ++j)
+            for (i32 j = i + 1; j < cards.size(); ++j)
             {
                 calcAttackMoves(cards, combos, yieldAllowed, cur, j);
             }
@@ -177,9 +176,7 @@ namespace regi
     i32 RandomStrategy::getRedirectIndex(const Player &player, const GameState &g)
     {
         i32 N = g.totalPlayers();
-        if (N < 2 || player.id != g.activePlayerID) {
-            return -1;
-        }
+        if (N < 2 || player.id != g.activePlayerID) { return -1; }
         i32 offset = 1 + randn(N - 1);
         i32 nextPlayerID = (g.activePlayerID + offset) % N;
         return nextPlayerID;
@@ -261,9 +258,7 @@ namespace regi
     i32 DamageStrategy::getRedirectIndex(const Player &player, const GameState &g)
     {
         i32 N = g.totalPlayers();
-        if (N < 2 || player.id != g.activePlayerID) {
-            return -1;
-        }
+        if (N < 2 || player.id != g.activePlayerID) { return -1; }
         i32 offset = 1 + randn(N - 1);
         i32 nextPlayerID = (g.activePlayerID + offset) % N;
         return nextPlayerID;

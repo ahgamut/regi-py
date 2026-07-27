@@ -484,8 +484,9 @@ void bind_gamestate(pybind11::object &m)
     py::class_<GameState>(m, "GameState")
         .def(py::init([](BaseLog &log) { return GameState(log); }),
              py::keep_alive<1, 2>())
-        .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>(),
-             "Seat a strategy at the next player id (LOADING only); no-op once RUNNING.")
+        .def(
+            "add_player", &GameState::addPlayer, py::keep_alive<1, 2>(),
+            "Seat a strategy at the next player id (LOADING only); no-op once RUNNING.")
         .def_property_readonly("num_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
         .def_readonly("active_player", &GameState::activePlayerID)

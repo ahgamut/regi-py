@@ -40,7 +40,8 @@ namespace regi
         std::cout << "\n";
     }
 
-    void ConsoleLog::redirect(const Player &player, const i32 nextPlayerID, const GameState &g)
+    void ConsoleLog::redirect(const Player &player, const i32 nextPlayerID,
+                              const GameState &g)
     {
         (void)g;
         std::cout << "Player " << player.id;

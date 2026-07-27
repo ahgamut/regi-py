@@ -5,6 +5,7 @@ construction, a one-line initializer, and a Pythonic stepping loop while exposin
 the wrapped state as ``.state`` and delegating attribute access to it.  Code that
 uses ``GameState`` directly is unaffected.
 """
+
 from .core import GameState
 from .logging import DummyLog
 

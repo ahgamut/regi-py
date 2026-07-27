@@ -308,9 +308,7 @@ namespace regi
 
     void PhaseInfo::randomize(i32 currentID)
     {
-        if (currentID < 0) {
-            currentID = this->activePlayerID;
-        }
+        if (currentID < 0) { currentID = this->activePlayerID; }
         /* randomize cards that the active player cannot see,
          * to simulate potential gamestates/futures */
         std::vector<Card> unknowns;

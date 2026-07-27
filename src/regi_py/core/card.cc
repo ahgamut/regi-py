@@ -167,4 +167,3 @@ u32 getPower(const Card& c)
     }
     return p;
 }
-

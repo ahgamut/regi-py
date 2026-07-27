@@ -4,6 +4,7 @@ The C++ extension ``regi_py.core`` must be built for the running interpreter
 (``pip install -e . --no-build-isolation``).  These fixtures build small games so
 individual tests do not repeat the boilerplate of adding players and initializing.
 """
+
 import pytest
 
 # Import the extension eagerly so a build/ABI mismatch fails collection with a

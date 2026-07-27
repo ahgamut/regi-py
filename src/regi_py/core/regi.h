@@ -16,7 +16,8 @@ namespace regi
         ENDED
     };
 
-    enum GameEvent {
+    enum GameEvent
+    {
         STARTGAME,
         ENDGAME,
         POSTGAME,

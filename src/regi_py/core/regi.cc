@@ -127,9 +127,7 @@ namespace regi
         }
     }
 
-    void GameState::initHistory() {
-        history.clear();
-    }
+    void GameState::initHistory() { history.clear(); }
 
     void GameState::init()
     {
@@ -151,7 +149,8 @@ namespace regi
 
     void GameState::setup()
     {
-        if (status == GameStatus::ENDED) {
+        if (status == GameStatus::ENDED)
+        {
             log.endgame(INVALID_START_PLAYER_SETUP, *this);
             return;
         }
@@ -159,7 +158,8 @@ namespace regi
         for (i32 i = 0; i < totalPlayers(); ++i)
         {
             bool validPlayer = players[i].alive;
-            validPlayer = validPlayer && (players[i].strat.setup(players[i], *this) == 0);
+            validPlayer =
+                validPlayer && (players[i].strat.setup(players[i], *this) == 0);
             validPlayer = validPlayer && (players[i].cards.size() <= handSize);
             if (!validPlayer)
             {

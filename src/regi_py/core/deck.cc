@@ -59,24 +59,27 @@ Deck::Deck()
           Card(JACK, CLUBS),      //
           Card(QUEEN, CLUBS),     //
           Card(KING, CLUBS)       /* end of deck */
-      } {
+      }
+{
     //
 }
 
 Deck Deck::standard() { return Deck(); }
 
-void Deck::show() {
-    for (i32 i = 0; i < 52; ++i) {
+void Deck::show()
+{
+    for (i32 i = 0; i < 52; ++i)
+    {
         std::cout << cards[i] << " ";
-        if (i % 13 == 12) {
-            std::cout << "\n";
-        }
+        if (i % 13 == 12) { std::cout << "\n"; }
     }
 }
 
-void Deck::shuffle() {
+void Deck::shuffle()
+{
     i32 i, j;
-    for (i = 0; i < 50; ++i) {
+    for (i = 0; i < 50; ++i)
+    {
         j = i + regi::randn(52 - i);
         std::swap(cards[i], cards[j]);
     }

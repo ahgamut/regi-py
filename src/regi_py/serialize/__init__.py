@@ -9,6 +9,7 @@ Card ``value`` fields are human-readable display strings; the canonical machine
 encoding of a card is its integer ``location`` (see ``Card.location``) and of a
 combo its ``bitwise`` (a u64 bitmask over locations).
 """
+
 from regi_py.core import GameState, Player, Enemy, Combo, Card  # noqa: F401
 
 # --------------------------------------------------------------------------- #

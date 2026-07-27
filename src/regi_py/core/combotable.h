@@ -40,9 +40,9 @@ namespace regi
     {
        private:
         u32 *data;
-        void setAcePairEntry(const Card&, const Card&);
-        void setC2Entry(const Combo&);
-        void setC3Entry(const Combo&);
+        void setAcePairEntry(const Card &, const Card &);
+        void setC2Entry(const Combo &);
+        void setC3Entry(const Combo &);
 
        public:
         static constexpr i32 rows = MAX_CARDS_IN_GAME;
@@ -84,6 +84,5 @@ namespace regi
         static std::shared_ptr<ComboTable> emptyTable();
     };
 
-    
 } /* namespace regi */
 #endif

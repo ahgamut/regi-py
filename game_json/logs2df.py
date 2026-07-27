@@ -14,6 +14,7 @@ so adding a field to a game/player/enemy/combo dict shows up here automatically.
 with the matching source, so existing command lines keep working.  ``msgpack`` is
 imported lazily inside the msgpack source, so the JSON path needs no msgpack.
 """
+
 import argparse
 import csv
 import glob
@@ -145,7 +146,7 @@ def get_metas(fname):
     parts = b0.split("-")
     padding = ["game00", "team00", "sim00"]
     if len(parts) < 3:
-        parts = parts + padding[len(parts):]
+        parts = parts + padding[len(parts) :]
     g, t, s = parts[:3]
     return bname, s.replace("sim", "s")
 
@@ -415,7 +416,10 @@ def main(source=None):
     if source is None:
         parser = argparse.ArgumentParser("logs2df")
         parser.add_argument(
-            "-s", "--source", choices=sorted(SOURCES), required=True,
+            "-s",
+            "--source",
+            choices=sorted(SOURCES),
+            required=True,
             help="log format: json event logs or msgpack MCTS records",
         )
     else:
@@ -423,7 +427,9 @@ def main(source=None):
             source = SOURCES[source]()
         parser = argparse.ArgumentParser(source.parser_desc)
     parser.add_argument(
-        "-i", "--input-object", required=True,
+        "-i",
+        "--input-object",
+        required=True,
         help="a folder, single log file, or ZIP archive of logs",
     )
     parser.add_argument("-o", "--output-csv", required=True, help="output csv")

@@ -4,6 +4,7 @@ These lock the additive surface: the clean method names delegate to the same
 C++ code as the legacy underscore names, and the ``Game`` wrapper's stepping
 loop is byte-for-byte identical to ``start_loop``.
 """
+
 import pytest
 
 import regi_py

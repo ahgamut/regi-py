@@ -43,7 +43,9 @@ class BruteSamplingStrategy(BaseStrategy, RecommenderMixin):
                 yield_penalty = random.random() * int(next_combos[i].bitwise == 0)
                 vals[i] = np.quantile(val_cur, 0.9) - yield_penalty
             else:
-                def_penalty = defend_throwing(i, root_phase, next_combos, score_only=True)
+                def_penalty = defend_throwing(
+                    i, root_phase, next_combos, score_only=True
+                )
                 vals[i] = np.quantile(val_cur, 0.9) - 0.5 * def_penalty
 
         val_arr = np.array(vals)

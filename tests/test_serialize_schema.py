@@ -3,6 +3,7 @@
 Locks that the schema-field tuples exactly match the keys the serializers emit
 (order included) and that the logging dump_* helpers delegate to this module.
 """
+
 import pytest
 
 core = pytest.importorskip("regi_py.core", reason="regi_py.core extension not built")
@@ -50,7 +51,10 @@ def test_card_and_enemy_schema_matches_keys():
 def test_player_schema_matches_keys():
     game = _fresh_game()
     player = game.players[0]
-    assert tuple(serialize.player_limited_to_dict(player)) == serialize.PLAYER_LIMITED_FIELDS
+    assert (
+        tuple(serialize.player_limited_to_dict(player))
+        == serialize.PLAYER_LIMITED_FIELDS
+    )
     assert tuple(serialize.player_to_dict(player)) == serialize.PLAYER_FIELDS
 
 
@@ -83,7 +87,11 @@ def test_logging_dump_helpers_delegate():
     game = _fresh_game(3)
     assert log_utils.dump_game(game) == serialize.game_to_dict(game, debug=False)
     assert log_utils.dump_debug(game) == serialize.game_to_dict(game, debug=True)
-    assert log_utils.dump_player(game.players[0]) == serialize.player_to_dict(game.players[0])
-    assert log_utils.dump_enemy(game.enemy_pile[0]) == serialize.enemy_to_dict(game.enemy_pile[0])
+    assert log_utils.dump_player(game.players[0]) == serialize.player_to_dict(
+        game.players[0]
+    )
+    assert log_utils.dump_enemy(game.enemy_pile[0]) == serialize.enemy_to_dict(
+        game.enemy_pile[0]
+    )
     card = game.players[0].cards[0]
     assert log_utils.dump_card(card) == serialize.card_to_dict(card)

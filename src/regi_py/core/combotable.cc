@@ -6,8 +6,7 @@ namespace regi
 
     void ComboTable::setYieldEntry() { this->set(LOCATION_YIELD, PLAYED_SELF); }
 
-    bool ComboTable::fillComboEntry(const Card &card, PlayedStatus s,
-                                    Combo &combo)
+    bool ComboTable::fillComboEntry(const Card &card, PlayedStatus s, Combo &combo)
     {
         combo.parts.clear();
         bool valid = false;
@@ -21,9 +20,7 @@ namespace regi
             case PLAYED_2_AS:
                 offset = static_cast<i32>(CLUBS) + static_cast<i32>(s) -
                          static_cast<i32>(PLAYED_2_AC);
-                if (card.entry() == ACE and card.suit() <= offset) {
-                    return false;
-                }
+                if (card.entry() == ACE and card.suit() <= offset) { return false; }
                 tmp = Card(ACE, static_cast<Suit>(offset));
                 combo.parts.push_back(tmp);
                 break;
@@ -263,9 +260,7 @@ namespace regi
         Combo combo;
         Card card;
         i32 i, j;
-        if (this->get(0, PLAYED_SELF)) {
-            res.push_back(combo);
-        }
+        if (this->get(0, PLAYED_SELF)) { res.push_back(combo); }
         for (i = 1; i < rows; ++i)
         {
             if (rowSum(i) == 0) continue;
@@ -323,7 +318,8 @@ namespace regi
         return result;
     }
 
-    Combo ComboTable::createComboFromTableEntry(i32 loc, i32 pst) {
+    Combo ComboTable::createComboFromTableEntry(i32 loc, i32 pst)
+    {
         Combo res;
         Card c;
         PlayedStatus s;

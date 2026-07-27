@@ -5,6 +5,7 @@ get_expansion_at is deterministic given the root phase (the legal moves and the
 immediate result of playing a chosen combo do not depend on RNG), so a frozen
 set of (root phase -> expansion) snapshots must survive the rewrite unchanged.
 """
+
 import gc
 import json
 
@@ -19,7 +20,13 @@ from regi_py.core import (
     GameStatus,
 )
 from regi_py.logging import DummyLog, JSONLog, RegiEncoder
-from regi_py.logging.utils import dump_game, dump_debug, dump_player, dump_enemy, dump_card
+from regi_py.logging.utils import (
+    dump_game,
+    dump_debug,
+    dump_player,
+    dump_enemy,
+    dump_card,
+)
 import regi_py.strats as strats
 from regi_py.strats.phase_utils import (
     get_expansion_at,
@@ -261,10 +268,23 @@ def test_jsonlog_matches_write_json_array(tmp_path):
 # Golden schema: lock the dict keys emitted by the dump_* helpers so the
 # schema unification cannot silently drop or rename a field.
 DUMP_GAME_KEYS = {
-    "num_players", "active_player_id", "active_player", "phase_count",
-    "phase_attacking", "hand_size", "players", "past_yields", "status",
-    "used_combos", "current_enemy", "current_block", "progress",
-    "draw_pile_size", "discard_pile_size", "enemy_pile_size", "enemy_pile",
+    "num_players",
+    "active_player_id",
+    "active_player",
+    "phase_count",
+    "phase_attacking",
+    "hand_size",
+    "players",
+    "past_yields",
+    "status",
+    "used_combos",
+    "current_enemy",
+    "current_block",
+    "progress",
+    "draw_pile_size",
+    "discard_pile_size",
+    "enemy_pile_size",
+    "enemy_pile",
 }
 DUMP_DEBUG_EXTRA_KEYS = {"draw_pile", "discard_pile"}
 DUMP_PLAYER_KEYS = {"id", "alive", "num_cards", "strategy", "cards"}

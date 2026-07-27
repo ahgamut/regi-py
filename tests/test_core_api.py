@@ -4,6 +4,7 @@ These lock the *current* behavior of the pybind11 bindings so later refactors
 (serialization unification, RNG, the get_expansion_at rewrite) cannot change it
 unnoticed.
 """
+
 import pytest
 
 import regi_py.core as core
@@ -44,11 +45,20 @@ def test_entry_values():
     assert int(Entry.ACE) == 1
     assert int(Entry.KING) == 13
     # contiguous 0..13
-    assert [int(e) for e in (Entry.TWO, Entry.TEN, Entry.JACK, Entry.QUEEN)] == [2, 10, 11, 12]
+    assert [int(e) for e in (Entry.TWO, Entry.TEN, Entry.JACK, Entry.QUEEN)] == [
+        2,
+        10,
+        11,
+        12,
+    ]
 
 
 def test_gamestatus_values():
-    assert (int(GameStatus.LOADING), int(GameStatus.RUNNING), int(GameStatus.ENDED)) == (0, 1, 2)
+    assert (
+        int(GameStatus.LOADING),
+        int(GameStatus.RUNNING),
+        int(GameStatus.ENDED),
+    ) == (0, 1, 2)
 
 
 def test_endgamereason_values():
@@ -84,7 +94,11 @@ def test_special_joker_slots():
     j1 = Card.from_location(28)
     j2 = Card.from_location(42)
     assert yld.entry == Entry.JOKER and yld.suit == Suit.CLUBS and yld.is_yield
-    assert resign.entry == Entry.JOKER and resign.suit == Suit.DIAMONDS and resign.is_resign
+    assert (
+        resign.entry == Entry.JOKER
+        and resign.suit == Suit.DIAMONDS
+        and resign.is_resign
+    )
     assert j1.entry == Entry.JOKER and j1.suit == Suit.HEARTS  # real joker 1
     assert j2.entry == Entry.JOKER and j2.suit == Suit.SPADES  # real joker 2
     # the two real jokers are distinct (no longer collapsed)

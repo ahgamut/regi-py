@@ -19,10 +19,13 @@ namespace regi
 
     void LocationInfo::setYield(i32 playerid, bool allowed)
     {
-        if (allowed) {
+        if (allowed)
+        {
             /* if playerid was allowed to yield, they have a yield "card" */
             this->set(0, 1 + playerid);
-        } else {
+        }
+        else
+        {
             /* otherwise a yield "card" is not technically in the game */
             this->set(0, static_cast<i32>(LocationStatus::NOT_IN_GAME));
         }
@@ -104,7 +107,7 @@ namespace regi
         if (!this->valid) return false;
         if (!next.valid) return false;
         int i, j1, j2;
-        for (i = 1; i < rows; ++i) // not checking yields
+        for (i = 1; i < rows; ++i)  // not checking yields
         {
             for (j1 = 0; j1 < cols; ++j2)
             {
@@ -192,16 +195,16 @@ namespace regi
         switch (p.numPlayers)
         {
             case 4:
-                table[WITH_PLAYER_4] =
-                    static_cast<u32>(p.player_cards[relativeID(p, currentID, 3)].size());
+                table[WITH_PLAYER_4] = static_cast<u32>(
+                    p.player_cards[relativeID(p, currentID, 3)].size());
             // fallthrough
             case 3:
-                table[WITH_PLAYER_3] =
-                    static_cast<u32>(p.player_cards[relativeID(p, currentID, 2)].size());
+                table[WITH_PLAYER_3] = static_cast<u32>(
+                    p.player_cards[relativeID(p, currentID, 2)].size());
             // fallthrough
             case 2:
-                table[WITH_PLAYER_2] =
-                    static_cast<u32>(p.player_cards[relativeID(p, currentID, 1)].size());
+                table[WITH_PLAYER_2] = static_cast<u32>(
+                    p.player_cards[relativeID(p, currentID, 1)].size());
                 break;
         }
     }
@@ -216,7 +219,7 @@ namespace regi
     }
 
     std::shared_ptr<LocationInfo> LocationInfo::fromCurrentPlayer(const PhaseInfo &p,
-                                                                 i32 currentID)
+                                                                  i32 currentID)
     {
         i32 i;
         u32 table[MAX_LOCATIONS] = {0};
@@ -246,8 +249,7 @@ namespace regi
         // resign is never in the game
         result->set(LOCATION_RESIGN, LocationStatus::NOT_IN_GAME);
         // set joker count explicitly (2p -> 0, 3p -> 1 at loc 28, 4p -> 2)
-        result->numJokers =
-            (result->numPlayers >= 2) ? (result->numPlayers - 2) : 0;
+        result->numJokers = (result->numPlayers >= 2) ? (result->numPlayers - 2) : 0;
         if (result->numJokers >= 1) { result->setUnknowns(LOCATION_JOKER_1, table); }
         else { result->set(LOCATION_JOKER_1, LocationStatus::NOT_IN_GAME); }
         if (result->numJokers >= 2) { result->setUnknowns(LOCATION_JOKER_2, table); }
@@ -256,8 +258,7 @@ namespace regi
         // every remaining real card location is an unknown to this player
         for (i = 1; i < MAX_CARDS_IN_GAME; ++i)
         {
-            if (i == LOCATION_RESIGN || i == LOCATION_JOKER_1 ||
-                i == LOCATION_JOKER_2)
+            if (i == LOCATION_RESIGN || i == LOCATION_JOKER_1 || i == LOCATION_JOKER_2)
                 continue;
             result->setUnknowns(i, table);
         }

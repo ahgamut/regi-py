@@ -5,6 +5,7 @@ location-bitmask space as Combo.bitwise, so combo-subset checks are one bitwise
 op.  The cell map is a fixed bijection between a combo's bitwise identity and its
 ComboTable (loc, pst) cell.
 """
+
 import numpy as np
 import pytest
 
