@@ -1,25 +1,96 @@
-from regi_py.core import PhaseInfo
-from regi_py.core import LocationInfo
-from regi_py.core import MAX_CARDS_IN_GAME
+from regi_py.core import PhaseInfo, LocationInfo, ComboTable, Card, Suit
+from regi_py.core import MAX_CARDS_IN_GAME, MAX_LOCATIONS, MAX_PLAYED_STATUS
 from regi_py.rl.az_explorer import AZNodeInfo
 from regi_py.rl.utils import *
 from regi_py.rl.subnets import (
-    LinearBlock,
     Conv1dBlock,
     Conv2dBlock,
     WidthCrossAttention,
 )
 
 #
+import numpy as np
 import torch
 import torch.nn as nn
+
+# per-card capability channels: [attack_potential, defense_potential]
+CAP_CHANNELS = 2
+# flattened trunk width for the value/keepy heads (card axis x location axis)
+_TRUNK_FLAT = MAX_CARDS_IN_GAME * int(MAX_LOCATIONS)
+
+# static per-card strength / clubs flag (capability's suit-power varies only with
+# the current enemy, so the per-card part is precomputed once)
+_STRENGTH = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
+_IS_CLUBS = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
+for _loc in range(MAX_CARDS_IN_GAME):
+    try:
+        _card = Card.from_location(_loc)
+        _STRENGTH[_loc] = _card.strength / 20.0
+        _IS_CLUBS[_loc] = 1.0 if _card.suit == Suit.CLUBS else 0.0
+    except Exception:
+        pass
+
+
+def card_capabilities(phase):
+    """Per-card ``(attack, defense)`` potential for ``phase``'s current enemy.
+
+    Attack doubles for clubs unless the enemy is itself clubs (immune); defense
+    is the raw card strength. Shape ``(MAX_CARDS_IN_GAME, CAP_CHANNELS)``.
+    """
+    enemy = phase.enemy_pile[0] if len(phase.enemy_pile) else None
+    clubs_active = enemy is None or enemy.suit != Suit.CLUBS
+    caps = np.zeros((MAX_CARDS_IN_GAME, CAP_CHANNELS), dtype=np.float32)
+    mult = 1.0 + (_IS_CLUBS if clubs_active else 0.0)  # 2x clubs when active
+    caps[:, 0] = _STRENGTH * mult
+    caps[:, 1] = _STRENGTH
+    return caps
+
+
+# content-keyed caches (by phase.to_string()) so the rolling history window and
+# sibling MCTS nodes don't re-tensorize the same phase repeatedly
+_CACHE_CAP = 8192
+_LOC_CACHE = {}  # (phase_str, perspective) -> np (56, 9)
+_USP_CACHE = {}  # phase_str -> np (56, 22)
+_CAP_CACHE = {}  # phase_str -> np (56, CAP_CHANNELS)
+
+
+def _cache_put(cache, key, val):
+    if len(cache) >= _CACHE_CAP:
+        cache.clear()
+    cache[key] = val
+    return val
+
+
+def _location_array(phase, perspective):
+    key = (phase.to_string(), perspective)
+    a = _LOC_CACHE.get(key)
+    if a is None:
+        loca0 = np.array(LocationInfo.from_current(phase, perspective), dtype=np.float32)
+        a = _cache_put(_LOC_CACHE, key, loca0 / loca0.sum(axis=1, keepdims=True))
+    return a
+
+
+def _used_pile_array(phase):
+    key = phase.to_string()
+    a = _USP_CACHE.get(key)
+    if a is None:
+        a = _cache_put(_USP_CACHE, key, np.array(ComboTable.from_phase(phase), dtype=np.float32))
+    return a
+
+
+def _capability_array(phase):
+    key = phase.to_string()
+    a = _CAP_CACHE.get(key)
+    if a is None:
+        a = _cache_put(_CAP_CACHE, key, card_capabilities(phase))
+    return a
 
 
 class ValueNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.net1 = Conv2dBlock(channels=(64, 8, 1), shapes=(3, 1), paddings=(1, 0))
-        self.net2 = nn.Linear(in_features=495, out_features=1)
+        self.net2 = nn.Linear(in_features=_TRUNK_FLAT, out_features=1)
         self.ac = nn.Sigmoid()
 
     def forward(self, x):
@@ -33,7 +104,7 @@ class KeepyNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.net1 = Conv2dBlock(channels=(64, 8, 1), shapes=(3, 1), paddings=(1, 0))
-        self.net2 = nn.Linear(in_features=495, out_features=MAX_CARDS_IN_GAME)
+        self.net2 = nn.Linear(in_features=_TRUNK_FLAT, out_features=MAX_CARDS_IN_GAME)
         self.ac = nn.Tanh()
 
     def forward(self, x):
@@ -47,12 +118,15 @@ class ActionNet(nn.Module):
     def __init__(self):
         super().__init__()
         n = MAX_CARDS_IN_GAME
-        self.ac = nn.Softmax2d()
         self.net1 = Conv2dBlock(channels=(64, 16, 4), shapes=(3, 1), paddings=(1, 0))
         self.net2 = Conv1dBlock(
             channels=(n, n, n, n), shapes=(7, 7, 3), paddings=(0, 0, 0)
         )
         self.wca = WidthCrossAttention(channels=MAX_CARDS_IN_GAME, heads=5)
+        # structurally-valid (location, played_status) cells; softmax is masked to
+        # these so probability isn't spread over impossible actions
+        mask = np.array(ComboTable.all_entries(), dtype=np.float32)  # (56, 22)
+        self.register_buffer("valid_mask", torch.from_numpy(mask))
 
     def forward(self, x0, k):
         x = self.net1(x0)
@@ -60,9 +134,14 @@ class ActionNet(nn.Module):
         x = self.net2(x)
         x = x.reshape(x.shape[0], MAX_CARDS_IN_GAME, 1, MAX_PLAYED_STATUS)
         k2 = k.reshape(x.shape[0], MAX_CARDS_IN_GAME, 1, 1)
-        x = self.wca(x, k2).reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
-        x = self.ac(x)
-        return x
+        logits = self.wca(x, k2).reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
+        # masked softmax over the whole (56 x 22) action grid
+        n = logits.shape[0]
+        flat = logits.reshape(n, -1)
+        m = self.valid_mask.reshape(1, -1)
+        flat = flat.masked_fill(m == 0, float("-inf"))
+        flat = torch.softmax(flat, dim=-1)
+        return flat.reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
 
 
 class CombineNet(nn.Module):
@@ -84,6 +163,18 @@ class CombineNet(nn.Module):
 class BasicNet(nn.Module):
     __mname__ = "basic"
 
+    # single source of truth for the training tensor field order, shared by
+    # tensorify_training / ShardBuffer / run_epoch
+    TRAIN_FIELDS = (
+        "location",
+        "used_pile",
+        "capability",
+        "value",
+        "keepyness",
+        "atk_probs",
+        "attacking",
+    )
+
     def __init__(self):
         super().__init__()
         self.device = "cpu"
@@ -99,8 +190,16 @@ class BasicNet(nn.Module):
             shapes=(1,),
             paddings=(0,),
         )
+        self.cap_net = Conv2dBlock(
+            channels=(self.max_history, 64),
+            shapes=(1,),
+            paddings=(0,),
+        )
 
         self.combiner = CombineNet(channels=32)
+        # fuse per-card capability into the trunk; query is the trunk, so the
+        # width-9 axis (and the value/keepy/action heads) are unchanged
+        self.cap_combiner = WidthCrossAttention(channels=64, heads=4)
         self.v_net = ValueNet()
         self.k_net = KeepyNet()
         self.a_net = ActionNet()
@@ -108,7 +207,9 @@ class BasicNet(nn.Module):
     def forward(self, data):
         x1 = self.loc_net(data["location"])
         x2 = self.usp_net(data["used_pile"])
+        x3 = self.cap_net(data["capability"])
         x = self.combiner(x1, x2)
+        x = self.cap_combiner(x, x3)
         v = self.v_net(x)
         k = self.k_net(x)
         a = self.a_net(x, k)
@@ -117,7 +218,9 @@ class BasicNet(nn.Module):
     def calculate_loss(self, y, y_hat, phase_atk):
         v, k, a = y
         v_hat, k_hat, a_hat = y_hat
-        loss1a = torch.sum(-a * torch.log(a_hat), dim=(-2, -1))
+        # clamp inside log: masked cells make a_hat exactly 0, and the target a is
+        # also 0 there, so 0*log(0) must not become nan
+        loss1a = torch.sum(-a * torch.log(a_hat.clamp_min(1e-9)), dim=(-2, -1))
         loss1 = torch.mean(loss1a * phase_atk)
         loss2 = nn.functional.mse_loss(v_hat, v)
         loss3 = nn.functional.mse_loss(k_hat * k, k)
@@ -136,19 +239,16 @@ class BasicNet(nn.Module):
         result = {
             "location": torch.zeros((1, window, MAX_CARDS_IN_GAME, MAX_LOCATIONS)),
             "used_pile": torch.zeros((1, window, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)),
+            "capability": torch.zeros((1, window, MAX_CARDS_IN_GAME, CAP_CHANNELS)),
         }
         if perspective is None:
             perspective = history[-1].active_player
         #
         for j in range(window):
             phase = history[j]
-            loca0 = np.array(
-                LocationInfo.from_current(phase, perspective), dtype=np.float32
-            )
-            locat = loca0 / loca0.sum(axis=1, keepdims=True)
-            table = np.array(ComboTable.from_phase(phase), dtype=np.float32)
-            result["location"][0, j] = torch.from_numpy(locat)
-            result["used_pile"][0, j] = torch.from_numpy(table)
+            result["location"][0, j] = torch.from_numpy(_location_array(phase, perspective))
+            result["used_pile"][0, j] = torch.from_numpy(_used_pile_array(phase))
+            result["capability"][0, j] = torch.from_numpy(_capability_array(phase))
         return result
 
     @staticmethod
@@ -158,6 +258,7 @@ class BasicNet(nn.Module):
         result = {
             "location": torch.zeros((N, window, MAX_CARDS_IN_GAME, MAX_LOCATIONS)),
             "used_pile": torch.zeros((N, window, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)),
+            "capability": torch.zeros((N, window, MAX_CARDS_IN_GAME, CAP_CHANNELS)),
             "value": torch.zeros((N, 1)),
             "keepyness": torch.ones((N, MAX_CARDS_IN_GAME)),
             "atk_probs": torch.zeros((N, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)),
@@ -175,12 +276,8 @@ class BasicNet(nn.Module):
             perspective = cur_phase.active_player
             for j in range(window, 0, -1):
                 phase = info.history[-j]
-                loca0 = np.array(
-                    LocationInfo.from_current(phase, perspective), dtype=np.float32
-                )
-                locat = loca0 / loca0.sum(axis=1, keepdims=True)
-                table = np.array(ComboTable.from_phase(phase), dtype=np.float32)
-                result["location"][i, -j] = torch.from_numpy(locat)
-                result["used_pile"][i, -j] = torch.from_numpy(table)
+                result["location"][i, -j] = torch.from_numpy(_location_array(phase, perspective))
+                result["used_pile"][i, -j] = torch.from_numpy(_used_pile_array(phase))
+                result["capability"][i, -j] = torch.from_numpy(_capability_array(phase))
 
         return result
