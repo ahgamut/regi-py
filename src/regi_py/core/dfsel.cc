@@ -17,10 +17,10 @@ namespace regi
     {
         // cards are assumed ordered
         if (i >= cards.size()) { return; }
-        u32 tmp = cur.getBitrep();
+        u64 tmp = cur.getBitrep();
         // try adding cards[i] to the combo
         cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
-        cur.setBitrep(tmp | (1 << i));
+        cur.setBitrep(tmp | (static_cast<u64>(1) << cards[i].toLocation()));
         //
         if (cur.valid(yieldAllowed))
         {
@@ -78,9 +78,9 @@ namespace regi
         // cards are assumed ordered
         if (i >= cards.size()) { return; }
         // try adding cards[i] to the combo
-        u32 tmp = cur.getBitrep();
+        u64 tmp = cur.getBitrep();
         cur.parts.push_back(Card(cards[i].entry(), cards[i].suit()));
-        cur.setBitrep(tmp | (1 << i));
+        cur.setBitrep(tmp | (static_cast<u64>(1) << cards[i].toLocation()));
         //
         if (cur.getBaseDefense() >= damage)
         {

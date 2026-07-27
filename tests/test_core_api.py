@@ -27,15 +27,16 @@ from conftest import make_game
 # constants and enums
 # --------------------------------------------------------------------------- #
 def test_max_cards_constant():
-    assert core.MAX_CARDS_IN_GAME == 55
+    assert core.MAX_CARDS_IN_GAME == 56
 
 
 def test_suit_values():
-    assert int(Suit.GLITCH) == 0
-    assert int(Suit.CLUBS) == 1
-    assert int(Suit.DIAMONDS) == 2
-    assert int(Suit.HEARTS) == 3
-    assert int(Suit.SPADES) == 4
+    # GLITCH is gone; the four real suits are 0..3
+    assert not hasattr(Suit, "GLITCH")
+    assert int(Suit.CLUBS) == 0
+    assert int(Suit.DIAMONDS) == 1
+    assert int(Suit.HEARTS) == 2
+    assert int(Suit.SPADES) == 3
 
 
 def test_entry_values():
@@ -58,47 +59,63 @@ def test_endgamereason_values():
 
 
 # --------------------------------------------------------------------------- #
-# Card: index / location encodings
+# Card: location encoding (the single canonical card encoding; no more index)
 # --------------------------------------------------------------------------- #
-def test_card_from_location_roundtrip_regular():
-    # locations 3..54 are the 52 regular cards and round-trip exactly
-    for loc in range(3, core.MAX_CARDS_IN_GAME):
-        assert Card.from_location(loc).location == loc
+def test_card_location_is_the_only_encoding():
+    # the index encoding has been removed entirely
+    assert not hasattr(Card.from_location(1), "index")
 
 
-def test_card_from_location_jokers_collapse():
-    # both joker slots (1, 2) decode to the single joker, whose location is 1
-    j1 = Card.from_location(1)
-    j2 = Card.from_location(2)
-    assert j1.entry == Entry.JOKER and j1.suit == Suit.GLITCH
-    assert j2.entry == Entry.JOKER and j2.suit == Suit.GLITCH
-    assert j1.location == 1 and j2.location == 1
-    assert j1.index == 0 and j2.index == 0
+def test_card_from_location_roundtrip_all():
+    # every one of the 56 locations decodes to a distinct card and round-trips
+    seen = set()
+    for loc in range(core.MAX_CARDS_IN_GAME):
+        card = Card.from_location(loc)
+        assert card.location == loc
+        assert card.location == int(card.entry) + 14 * int(card.suit)
+        seen.add((int(card.entry), int(card.suit)))
+    assert len(seen) == core.MAX_CARDS_IN_GAME  # bijection
 
 
-@pytest.mark.parametrize("loc", [0, -1, 55, 100])
+def test_special_joker_slots():
+    # the four JOKER-entry cards are the special slots (location % 14 == 0)
+    yld = Card.from_location(0)
+    resign = Card.from_location(14)
+    j1 = Card.from_location(28)
+    j2 = Card.from_location(42)
+    assert yld.entry == Entry.JOKER and yld.suit == Suit.CLUBS and yld.is_yield
+    assert resign.entry == Entry.JOKER and resign.suit == Suit.DIAMONDS and resign.is_resign
+    assert j1.entry == Entry.JOKER and j1.suit == Suit.HEARTS  # real joker 1
+    assert j2.entry == Entry.JOKER and j2.suit == Suit.SPADES  # real joker 2
+    # the two real jokers are distinct (no longer collapsed)
+    assert j1 != j2 and j1.location == 28 and j2.location == 42
+    # real jokers are neither yield nor resign
+    assert not (j1.is_yield or j1.is_resign or j2.is_yield or j2.is_resign)
+
+
+@pytest.mark.parametrize("loc", [-1, 56, 100])
 def test_card_from_location_invalid_raises(loc):
     with pytest.raises(Exception):
         Card.from_location(loc)
 
 
-def test_card_index_matches_entry_suit():
-    # index == entry + 14 * suit for every card dealt into a game
+def test_card_location_matches_entry_suit():
+    # location == entry + 14 * suit for every card dealt into a game
     game = make_game(4)
     cards = [c for p in game.players for c in p.cards]
     cards += list(game.draw_pile) + list(game.discard_pile)
     assert cards, "expected some cards to be dealt"
     for c in cards:
-        assert 0 <= c.index <= 70
-        assert c.index == int(c.entry) + 14 * int(c.suit)
+        assert 0 <= c.location < core.MAX_CARDS_IN_GAME
+        assert c.location == int(c.entry) + 14 * int(c.suit)
 
 
 def test_card_strength():
-    assert Card.from_location(3).strength == 1  # A of clubs
-    assert Card.from_location(54).strength == 20  # K of spades
+    assert Card.from_location(1).strength == 1  # A of clubs (location 1)
+    assert Card.from_location(55).strength == 20  # K of spades (location 55)
     # a jack/queen/king have fixed strengths regardless of numeric entry
-    kings = [Card.from_location(loc) for loc in range(3, 55)]
-    for c in kings:
+    cards = [Card.from_location(loc) for loc in range(core.MAX_CARDS_IN_GAME)]
+    for c in cards:
         if c.entry == Entry.KING:
             assert c.strength == 20
         elif c.entry == Entry.QUEEN:
@@ -108,9 +125,9 @@ def test_card_strength():
 
 
 def test_card_ordering_and_hash():
-    a_clubs = Card.from_location(3)
-    a_clubs2 = Card.from_location(3)
-    k_spades = Card.from_location(54)
+    a_clubs = Card.from_location(1)
+    a_clubs2 = Card.from_location(1)
+    k_spades = Card.from_location(55)
     assert a_clubs == a_clubs2
     assert a_clubs < k_spades
     assert k_spades > a_clubs

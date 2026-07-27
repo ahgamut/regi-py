@@ -30,7 +30,9 @@ namespace regi
 
     void LocationInfo::setJokers()
     {
-        for (i32 i = 1; i < 3; ++i)
+        /* resign is never dealt; either joker may be absent (2p/3p). any special
+         * slot that no card landed in is marked NOT_IN_GAME. */
+        for (i32 i : {LOCATION_RESIGN, LOCATION_JOKER_1, LOCATION_JOKER_2})
         {
             if (rowSum(i) == 0) { set(i, LocationStatus::NOT_IN_GAME); }
         }
@@ -39,8 +41,8 @@ namespace regi
     bool LocationInfo::validJokers() const
     {
         // check joker count summary;
-        u32 nj2 = this->get(1, LocationStatus::NOT_IN_GAME) +
-                  this->get(2, LocationStatus::NOT_IN_GAME);
+        u32 nj2 = this->get(LOCATION_JOKER_1, LocationStatus::NOT_IN_GAME) +
+                  this->get(LOCATION_JOKER_2, LocationStatus::NOT_IN_GAME);
         if (numJokers + nj2 > 2) return false;
         // check if number of jokers is valid
         if (numPlayers == 2 && numJokers != 0) return false;
@@ -53,12 +55,8 @@ namespace regi
     {
         i32 loc = c.toLocation();
         if (loc < 0 || loc >= MAX_CARDS_IN_GAME) return;
-        if (loc == 1)
-        {
-            if (numJokers >= 2) return;
-            loc = loc + numJokers;
-            numJokers++;
-        }
+        /* each joker now has its own distinct location, so no spreading hack */
+        if (c.entry() == JOKER) { numJokers++; }
         this->set(loc, static_cast<i32>(j));
     }
 
@@ -92,8 +90,11 @@ namespace regi
         {
             // every card has a location wrt the game
             if (rowSum(i) == 0) return;
-            // non-jokers have to be in the game
-            if (i > 2 && this->get(i, LocationStatus::NOT_IN_GAME) != 0) return;
+            // only the special slots (yield/resign/jokers, location % 14 == 0)
+            // may be NOT_IN_GAME; every real card must be somewhere in play
+            if ((i % TOTAL_ENTRY_OPTIONS != 0) &&
+                this->get(i, LocationStatus::NOT_IN_GAME) != 0)
+                return;
         }
         valid = true;
     }
@@ -242,22 +243,24 @@ namespace regi
         // assign uniform probabilities for unknown cards
         fillUnknowns(p, currentID, table);
 
-        // set joker count explicitly
-        if (result->numPlayers >= 2)
-        {
-            result->numJokers = result->numPlayers - 2;
-            for (i = 1; i < 1 + result->numJokers; ++i)
-            {
-                result->setUnknowns(i, table);
-            }
-            for (; i < 3; ++i) { result->set(i, 0); }
-        }
-        else
-        {
-            for (i = 1; i < 3; ++i) { result->set(i, 0); }
-        }
+        // resign is never in the game
+        result->set(LOCATION_RESIGN, LocationStatus::NOT_IN_GAME);
+        // set joker count explicitly (2p -> 0, 3p -> 1 at loc 28, 4p -> 2)
+        result->numJokers =
+            (result->numPlayers >= 2) ? (result->numPlayers - 2) : 0;
+        if (result->numJokers >= 1) { result->setUnknowns(LOCATION_JOKER_1, table); }
+        else { result->set(LOCATION_JOKER_1, LocationStatus::NOT_IN_GAME); }
+        if (result->numJokers >= 2) { result->setUnknowns(LOCATION_JOKER_2, table); }
+        else { result->set(LOCATION_JOKER_2, LocationStatus::NOT_IN_GAME); }
 
-        for (i = 3; i < MAX_CARDS_IN_GAME; ++i) { result->setUnknowns(i, table); }
+        // every remaining real card location is an unknown to this player
+        for (i = 1; i < MAX_CARDS_IN_GAME; ++i)
+        {
+            if (i == LOCATION_RESIGN || i == LOCATION_JOKER_1 ||
+                i == LOCATION_JOKER_2)
+                continue;
+            result->setUnknowns(i, table);
+        }
         result->setYield(relativeID(p, currentID, p.activePlayerID - currentID),
                          p.pastYieldsInARow < (p.numPlayers - 1));
         // no validation

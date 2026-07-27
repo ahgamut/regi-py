@@ -84,14 +84,14 @@ namespace regi
         drawPile.push_back(Card(TEN, CLUBS));       //
         if (totalPlayers() == 3)
         {
-            /* 1 joker for 3p */
-            drawPile.push_back(Card(JOKER, GLITCH));
+            /* 1 joker for 3p (location 28) */
+            drawPile.push_back(Card(JOKER, HEARTS));
         }
         else if (totalPlayers() == 4)
         {
-            /* 2 joker for 4p */
-            drawPile.push_back(Card(JOKER, GLITCH));
-            drawPile.push_back(Card(JOKER, GLITCH));
+            /* 2 jokers for 4p (locations 28 and 42) */
+            drawPile.push_back(Card(JOKER, HEARTS));
+            drawPile.push_back(Card(JOKER, SPADES));
         }
         else if (totalPlayers() > 4 || totalPlayers() < 2)
         {

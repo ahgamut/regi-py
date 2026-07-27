@@ -68,7 +68,6 @@ namespace regi
 
         void setComboEntry(const Combo &);
         void setYieldEntry();
-        void setJokerEntry();
         void setAllCardEntries(const Card &);
         void clearAllCardEntries(const Card &);
         void fromUsedPile(const std::vector<Combo> &pile);

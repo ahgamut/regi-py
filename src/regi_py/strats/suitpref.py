@@ -1,9 +1,8 @@
-from regi_py.core import BaseStrategy, Suit
+from regi_py.core import BaseStrategy, Suit, Entry
 from dataclasses import dataclass
 import random
 
 SUITPREF_MAP = {
-    Suit.GLITCH: "X",
     Suit.CLUBS: "C",
     Suit.DIAMONDS: "D",
     Suit.HEARTS: "H",
@@ -56,7 +55,7 @@ class SuitPrefStrategy(BaseStrategy):
         sval = list(self.__suit_order__)
         pref = 0
         for c in combo.parts:
-            if c.suit == Suit.GLITCH:
+            if c.entry == Entry.JOKER:
                 pref = random.randint(0, 16)
                 break
             ind = sval.index(SUITPREF_MAP[c.suit])

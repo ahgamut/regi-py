@@ -22,7 +22,8 @@ from conftest import make_game
 
 
 def _combo_key(combo):
-    return tuple(sorted(c.index for c in combo.parts))
+    # bitwise is the canonical location-based combo identity (u64 bitmask)
+    return combo.bitwise
 
 
 def _phases_from_played_games(num_games=8, num_players=2):
@@ -97,7 +98,7 @@ def test_malformed_string_raises(bad):
 def test_locationinfo_buffer_shape_and_readonly():
     info = make_game(2).export_phaseinfo()
     arr = np.asarray(LocationInfo.from_phase(info))
-    assert arr.shape == (55, 9)  # MAX_CARDS_IN_GAME x MAX_LOCATIONS
+    assert arr.shape == (56, 9)  # MAX_CARDS_IN_GAME x MAX_LOCATIONS
     assert arr.dtype == np.uint32
     assert arr.flags.writeable is False
 
@@ -116,7 +117,7 @@ def test_locationinfo_each_card_in_exactly_one_location():
 def test_combotable_buffer_shape_and_readonly():
     info = make_game(2).export_phaseinfo()
     arr = np.asarray(ComboTable.from_phase(info))
-    assert arr.shape == (55, 22)  # MAX_CARDS_IN_GAME x MAX_PLAYED_STATUS
+    assert arr.shape == (56, 22)  # MAX_CARDS_IN_GAME x MAX_PLAYED_STATUS
     assert arr.dtype == np.uint32
     assert arr.flags.writeable is False
 

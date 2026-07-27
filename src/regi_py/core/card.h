@@ -9,21 +9,26 @@ typedef std::int32_t i32;
 typedef std::uint32_t u32;
 typedef std::size_t u64;
 
-constexpr i32 TOTAL_SUIT_OPTIONS = 5;
+constexpr i32 TOTAL_SUIT_OPTIONS = 4;
 constexpr i32 TOTAL_ENTRY_OPTIONS = 14;
-constexpr i32 NONGLITCH_ENTRY_OPTIONS = 13;
-/* yield is  0
- * joker is  1,2
- * suits are 3-54 */
-constexpr i32 MAX_CARDS_IN_GAME = 55;
+/* Every (entry, suit) pair is a card, located at (entry + 14 * suit), 0..55.
+ * The four JOKER-entry cards are the "special" slots (location % 14 == 0):
+ *   (JOKER, CLUBS)    -> location 0  -> yield
+ *   (JOKER, DIAMONDS) -> location 14 -> resign  (never dealt into the game)
+ *   (JOKER, HEARTS)   -> location 28 -> joker 1 (real deck joker)
+ *   (JOKER, SPADES)   -> location 42 -> joker 2 (real deck joker) */
+constexpr i32 MAX_CARDS_IN_GAME = 56;
+constexpr i32 LOCATION_YIELD = 0;
+constexpr i32 LOCATION_RESIGN = 14;
+constexpr i32 LOCATION_JOKER_1 = 28;
+constexpr i32 LOCATION_JOKER_2 = 42;
 
 enum Suit : u16
 {
-    GLITCH = 0,
-    CLUBS = 1,
-    DIAMONDS = 2,
-    HEARTS = 3,
-    SPADES = 4
+    CLUBS = 0,
+    DIAMONDS = 1,
+    HEARTS = 2,
+    SPADES = 3
 };
 std::ostream& operator<<(std::ostream& os, const Suit s);
 
@@ -53,15 +58,17 @@ struct Card
     Suit s;
 
    public:
-    Card() : e(KING), s(GLITCH) {};
+    Card() : e(KING), s(SPADES) {};
     Card(Entry ee, Suit ss);
     i32 strength() const;
     Entry entry() const;
     Suit suit() const;
-    i32 toIndex() const;
     i32 toLocation() const;
     bool fromLocation(i32);
-    bool fromIndex(i32);
+    /* the yield / resign "cards" are sentinels for those actions; they encode
+     * to locations 0 / 14 and must never appear in a player's hand. */
+    bool isYield() const;
+    bool isResign() const;
     bool operator<(const Card&) const;
     bool operator>(const Card&) const;
     bool operator==(const Card&) const;

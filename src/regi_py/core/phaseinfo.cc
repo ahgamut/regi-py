@@ -56,7 +56,7 @@ namespace regi
             for (i32 j = 0; j < subSize; ++j)
             {
                 EXPECT_WITHIN(ss, ind, 0, 70);
-                if (!player_cards[i][j].fromIndex(ind)) { return false; }
+                if (!player_cards[i][j].fromLocation(ind)) { return false; }
                 if ((j + 1) != subSize) { EXPECT_SEPARATOR(ss, SEP3); }
             }
             if ((i + 1) != numPlayers) { EXPECT_SEPARATOR(ss, SEP2); }
@@ -70,7 +70,7 @@ namespace regi
         for (i32 i = 0; i < pileSize; ++i)
         {
             EXPECT_WITHIN(ss, ind, 0, 70);
-            if (!enemyPile[i].fromIndex(ind)) { return false; }
+            if (!enemyPile[i].fromLocation(ind)) { return false; }
             EXPECT_SEPARATOR(ss, SEP3);
             EXPECT_WITHIN(ss, hpvalue, -40, 40);
             enemyPile[i].hp = hpvalue;
@@ -85,7 +85,7 @@ namespace regi
         for (i32 i = 0; i < pileSize; ++i)
         {
             EXPECT_WITHIN(ss, ind, 0, 70);
-            if (!drawPile[i].fromIndex(ind)) { return false; }
+            if (!drawPile[i].fromLocation(ind)) { return false; }
             if ((i + 1) != drawPile.size()) { EXPECT_SEPARATOR(ss, SEP2); }
         }
         EXPECT_SEPARATOR(ss, SEP1);
@@ -97,7 +97,7 @@ namespace regi
         for (i32 i = 0; i < pileSize; ++i)
         {
             EXPECT_WITHIN(ss, ind, 0, 70);
-            if (!discardPile[i].fromIndex(ind)) { return false; }
+            if (!discardPile[i].fromLocation(ind)) { return false; }
             if ((i + 1) != discardPile.size()) { EXPECT_SEPARATOR(ss, SEP2); }
         }
         EXPECT_SEPARATOR(ss, SEP1);
@@ -114,7 +114,7 @@ namespace regi
             for (i32 j = 0; j < subSize; ++j)
             {
                 EXPECT_WITHIN(ss, ind, 0, 70);
-                if (!usedPile[i].parts[j].fromIndex(ind)) { return false; }
+                if (!usedPile[i].parts[j].fromLocation(ind)) { return false; }
                 if ((j + 1) != usedPile[i].parts.size()) { EXPECT_SEPARATOR(ss, SEP3); }
             }
             if ((i + 1) != usedPile.size()) { EXPECT_SEPARATOR(ss, SEP2); }
@@ -149,7 +149,7 @@ namespace regi
             ss << player_cards[i].size() << SEP2;
             for (i32 j = 0; j < player_cards[i].size(); ++j)
             {
-                ss << player_cards[i][j].toIndex();
+                ss << player_cards[i][j].toLocation();
                 if ((j + 1) != player_cards[i].size()) { ss << SEP3; }
             }
             if ((i + 1) != numPlayers) { ss << SEP2; }
@@ -159,7 +159,7 @@ namespace regi
         ss << enemyPile.size() << SEP1;
         for (i32 i = 0; i < enemyPile.size(); ++i)
         {
-            ss << enemyPile[i].toIndex() << SEP3 << enemyPile[i].hp;
+            ss << enemyPile[i].toLocation() << SEP3 << enemyPile[i].hp;
             if ((i + 1) != enemyPile.size()) { ss << SEP2; }
         }
         ss << SEP1;
@@ -167,7 +167,7 @@ namespace regi
         ss << drawPile.size() << SEP1;
         for (i32 i = 0; i < drawPile.size(); ++i)
         {
-            ss << drawPile[i].toIndex();
+            ss << drawPile[i].toLocation();
             if ((i + 1) != drawPile.size()) { ss << SEP2; }
         }
         ss << SEP1;
@@ -175,7 +175,7 @@ namespace regi
         ss << discardPile.size() << SEP1;
         for (i32 i = 0; i < discardPile.size(); ++i)
         {
-            ss << discardPile[i].toIndex();
+            ss << discardPile[i].toLocation();
             if ((i + 1) != discardPile.size()) { ss << SEP2; }
         }
         ss << SEP1;
@@ -186,7 +186,7 @@ namespace regi
             ss << usedPile[i].parts.size() << SEP2;
             for (i32 j = 0; j < usedPile[i].parts.size(); ++j)
             {
-                ss << usedPile[i].parts[j].toIndex();
+                ss << usedPile[i].parts[j].toLocation();
                 if ((j + 1) != usedPile[i].parts.size()) { ss << SEP3; }
             }
             if ((i + 1) != usedPile.size()) { ss << SEP2; }

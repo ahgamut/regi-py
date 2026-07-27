@@ -4,12 +4,7 @@
 namespace regi
 {
 
-    void ComboTable::setYieldEntry() { this->set(0, PLAYED_SELF); }
-    void ComboTable::setJokerEntry()
-    {
-        if (!this->get(1, PLAYED_SELF)) { this->set(1, PLAYED_SELF); }
-        else { this->set(2, PLAYED_SELF); }
-    }
+    void ComboTable::setYieldEntry() { this->set(LOCATION_YIELD, PLAYED_SELF); }
 
     bool ComboTable::fillComboEntry(const Card &card, PlayedStatus s,
                                     Combo &combo)
@@ -113,6 +108,9 @@ namespace regi
         combo.parts.push_back(card);
         valid = combo.valid(true);
         if (!valid) { combo.parts.clear(); }
+        /* populate baseDmg/powers/bitrep so every combo built from the table
+         * carries its canonical bitwise identity */
+        else { combo.loadDetails(); }
         return valid;
     }
 
@@ -229,8 +227,9 @@ namespace regi
                 this->setYieldEntry();
                 break;
             case 1:
-                if (combo.parts[0].entry() == JOKER) { this->setJokerEntry(); }
-                else { this->set(combo.parts[0].toLocation(), PLAYED_SELF); }
+                /* a single card (including a joker, which now has its own
+                 * distinct location) is just PLAYED_SELF at its location */
+                this->set(combo.parts[0].toLocation(), PLAYED_SELF);
                 break;
             case 2:
                 this->setC2Entry(combo);
@@ -299,14 +298,14 @@ namespace regi
     std::shared_ptr<ComboTable> ComboTable::allViableEntries()
     {
         std::shared_ptr<ComboTable> result = std::make_shared<ComboTable>();
-        result->setYieldEntry();
-        result->setJokerEntry();
-        result->setJokerEntry();
+        result->setYieldEntry();  // location 0
         Combo combo;
         Card card;
         i32 i, j;
-        for (i = 3; i < result->rows; ++i)
+        for (i = 1; i < result->rows; ++i)
         {
+            // resign is not a playable card; yield is handled above (i starts at 1)
+            if (i == LOCATION_RESIGN) continue;
             card.fromLocation(i);
             for (j = 0; j < result->cols; ++j)
             {

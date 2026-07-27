@@ -234,7 +234,7 @@ def multi(game, cmb):
     joker_nerf = False
     for combo in game.used_combos:
         for card in combo:
-            if card.suit == Suit.GLITCH:
+            if card.entry == Entry.JOKER:
                 joker_nerf = True
     if joker_nerf or enemy.suit != Suit.CLUBS:
         return 2

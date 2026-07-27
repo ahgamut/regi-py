@@ -29,65 +29,24 @@ i32 Card::strength() const
     return st;
 }
 
-i32 Card::toIndex() const
+i32 Card::toLocation() const
 {
+    /* dense bijection over all 56 cards: location = entry + 14 * suit */
     return static_cast<i32>(this->e) +
            (TOTAL_ENTRY_OPTIONS * static_cast<i32>(this->s));
 }
 
-bool Card::fromIndex(i32 ind)
-{
-    i32 e0 = ind % TOTAL_ENTRY_OPTIONS;
-    i32 s0 = ind / TOTAL_ENTRY_OPTIONS;
-    // valid entry?
-    if (e0 < 0 || e0 >= TOTAL_ENTRY_OPTIONS) return false;
-    // valid suit?
-    if (s0 < 0 || s0 >= TOTAL_SUIT_OPTIONS) return false;
-    // valid joker?
-    if (e0 == 0 && s0 != 0) return false;
-    this->e = static_cast<Entry>(e0);
-    this->s = static_cast<Suit>(s0);
-    return true;
-}
-
-i32 Card::toLocation() const
-{
-    if (this->s == Suit::GLITCH)
-    {
-        if (this->e == Entry::JOKER) { return 1; }
-        return -1;
-    }
-
-    i32 sp = static_cast<i32>(this->s) - 1;  // sp always >= 0
-    i32 ep = static_cast<i32>(this->e) - 1;  // ep always >= 0
-    i32 loc = 3 + sp * NONGLITCH_ENTRY_OPTIONS + ep;
-    if (loc < 3 || loc > MAX_CARDS_IN_GAME) { return -1; }
-    return loc;
-}
-
 bool Card::fromLocation(i32 loc)
 {
-    if (loc < 1 || loc >= MAX_CARDS_IN_GAME) return false;
-    if (loc < 3)
-    {
-        this->e = Entry::JOKER;
-        this->s = Suit::GLITCH;
-        return true;
-    }
-
-    i32 l2 = loc - 3;
-    i32 e0 = 1 + l2 % (NONGLITCH_ENTRY_OPTIONS);
-    i32 s0 = 1 + l2 / (NONGLITCH_ENTRY_OPTIONS);
-    // valid entry?
-    if (e0 < 0 || e0 >= TOTAL_ENTRY_OPTIONS) return false;
-    // valid suit?
-    if (s0 < 0 || s0 >= TOTAL_SUIT_OPTIONS) return false;
-    // valid joker?
-    if (e0 == 0 && s0 != 0) return false;
-    this->e = static_cast<Entry>(e0);
-    this->s = static_cast<Suit>(s0);
+    if (loc < 0 || loc >= MAX_CARDS_IN_GAME) return false;
+    this->e = static_cast<Entry>(loc % TOTAL_ENTRY_OPTIONS);
+    this->s = static_cast<Suit>(loc / TOTAL_ENTRY_OPTIONS);
     return true;
 }
+
+bool Card::isYield() const { return this->e == JOKER && this->s == CLUBS; }
+
+bool Card::isResign() const { return this->e == JOKER && this->s == DIAMONDS; }
 
 bool Card::operator<(const Card& other) const
 {
@@ -123,9 +82,6 @@ std::ostream& operator<<(std::ostream& os, const Suit s)
         case SPADES:
             os << "\u2660";
             break;
-        case GLITCH:
-            os << "!";
-            break;
     }
     return os;
 }
@@ -147,9 +103,6 @@ std::ostream& operator<<(std::ostream& os, const Suit s)
             break;
         case SPADES:
             os << "S";
-            break;
-        case GLITCH:
-            os << "!";
             break;
     }
     return os;
@@ -194,6 +147,8 @@ std::ostream& operator<<(std::ostream& os, const Card& c)
 
 u32 getPower(const Card& c)
 {
+    /* a joker only ever nerfs the enemy; it never grants its suit's power */
+    if (c.entry() == JOKER) { return JOKER_NERF; }
     u32 p = 0;
     switch (c.suit())
     {
@@ -208,9 +163,6 @@ u32 getPower(const Card& c)
             break;
         case SPADES:
             p |= SPADES_BLOCK;
-            break;
-        case GLITCH:
-            p |= JOKER_NERF;
             break;
     }
     return p;

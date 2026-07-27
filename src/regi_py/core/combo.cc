@@ -56,13 +56,18 @@ namespace regi
          * actual damage calc needs context */
         i32 dmg = 0;
         u32 pow = 0;
+        u64 bits = 0;
         for (auto c : parts)
         {
             dmg += c.strength();
             pow |= getPower(c);
+            /* canonical, hand-independent combo identity: one bit per card
+             * location. an empty (yield) combo stays 0. */
+            bits |= (static_cast<u64>(1) << c.toLocation());
         }
         this->baseDmg = dmg;
         this->powers = pow;
+        this->bitrep = bits;
     }
 
     i32 Combo::getBaseDefense() const
@@ -93,7 +98,7 @@ namespace regi
         return os;
     }
 
-    u32 Combo::getBitrep() const { return this->bitrep; }
-    void Combo::setBitrep(u32 br) { this->bitrep = br; }
+    u64 Combo::getBitrep() const { return this->bitrep; }
+    void Combo::setBitrep(u64 br) { this->bitrep = br; }
 } /* namespace regi */
 
