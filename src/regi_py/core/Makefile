@@ -21,7 +21,7 @@ libregi.a: card.o deck.o \
 	player.o enemy.o \
 	regi.o combo.o effects.o \
 	interact.o dfsel.o \
-	console.o
+	rng.o console.o
 	$(AR) rcs $@ $^
 
 %.o: %.cc

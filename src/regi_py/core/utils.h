@@ -2,8 +2,8 @@
 #define UTILS_H
 #include <cstdint>
 #include <vector>
-#include <random>
 #include <combo.h>
+#include <rng.h>
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::vector<T> pile)
@@ -19,11 +19,9 @@ void shuffle(std::vector<T> &pile, u32 start, u32 end)
     if (end <= 1 || end <= start) { return; }
     i32 i, j;
     i32 len = end - start;
-    std::random_device dev;
-    std::default_random_engine engine(dev());
     for (i = 0; i < len - 1; ++i)
     {
-        j = i + (engine() % (len - i));
+        j = i + regi::randn(len - i);
         std::swap(pile[start + i], pile[start + j]);
     }
 }

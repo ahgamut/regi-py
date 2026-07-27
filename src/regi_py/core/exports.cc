@@ -4,6 +4,7 @@
 #include <phaseinfo.h>
 #include <location.h>
 #include <combotable.h>
+#include <rng.h>
 //
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -566,4 +567,6 @@ PYBIND11_MODULE(core, m)
     bind_location(m);
     bind_combotable(m);
     bind_gamestate(m);
+    m.def("seed", &seed, py::arg("value"),
+          "Seed the shared per-thread RNG for reproducible games.");
 }

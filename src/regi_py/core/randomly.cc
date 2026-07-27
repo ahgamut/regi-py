@@ -1,5 +1,5 @@
 #include <regi.h>
-#include <random>
+#include <rng.h>
 
 namespace regi
 {
@@ -18,12 +18,10 @@ namespace regi
         discardPile.clear();
         usedPile.clear();
         // starting at a random point in the game
-        std::random_device dev;
-        std::default_random_engine engine(dev());
 
         // some enemies have been killed
         i32 maxEnemies = enemyPile.size();
-        i32 killedEnemies = engine() % maxEnemies;
+        i32 killedEnemies = randn(maxEnemies);
         if (killedEnemies != 0)
         {
             for (i32 i = 0; i < killedEnemies; i++)
@@ -40,12 +38,12 @@ namespace regi
             players[i].alive = true;
             players[i].id = i;
             players[i].cards.clear();
-            i32 psize = engine() % (handSize + 1);
+            i32 psize = randn(handSize + 1);
             playerDraws(players[i], psize);
         }
 
         // some cards are in the discard pile
-        i32 numCardsDiscarded = engine() % drawPile.size();
+        i32 numCardsDiscarded = randn(drawPile.size());
         if (numCardsDiscarded != 0)
         {
             for (i32 i = 0; i < numCardsDiscarded; i++)
@@ -57,7 +55,7 @@ namespace regi
         }
 
         //
-        activePlayerID = engine() % totalPlayers();
+        activePlayerID = randn(totalPlayers());
         currentPhaseIsAttack = true;
         status = GameStatus::LOADING;
         //

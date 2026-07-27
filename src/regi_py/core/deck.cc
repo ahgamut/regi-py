@@ -1,6 +1,6 @@
 #include <deck.h>
 
-#include <random>
+#include <rng.h>
 
 Deck::Deck()
     : cards{
@@ -76,10 +76,8 @@ void Deck::show() {
 
 void Deck::shuffle() {
     i32 i, j;
-    std::random_device dev;
-    std::default_random_engine engine(dev());
     for (i = 0; i < 50; ++i) {
-        j = i + (engine() % (52 - i));
+        j = i + regi::randn(52 - i);
         std::swap(cards[i], cards[j]);
     }
 }

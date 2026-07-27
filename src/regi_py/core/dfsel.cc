@@ -1,5 +1,5 @@
 #include <dfsel.h>
-#include <random>
+#include <rng.h>
 #include <algorithm>
 
 namespace regi
@@ -130,9 +130,7 @@ namespace regi
     {
         i32 len = combos.size();
         if (len == 0) return -1;
-        std::random_device dev;
-        std::default_random_engine engine(dev());
-        return engine() % len;
+        return randn(len);
     }
 
     i32 calcDamage(const Combo &cur, const Enemy &enemy, const GameState &g)
@@ -182,9 +180,7 @@ namespace regi
         if (N < 2 || player.id != g.activePlayerID) {
             return -1;
         }
-        std::random_device dev;
-        std::default_random_engine engine(dev());
-        i32 offset = 1 + (engine() % (N - 1));
+        i32 offset = 1 + randn(N - 1);
         i32 nextPlayerID = (g.activePlayerID + offset) % N;
         return nextPlayerID;
     }
@@ -268,9 +264,7 @@ namespace regi
         if (N < 2 || player.id != g.activePlayerID) {
             return -1;
         }
-        std::random_device dev;
-        std::default_random_engine engine(dev());
-        i32 offset = 1 + (engine() % (N - 1));
+        i32 offset = 1 + randn(N - 1);
         i32 nextPlayerID = (g.activePlayerID + offset) % N;
         return nextPlayerID;
     }
