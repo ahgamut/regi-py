@@ -42,7 +42,7 @@ from fastapi.templating import Jinja2Templates
 from regi_py.strats import BaseStrategy, BruteSamplingStrategy
 from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
 from regi_py import get_strategy_map
-from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus
+from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus, write_json_array
 
 
 ###
@@ -255,8 +255,7 @@ class WebPlayerLog(JSONBaseLog):
             os.makedirs(self.history_folder, exist_ok=True)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filepath = os.path.join(self.history_folder, f"game_{timestamp}.json")
-            with open(filepath, "w") as f:
-                json.dump(self.history, f, cls=RegiEncoder, indent=2)
+            write_json_array(filepath, self.history, indent=2)
 
     @staticmethod
     async def log_actual(manager, obj):

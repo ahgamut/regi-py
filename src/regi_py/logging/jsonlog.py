@@ -124,21 +124,91 @@ class JSONBaseLog(BaseLog):
         self.log({"event": GameEvent.DEBUG.name, "game": dump_debug(game)})
 
 
+def write_json_array(path, items, *, indent=None):
+    """Write ``items`` to ``path`` as one clean JSON array (RegiEncoder-encoded).
+
+    The single canonical on-disk log format.  Used for whole-history snapshots
+    (WebPlayerLog) and, via :class:`JSONArrayWriter`, for streamed event logs.
+    """
+    with open(path, "w") as f:
+        json.dump(list(items), f, cls=RegiEncoder, indent=indent)
+
+
+class JSONArrayWriter:
+    """Stream objects to a file as one valid JSON array, element by element.
+
+    Produces the same on-disk shape as :func:`write_json_array` (``[a,b,c]``)
+    without buffering everything in memory and without the old trailing-``{}``
+    sentinel: elements are comma-separated as they arrive and the array is
+    closed with ``]`` explicitly.  Use as a context manager or call ``close()``;
+    ``__del__`` finalizes as a best-effort fallback.
+    """
+
+    def __init__(self, path, *, indent=None):
+        self.path = path
+        self._indent = indent
+        self._fptr = open(path, "w")
+        self._fptr.write("[")
+        self.count = 0
+
+    def append(self, obj):
+        if self._fptr is None:
+            raise ValueError("append() on a closed JSONArrayWriter")
+        if self.count:
+            self._fptr.write(",")
+        json.dump(obj, self._fptr, cls=RegiEncoder, indent=self._indent)
+        self.count += 1
+
+    def close(self):
+        if self._fptr is not None:
+            self._fptr.write("]")
+            self._fptr.close()
+            self._fptr = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 class JSONLog(JSONBaseLog):
+    """Streams game events to a file as one clean JSON array.
+
+    Finalizes on ``close()`` / context-manager exit; ``__del__`` is a fallback
+    so the legacy ``log = JSONLog(path)`` usage (finalized at GC) still yields
+    valid JSON.  An unused log writes ``[]`` rather than the old ``[{}]``.
+    """
+
     def __init__(self, fname):
         super().__init__()
         self.fname = fname
-        self.fptr = open(fname, "w")
-        self.count = 0
-        self.fptr.write("[\n")
+        self.writer = JSONArrayWriter(fname)
+
+    @property
+    def count(self):
+        return self.writer.count
+
+    def close(self):
+        self.writer.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
     def __del__(self):
-        if self.fptr:
-            self.fptr.write("{}]\n")
-            self.fptr.close()
-        self.fptr = None
+        try:
+            self.close()
+        except Exception:
+            pass
 
     def log(self, obj):
-        json.dump(obj, self.fptr, cls=RegiEncoder)
-        self.fptr.write(",\n")
-        self.count += 1
+        self.writer.append(obj)

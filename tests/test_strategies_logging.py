@@ -172,19 +172,56 @@ def test_jsonlog_writes_parseable_event_stream(tmp_path):
         game.add_player(RandomStrategy())
     game.initialize()
     game.start_loop()
-    # JSONLog closes the array in __del__
+    # JSONLog finalizes the array in __del__ (fallback for the legacy
+    # create-and-forget usage); the format is a clean array, no {} sentinel.
     del game
     del log
     gc.collect()
 
     data = json.loads(path.read_text())
     assert isinstance(data, list) and len(data) > 0
-    assert data[-1] == {}  # trailing sentinel object
-    events = [e for e in data if e]
-    kinds = [e["event"] for e in events]
+    assert {} not in data  # no trailing sentinel object anymore
+    kinds = [e["event"] for e in data]
     # dealing emits DRAWONE events before STARTGAME; POSTGAME is the final event.
     assert "STARTGAME" in kinds
     assert kinds[-1] == "POSTGAME"
+
+
+def test_jsonlog_context_manager_and_empty(tmp_path):
+    # explicit close via context manager; an unused log is an empty array
+    empty = tmp_path / "empty.json"
+    with JSONLog(str(empty)):
+        pass
+    assert json.loads(empty.read_text()) == []
+
+    used = tmp_path / "used.json"
+    with JSONLog(str(used)) as log:
+        game = GameState(log)
+        for _ in range(2):
+            game.add_player(RandomStrategy())
+        game.initialize()
+        game.start_loop()
+    data = json.loads(used.read_text())
+    assert isinstance(data, list) and len(data) > 0
+    assert data[-1]["event"] == "POSTGAME"
+
+
+def test_jsonlog_matches_write_json_array(tmp_path):
+    # the streamed JSONLog format equals the whole-array writer (one format)
+    from regi_py.logging import write_json_array
+
+    streamed = tmp_path / "streamed.json"
+    with JSONLog(str(streamed)) as log:
+        game = GameState(log)
+        for _ in range(2):
+            game.add_player(RandomStrategy())
+        game.initialize()
+        game.start_loop()
+    events = json.loads(streamed.read_text())
+
+    whole = tmp_path / "whole.json"
+    write_json_array(str(whole), events)
+    assert json.loads(whole.read_text()) == events
 
 
 # Golden schema: lock the dict keys emitted by the dump_* helpers so the C5

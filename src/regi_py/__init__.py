@@ -5,6 +5,7 @@ from .core import BaseLog, CXXConsoleLog
 from .core import GameState
 from .core import PhaseInfo
 from .logging import JSONBaseLog, JSONLog, RegiEncoder, DummyLog
+from .logging import JSONArrayWriter, write_json_array
 
 #
 from .strats import STRATEGY_LIST as strat1
