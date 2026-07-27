@@ -6,15 +6,15 @@ class LinearBlock(nn.Module):
     def __init__(self, shapes):
         super(LinearBlock, self).__init__()
         self.ac = nn.ReLU()
-        self.nets = []
-        for i in range(0, len(shapes) - 1):
-            self.nets.append(
-                nn.Linear(in_features=shapes[i], out_features=shapes[i + 1])
-            )
+        # nn.ModuleList so the layers are registered params (a plain list is not)
+        self.nets = nn.ModuleList(
+            nn.Linear(in_features=shapes[i], out_features=shapes[i + 1])
+            for i in range(len(shapes) - 1)
+        )
 
     def forward(self, x0):
         x = x0
-        for i, net in enumerate(self.nets):
+        for net in self.nets:
             y = self.ac(net(x))
             if x.shape == y.shape:
                 x = x + y
@@ -27,25 +27,24 @@ class Conv1dBlock(nn.Module):
     def __init__(self, shapes, channels, paddings):
         super(Conv1dBlock, self).__init__()
         self.ac = nn.ReLU()
-        self.nets = []
-        self.feeds = []
-        for i in range(0, len(channels) - 1):
-            self.nets.append(
-                nn.Sequential(
-                    nn.Conv1d(
-                        kernel_size=shapes[i],
-                        in_channels=channels[i],
-                        out_channels=channels[i + 1],
-                        padding=paddings[i],
-                        bias=False,
-                    ),
-                    nn.BatchNorm1d(num_features=channels[i + 1]),
-                )
+        # nn.ModuleList so the conv/bn layers are registered params
+        self.nets = nn.ModuleList(
+            nn.Sequential(
+                nn.Conv1d(
+                    kernel_size=shapes[i],
+                    in_channels=channels[i],
+                    out_channels=channels[i + 1],
+                    padding=paddings[i],
+                    bias=False,
+                ),
+                nn.BatchNorm1d(num_features=channels[i + 1]),
             )
+            for i in range(len(channels) - 1)
+        )
 
     def forward(self, x0):
         x = x0
-        for i, net in enumerate(self.nets):
+        for net in self.nets:
             y = self.ac(net(x))
             if y.shape == x.shape:
                 x = x + y
@@ -58,25 +57,24 @@ class Conv2dBlock(nn.Module):
     def __init__(self, shapes, channels, paddings):
         super(Conv2dBlock, self).__init__()
         self.ac = nn.ReLU()
-        self.nets = []
-        self.feeds = []
-        for i in range(0, len(channels) - 1):
-            self.nets.append(
-                nn.Sequential(
-                    nn.Conv2d(
-                        kernel_size=shapes[i],
-                        in_channels=channels[i],
-                        out_channels=channels[i + 1],
-                        padding=paddings[i],
-                        bias=False,
-                    ),
-                    nn.BatchNorm2d(num_features=channels[i + 1]),
-                )
+        # nn.ModuleList so the conv/bn layers are registered params
+        self.nets = nn.ModuleList(
+            nn.Sequential(
+                nn.Conv2d(
+                    kernel_size=shapes[i],
+                    in_channels=channels[i],
+                    out_channels=channels[i + 1],
+                    padding=paddings[i],
+                    bias=False,
+                ),
+                nn.BatchNorm2d(num_features=channels[i + 1]),
             )
+            for i in range(len(channels) - 1)
+        )
 
     def forward(self, x0):
         x = x0
-        for i, net in enumerate(self.nets):
+        for net in self.nets:
             y = self.ac(net(x))
             if y.shape == x.shape:
                 x = x + y
