@@ -236,9 +236,12 @@ namespace regi
         while (gameRunning())
         {
             log.state(*this);
-            PhaseInfo p;
-            this->loadPhaseInfoForExport(p);
-            this->history.emplace_back(std::move(p));
+            if (this->recordHistory)
+            {
+                PhaseInfo p;
+                this->loadPhaseInfoForExport(p);
+                this->history.emplace_back(std::move(p));
+            }
             onePhase();
         }
         status = GameStatus::ENDED;

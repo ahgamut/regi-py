@@ -61,6 +61,10 @@ namespace regi
        public:
         GameStatus status;
         bool currentPhaseIsAttack;
+        /* when false, startLoop() skips the per-phase PhaseInfo snapshot into
+         * `history` -- throwaway rollouts don't need it and it's the dominant
+         * per-phase allocation. Default true preserves existing behavior. */
+        bool recordHistory;
         i32 activePlayerID;
         i32 pastYieldsInARow;
         i32 phaseCount;
@@ -78,6 +82,7 @@ namespace regi
             handSize = 0;
             activePlayerID = 0;
             currentPhaseIsAttack = false;
+            recordHistory = true;
         };
         i32 addPlayer(Strategy &);
         void init();

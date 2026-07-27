@@ -213,6 +213,36 @@ def test_start_loop_reaches_ended():
     assert game.status == GameStatus.ENDED
 
 
+def test_record_history_default_true():
+    game = make_game(2)
+    assert game.record_history is True
+    game.start_loop()
+    assert len(game.history) > 0
+
+
+def _seeded_finished_game(record_history, n_players=3):
+    core.seed(20260727)
+    game = GameState(DummyLog())
+    for _ in range(n_players):
+        game.add_player(RandomStrategy())
+    game.record_history = record_history
+    game.initialize()
+    game.start_loop()
+    return game
+
+
+def test_record_history_false_skips_history_but_same_game():
+    with_hist = _seeded_finished_game(True)
+    without = _seeded_finished_game(False)
+    # history is skipped entirely when disabled...
+    assert len(with_hist.history) > 0
+    assert len(without.history) == 0
+    # ...but the game itself is byte-for-byte identical (recording is passive)
+    assert without.status == GameStatus.ENDED
+    assert with_hist.export_string() == without.export_string()
+    assert [p.alive for p in with_hist.players] == [p.alive for p in without.players]
+
+
 class CapturingLog(DummyLog):
     def __init__(self):
         super().__init__()

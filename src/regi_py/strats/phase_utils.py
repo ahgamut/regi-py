@@ -219,6 +219,9 @@ class QuickLog(DummyLog):
 def quick_game_sim(root_phase, strat_klass):
     log = QuickLog()
     tmp = GameState(log)
+    # throwaway rollout: only the final state is read, so skip the per-phase
+    # history snapshot allocation
+    tmp.record_history = False
     exp_strat = strat_klass()
     for i in range(root_phase.num_players):
         tmp.add_player(exp_strat)
