@@ -395,7 +395,10 @@ void bind_phaseinfo(pybind11::object &m)
                         info.randomize(currentID);
                         return info;
                     }, py::arg("other"), py::arg("currentID") = -1)
-        .def("_randomize", &PhaseInfo::randomize, py::arg("currentID") = -1)
+        .def("randomize", &PhaseInfo::randomize, py::arg("currentID") = -1,
+             "Randomize this snapshot's hidden information in place, from the "
+             "perspective of player ``currentID`` (-1 = omniscient).")
+        .def("_randomize", &PhaseInfo::randomize, py::arg("currentID") = -1)  // legacy alias
         .def_readonly("num_players", &PhaseInfo::numPlayers)
         .def_readonly("game_endvalue", &PhaseInfo::gameHasEnded)
         .def_readonly("active_player", &PhaseInfo::activePlayerID)
@@ -424,12 +427,61 @@ void bind_phaseinfo(pybind11::object &m)
         ));
 }
 
+// GameState lifecycle helpers, shared by the underscore-prefixed bindings and
+// their clean public aliases (C13) so both names call identical code.
+static GameStatus gsInitialize(GameState &g)
+{
+    g.init();
+    g.setup();
+    return g.status;
+}
+
+static GameStatus gsInitRandom(GameState &g)
+{
+    g.initRandom();
+    g.setup();
+    return g.status;
+}
+
+static GameStatus gsInitPhaseInfo(GameState &g, PhaseInfo &info)
+{
+    g.initPhaseInfo(info);
+    g.setup();
+    return g.status;
+}
+
+static GameStatus gsInitString(GameState &g, std::string s)
+{
+    PhaseInfo info;
+    loadPhaseInfoOrFail(info, s);
+    g.initPhaseInfo(info);
+    g.setup();
+    return g.status;
+}
+
+static PhaseInfo gsExportPhaseInfo(GameState &g)
+{
+    PhaseInfo info;
+    g.loadPhaseInfoForExport(info);
+    return info;
+}
+
+static std::string gsExportString(GameState &g)
+{
+    PhaseInfo info;
+    g.loadPhaseInfoForExport(info);
+    return info.toString();
+}
+
+static void gsSetStatus(GameState &g, GameStatus s) { g.status = s; }
+
 void bind_gamestate(pybind11::object &m)
 {
     py::class_<GameState>(m, "GameState")
         .def(py::init([](BaseLog &log) { return GameState(log); }),
              py::keep_alive<1, 2>())
-        .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>())
+        .def("add_player", &GameState::addPlayer, py::keep_alive<1, 2>(),
+             "Seat a strategy at the next player id (LOADING only); no-op once RUNNING.")
         .def_property_readonly("num_players", &GameState::totalPlayers)
         .def_property_readonly("hand_size", &GameState::getHandSize)
         .def_readonly("active_player", &GameState::activePlayerID)
@@ -447,54 +499,34 @@ void bind_gamestate(pybind11::object &m)
         .def("get_current_block", [](GameState &g, Enemy &e) { return g.calcBlock(e); })
         .def("get_combo_damage", &GameState::calcDamageOfCombo)
         .def("get_combo_block", &GameState::calcBlockOfCombo)
-        .def("start_loop", &GameState::startLoop)
-        .def("_step", &GameState::onePhase)
-        .def("_set_status", [](GameState &g, GameStatus s) { g.status = s; })
-        .def_property_readonly("is_runnable", &GameState::gameRunning)
-        .def("initialize",
-             [](GameState &g)
-             {
-                 g.init();
-                 g.setup();
-                 return g.status;
-             })
-        .def("_init_random",
-             [](GameState &g)
-             {
-                 g.initRandom();
-                 g.setup();
-                 return g.status;
-             })
-        .def("_init_phaseinfo",
-             [](GameState &g, PhaseInfo &info)
-             {
-                 g.initPhaseInfo(info);
-                 g.setup();
-                 return g.status;
-             })
-        .def("export_phaseinfo",
-             [](GameState &g)
-             {
-                 PhaseInfo info;
-                 g.loadPhaseInfoForExport(info);
-                 return info;
-             })
-        .def("_init_string",
-             [](GameState &g, std::string s)
-             {
-                 PhaseInfo info;
-                 loadPhaseInfoOrFail(info, s);
-                 g.initPhaseInfo(info);
-                 g.setup();
-                 return g.status;
-             })
-        .def("export_string",
-             [](GameState &g)
-             {
-                 PhaseInfo info;
-                 g.loadPhaseInfoForExport(info);
-                 return info.toString();
-             });
+        .def("start_loop", &GameState::startLoop,
+             "Run the game to completion, one phase at a time, until ENDED.")
+        .def_property_readonly("is_runnable", &GameState::gameRunning,
+                               "True while the game is RUNNING and can be stepped.")
+        // one phase at a time
+        .def("step", &GameState::onePhase,
+             "Advance the game by exactly one phase (the next decision node).")
+        .def("_step", &GameState::onePhase)  // legacy alias
+        .def("set_status", &gsSetStatus,
+             "Force the GameStatus (advanced/manual stepping).")
+        .def("_set_status", &gsSetStatus)  // legacy alias
+        // initializers -- each runs setup() and returns the resulting GameStatus
+        .def("initialize", &gsInitialize,
+             "Canonical fresh start: full deal, 12 enemies. Returns the GameStatus.")
+        .def("init_random", &gsInitRandom,
+             "Build a random mid-game state (partial deck). Returns the GameStatus.")
+        .def("_init_random", &gsInitRandom)  // legacy alias
+        .def("init_phaseinfo", &gsInitPhaseInfo,
+             "Seat the game from a PhaseInfo snapshot. Returns the GameStatus.")
+        .def("_init_phaseinfo", &gsInitPhaseInfo)  // legacy alias
+        .def("init_string", &gsInitString,
+             "Seat the game from a compact PhaseInfo string. Returns the GameStatus.")
+        .def("_init_string", &gsInitString)  // legacy alias
+        // exporters
+        .def("export_phaseinfo", &gsExportPhaseInfo,
+             "Snapshot the current state as a PhaseInfo.")
+        .def("export_string", &gsExportString,
+             "Snapshot the current state as a compact PhaseInfo string.");
 }
 
 void bind_location(pybind11::object &m)

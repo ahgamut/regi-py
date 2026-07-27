@@ -1,14 +1,32 @@
 from .core import Suit, Entry, SuitPower, GameStatus, EndGameReason
-from .core import Card, Enemy
+from .core import Card, Enemy, Combo
 from .core import Player
 from .core import BaseLog, CXXConsoleLog
 from .core import GameState
 from .core import PhaseInfo
+from .core import LocationInfo, ComboTable
+from .core import seed
+from .game import Game
 from .logging import JSONBaseLog, JSONLog, RegiEncoder, DummyLog
 from .logging import JSONArrayWriter, write_json_array
 
 #
 from .strats import STRATEGY_LIST as strat1
+
+__all__ = [
+    # enums / constants
+    "Suit", "Entry", "SuitPower", "GameStatus", "EndGameReason",
+    # value objects
+    "Card", "Enemy", "Combo", "Player", "PhaseInfo",
+    "LocationInfo", "ComboTable",
+    # engine
+    "GameState", "Game", "seed",
+    # logging
+    "BaseLog", "CXXConsoleLog", "JSONBaseLog", "JSONLog", "DummyLog",
+    "RegiEncoder", "JSONArrayWriter", "write_json_array",
+    # helpers
+    "get_strategy_map",
+]
 
 def get_strategy_map(rl_mods=False):
     all_strats = strat1
