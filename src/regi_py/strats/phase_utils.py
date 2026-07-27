@@ -167,43 +167,101 @@ def indexify(move, combos):
     return 0
 
 
-def get_expansion_at(root_phase, trim=False):
-    log = DummyLog()
-    tmp = GameState(log)
-    exp_strat = PhaseRecorderStrategy(root_phase)
-    for i in range(root_phase.num_players):
-        tmp.add_player(exp_strat)
+class _ExpansionStrategy(BaseStrategy):
+    """Forcing strategy for get_expansion_at.
 
-    tmp._init_phaseinfo(root_phase)
-    tmp.start_loop()
-    root_combos = exp_strat.root_combos
-    exp_strat.is_recording = False
+    It is consulted only at decision points (an attack/defense where a combo is
+    chosen).  At the root decision it records the offered combos and plays the
+    one whose ``bitwise`` matches ``force_bitwise`` (or index 0 while just
+    discovering the root combos).  At the *first* decision after that -- the
+    child node -- it snapshots the phase into ``captured`` so the driver knows to
+    stop stepping.  Phases that resolve without a decision (e.g. an auto-blocked
+    counterattack) are stepped over, matching "next decision node" semantics.
+    """
+
+    __strat_name__ = "expansion"
+
+    def __init__(self):
+        super(_ExpansionStrategy, self).__init__()
+        self.root_offered = None
+        self.force_bitwise = None
+        self.at_root = True
+        self.captured = None
+
+    def arm(self, force_bitwise):
+        self.force_bitwise = force_bitwise
+        self.at_root = True
+        self.captured = None
+
+    def setup(self, player, game):
+        return 0
+
+    def getRedirectIndex(self, player, game):
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
+    def _choose(self, combos, game):
+        if self.at_root:
+            self.root_offered = list(combos)
+            self.at_root = False
+            if self.force_bitwise is not None:
+                for i, c in enumerate(combos):
+                    if c.bitwise == self.force_bitwise:
+                        return i
+            return 0
+        # first decision reached after the root combo == the child phase
+        if self.captured is None:
+            self.captured = game.export_phaseinfo()
+        return 0
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        return self._choose(combos, game)
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        return self._choose(combos, game)
+
+
+def get_expansion_at(root_phase, trim=False):
+    """Enumerate the children of ``root_phase``: the combos legally playable at
+    the root and, for each, the phase at the next decision node reached after
+    playing it (or the terminal phase if the game ends).
+
+    Each child is expanded by re-seating the root phase, forcing that combo, and
+    stepping only until the next decision -- not replaying a whole game.
+    """
+    tmp = GameState(DummyLog())
+    tmp.record_history = False  # throwaway: history is never read here
+    strat = _ExpansionStrategy()
+    for _ in range(root_phase.num_players):
+        tmp.add_player(strat)
+
+    def expand(force_bitwise):
+        strat.arm(force_bitwise)
+        tmp._init_phaseinfo(root_phase)
+        if not tmp.is_runnable:
+            return None
+        tmp._step()  # the root decision (plays the forced combo)
+        # advance to the next decision node (or the end of the game)
+        while tmp.is_runnable and strat.captured is None:
+            tmp._step()
+        if strat.captured is not None:
+            return strat.captured
+        return tmp.export_phaseinfo()
+
+    # discover the combos offered at the root
+    expand(None)
+    root_combos = strat.root_offered
+    if root_combos is None:
+        return [], []
 
     if trim:
         if root_phase.phase_attacking:
             root_combos = get_nonbad_attacks(None, root_combos)
         else:
             root_combos = get_nonbad_defends(None, root_combos)
-        exp_strat.root_combos = root_combos
-        exp_strat.next_phases = [None] * len(root_combos)
 
-    if root_combos is None:
-        return [], []
-
-    for i in range(len(root_combos)):
-        exp_strat.shortcut = i
-        tmp._init_phaseinfo(root_phase)
-        tmp.start_loop()
-        if exp_strat.next_phases[i] is None:
-            exp_strat.next_phases[i] = tmp.export_phaseinfo()
-
-    next_phases = exp_strat.next_phases
+    next_phases = [expand(combo.bitwise) for combo in root_combos]
     assert len(next_phases) == len(root_combos)
-    # print(root_phase.player_cards[root_phase.active_player])
-    for i, x in enumerate(next_phases):
-        assert x is not None
-        # print(root_combos[i], x.player_cards[x.active_player])
-
     return next_phases, root_combos
 
 
