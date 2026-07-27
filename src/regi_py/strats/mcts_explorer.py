@@ -69,12 +69,11 @@ class MCTSNode:
         combos = []
         policy = []
         for combo in self.next_combos:
-            c0 = str(combo)
-            combos.append(c0)
-            if c0 in self.childmap:
-                policy.append(self.childmap[c0].visits)
-            else:
-                policy.append(0)
+            # bitwise is the canonical combo identity; str() stays in the
+            # serialized `combos` output only
+            combos.append(str(combo))
+            node = self.childmap.get(combo.bitwise)
+            policy.append(node.visits if node is not None else 0)
 
         if len(self.children) > 0:
             sel_index = self.best_child_node.prev_index
@@ -138,7 +137,7 @@ class MCTSNode:
             weight=self.weight,
         )
         self.children.append(new_node)
-        self.childmap[str(combo)] = new_node
+        self.childmap[combo.bitwise] = new_node
         return new_node
 
     def simulate(self, active_perspective):

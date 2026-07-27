@@ -80,23 +80,20 @@ class AlphaZeroNode(MCTSNode):
             self.next_priors[i] = max(0, 1 - wt)
 
     def _load_atk_priors(self):
-        roundabout = dict()
-        N = len(self.next_combos)
-        for i, combo in enumerate(self.next_combos):
-            roundabout[str(sorted(combo.parts))] = i
-        #
+        # map each combo (by its canonical bitwise identity) to its ComboTable
+        # cell, then read the net's per-cell prior straight into combo order
         avail = ComboTable.empty()
         avail.add_used_pile(self.next_combos)
         loc, pst = np.array(avail).nonzero()
-        #
-        for i in range(N):
-            combo = ComboTable.make_combo(loc[i], pst[i])
-            k = str(sorted(combo.parts))
-            if k not in roundabout:
-                print(k, roundabout)
+        cell = {
+            ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)
+        }
+        for i, combo in enumerate(self.next_combos):
+            lp = cell.get(combo.bitwise)
+            if lp is None:
                 continue
-            self.next_priors[roundabout[k]] = self.atk_probs[loc[i], pst[i]]
-            self.atk_map[k] = loc[i], pst[i]
+            self.next_priors[i] = self.atk_probs[lp]
+            self.atk_map[combo.bitwise] = lp
         #
         noise = self.rng.dirichlet([0.35] * N)
         self.next_priors = 0.8 * self.next_priors + 0.2 * noise
@@ -129,7 +126,7 @@ class AlphaZeroNode(MCTSNode):
             weight=self.weight,
         )
         self.children.append(new_node)
-        self.childmap[str(sorted(combo.parts))] = new_node
+        self.childmap[combo.bitwise] = new_node
         return new_node
 
     def simulate(self):
@@ -156,7 +153,7 @@ class AlphaZeroNode(MCTSNode):
             keepyness[card.location] = N0
         #
         for combo in self.next_combos:
-            c0 = str(sorted(combo.parts))
+            c0 = combo.bitwise
 
             if c0 in self.childmap:
                 N1 = self.childmap[c0].visits
@@ -220,22 +217,16 @@ class NetDirectStrategy(BaseStrategy):
         v_hat, k_hat, a_hat = self.net.predict(history)
         atk_priors = np.zeros(len(combos), dtype=np.float32)
         #
-        roundabout = dict()
-        N = len(combos)
-        for i, combo in enumerate(combos):
-            roundabout[str(sorted(combo.parts))] = i
-        #
         avail = ComboTable.empty()
         avail.add_used_pile(combos)
         loc, pst = np.array(avail).nonzero()
-        #
-        for i in range(len(loc)):
-            combo = ComboTable.make_combo(loc[i], pst[i])
-            k = str(sorted(combo.parts))
-            if k not in roundabout:
-                print(k, roundabout)
-                continue
-            atk_priors[roundabout[k]] = a_hat[loc[i], pst[i]]
+        cell = {
+            ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)
+        }
+        for i, combo in enumerate(combos):
+            lp = cell.get(combo.bitwise)
+            if lp is not None:
+                atk_priors[i] = a_hat[lp]
 
         ind = int(np.argmax(atk_priors))
         return ind
