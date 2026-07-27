@@ -27,6 +27,11 @@ namespace regi
         u64 getBitrep() const;
     };
 
+    /* OR of (1 << card.toLocation()) over the cards -- the same u64 location
+     * bitmask space as Combo::bitrep, so a combo is playable from a hand iff
+     * (combo.getBitrep() & ~cardsBitrep(hand)) == 0. */
+    u64 cardsBitrep(const std::vector<Card> &cards);
+
 } /* namespace regi */
 
 #endif

@@ -273,6 +273,10 @@ void bind_player(pybind11::object &m)
         .def_readonly("cards", &Player::cards)
         .def_readonly("id", &Player::id)
         .def_readonly("alive", &Player::alive)
+        .def_property_readonly(
+            "hand_bitwise", [](const Player &p) { return cardsBitrep(p.cards); },
+            "The hand as a u64 location bitmask (same space as Combo.bitwise); a "
+            "combo fits this hand iff (combo.bitwise & ~hand_bitwise) == 0.")
         .def_property_readonly("strategy",
                                [](Player &player)
                                {
@@ -602,4 +606,7 @@ PYBIND11_MODULE(core, m)
     bind_gamestate(m);
     m.def("seed", &seed, py::arg("value"),
           "Seed the shared per-thread RNG for reproducible games.");
+    m.def("cards_bitwise", &cardsBitrep, py::arg("cards"),
+          "OR of (1 << card.location) over any iterable of Cards; a u64 bitmask "
+          "in the same space as Combo.bitwise, for combo-subset checks.");
 }

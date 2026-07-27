@@ -100,5 +100,15 @@ namespace regi
 
     u64 Combo::getBitrep() const { return this->bitrep; }
     void Combo::setBitrep(u64 br) { this->bitrep = br; }
+
+    u64 cardsBitrep(const std::vector<Card> &cards)
+    {
+        u64 bits = 0;
+        for (const auto &c : cards)
+        {
+            bits |= (static_cast<u64>(1) << c.toLocation());
+        }
+        return bits;
+    }
 } /* namespace regi */
 

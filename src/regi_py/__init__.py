@@ -5,8 +5,9 @@ from .core import BaseLog, CXXConsoleLog
 from .core import GameState
 from .core import PhaseInfo
 from .core import LocationInfo, ComboTable
-from .core import seed
+from .core import seed, cards_bitwise
 from .game import Game
+from .combomap import cell_of_bitwise, bitwise_of_cell, bitwise_to_cell_map
 from .logging import JSONBaseLog, JSONLog, RegiEncoder, DummyLog
 from .logging import JSONArrayWriter, write_json_array
 
@@ -21,6 +22,8 @@ __all__ = [
     "LocationInfo", "ComboTable",
     # engine
     "GameState", "Game", "seed",
+    # bitwise helpers
+    "cards_bitwise", "cell_of_bitwise", "bitwise_of_cell", "bitwise_to_cell_map",
     # logging
     "BaseLog", "CXXConsoleLog", "JSONBaseLog", "JSONLog", "DummyLog",
     "RegiEncoder", "JSONArrayWriter", "write_json_array",
