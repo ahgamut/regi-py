@@ -15,7 +15,7 @@ from regi_py.logging import DummyLog  # noqa: E402
 
 
 def _seed(value=1234):
-    """Seed the engine RNG when a seed() binding exists (added in C9)."""
+    """Seed the engine RNG when a seed() binding exists."""
     seed_fn = getattr(core, "seed", None)
     if seed_fn is not None:
         seed_fn(value)

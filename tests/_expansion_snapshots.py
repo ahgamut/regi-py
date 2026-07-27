@@ -1,6 +1,6 @@
 # AUTO-GENERATED golden snapshots for get_expansion_at (see test_strategies_logging.py).
 # Frozen fixed root phases + expected (bitwise, next_phase_string) expansion pairs.
-# get_expansion_at is deterministic given the root phase, so these guard the C11 rewrite.
+# get_expansion_at is deterministic given the root phase, so these guard its rewrite.
 # Card integers are LOCATIONS (entry + 14*suit); bitwise is the u64 location bitmask.
 
 FIXED_PHASES = {

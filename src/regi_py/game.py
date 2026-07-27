@@ -1,6 +1,6 @@
 """A thin, ergonomic wrapper around :class:`regi_py.core.GameState`.
 
-This is purely additive sugar over the C++ bindings (C13): it offers clean
+This is purely additive sugar over the C++ bindings: it offers clean
 construction, a one-line initializer, and a Pythonic stepping loop while exposing
 the wrapped state as ``.state`` and delegating attribute access to it.  Code that
 uses ``GameState`` directly is unaffected.

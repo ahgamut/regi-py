@@ -1,4 +1,4 @@
-"""C13: clean public API names + the thin ``Game`` wrapper.
+"""Clean public API names + the thin ``Game`` wrapper.
 
 These lock the additive surface: the clean method names delegate to the same
 C++ code as the legacy underscore names, and the ``Game`` wrapper's stepping

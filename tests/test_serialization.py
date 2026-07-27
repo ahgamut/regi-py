@@ -2,7 +2,7 @@
 
 Covers the compact PhaseInfo string format, pickle (which is string-based),
 GameState string/phaseinfo export + restore, and the LocationInfo / ComboTable
-numpy buffers. These guard the serialization-unification refactors (C5-C8).
+numpy buffers. These guard the serialization-unification refactors.
 """
 import pickle
 

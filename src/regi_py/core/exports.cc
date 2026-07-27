@@ -432,7 +432,7 @@ void bind_phaseinfo(pybind11::object &m)
 }
 
 // GameState lifecycle helpers, shared by the underscore-prefixed bindings and
-// their clean public aliases (C13) so both names call identical code.
+// their clean public aliases so both names call identical code.
 static GameStatus gsInitialize(GameState &g)
 {
     g.init();

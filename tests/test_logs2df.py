@@ -1,9 +1,9 @@
-"""C7: the merged log->CSV builder (game_json/logs2df.py).
+"""The merged log->CSV builder (game_json/logs2df.py).
 
-Locks the R-facing column schema (derived from the C5 serialize tuples but
+Locks the R-facing column schema (derived from the serialize tuples but
 byte-identical to the historical hardcoded lists), exercises the JSON path
-end-to-end on a real JSONLog, and guards the two bugs C7 fixes: the game_digest
-``x0`` pile leak and the recommender ``NotImplemented`` misuse.
+end-to-end on a real JSONLog, and guards the two bugs the merge fixes: the
+game_digest ``x0`` pile leak and the recommender ``NotImplemented`` misuse.
 """
 import os
 import sys

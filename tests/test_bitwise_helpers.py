@@ -1,8 +1,9 @@
-"""Feature helpers: hand/cards bitwise (F1, C++) and the bitwise<->cell map (F2).
+"""Feature helpers: hand/cards bitwise (C++) and the bitwise<->cell map (Python).
 
-F1 lets a hand (any vector<Card>) be viewed as the same u64 location-bitmask
-space as Combo.bitwise, so combo-subset checks are one bitwise op.  F2 is a fixed
-bijection between a combo's bitwise identity and its ComboTable (loc, pst) cell.
+The hand bitwise lets a hand (any vector<Card>) be viewed as the same u64
+location-bitmask space as Combo.bitwise, so combo-subset checks are one bitwise
+op.  The cell map is a fixed bijection between a combo's bitwise identity and its
+ComboTable (loc, pst) cell.
 """
 import numpy as np
 import pytest
@@ -18,7 +19,7 @@ from regi_py.strats.phase_utils import get_expansion_at
 
 
 # --------------------------------------------------------------------------- #
-# F1: cards / hand -> bitwise
+# cards / hand -> bitwise
 # --------------------------------------------------------------------------- #
 def test_hand_bitwise_is_or_of_locations(seeded):
     game = make_game(2)
@@ -56,7 +57,7 @@ def test_offered_combos_are_subsets_of_the_hand(seeded):
 
 
 # --------------------------------------------------------------------------- #
-# F2: bitwise <-> ComboTable (loc, pst)
+# bitwise <-> ComboTable (loc, pst)
 # --------------------------------------------------------------------------- #
 def test_map_is_a_bijection():
     mapping = bitwise_to_cell_map()

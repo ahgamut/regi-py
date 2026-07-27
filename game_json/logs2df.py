@@ -34,7 +34,7 @@ IGNORE_EVENTS = ("STATE", "REPLENISH", "DRAWONE")
 MAX_PLAYERS = 4
 
 # --------------------------------------------------------------------------- #
-# schema -- derived from the C5 serialize tuples (regi_py.serialize.*_FIELDS)
+# schema -- derived from the serialize tuples (regi_py.serialize.*_FIELDS)
 # --------------------------------------------------------------------------- #
 # event-record scalars that are not part of any serialized game object
 EVENT_SCALARS = ("damage", "event", "fullblock", "maxblock", "strategy")

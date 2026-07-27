@@ -1,6 +1,6 @@
 """Strategy, logging, and MCTS/expansion behavior tests.
 
-The get_expansion_at golden-snapshot tests are the key guard for the C11 rewrite:
+The get_expansion_at golden-snapshot tests are the key guard for its rewrite:
 get_expansion_at is deterministic given the root phase (the legal moves and the
 immediate result of playing a chosen combo do not depend on RNG), so a frozen
 set of (root phase -> expansion) snapshots must survive the rewrite unchanged.
@@ -107,7 +107,7 @@ def test_index_of_bitwise_resolves_and_defaults(seeded):
 
 
 # --------------------------------------------------------------------------- #
-# get_expansion_at: golden snapshots (C11 guard) + invariants
+# get_expansion_at: golden snapshots (rewrite guard) + invariants
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("label", sorted(snapshots.FIXED_PHASES))
 def test_get_expansion_at_matches_golden(label):
@@ -258,7 +258,7 @@ def test_jsonlog_matches_write_json_array(tmp_path):
     assert json.loads(whole.read_text()) == events
 
 
-# Golden schema: lock the dict keys emitted by the dump_* helpers so the C5
+# Golden schema: lock the dict keys emitted by the dump_* helpers so the
 # schema unification cannot silently drop or rename a field.
 DUMP_GAME_KEYS = {
     "num_players", "active_player_id", "active_player", "phase_count",

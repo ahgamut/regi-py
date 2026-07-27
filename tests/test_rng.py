@@ -1,4 +1,4 @@
-"""C9: the engine RNG is a single reused, seedable thread-local generator."""
+"""The engine RNG is a single reused, seedable thread-local generator."""
 import pytest
 
 core = pytest.importorskip("regi_py.core", reason="regi_py.core extension not built")

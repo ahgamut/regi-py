@@ -1,4 +1,4 @@
-"""C5: regi_py.serialize is the single source of truth for game -> dict.
+"""regi_py.serialize is the single source of truth for game -> dict.
 
 Locks that the schema-field tuples exactly match the keys the serializers emit
 (order included) and that the logging dump_* helpers delegate to this module.
