@@ -1,75 +1,34 @@
-from regi_py.core import *
+"""Backwards-compatible ``dump_*`` helpers.
+
+The dict schema is defined once in :mod:`regi_py.serialize`; this module just
+exposes the historical names used by the JSON logs and the dataframe builders.
+"""
+from regi_py.serialize import (
+    CARD_FIELDS,
+    ENEMY_FIELDS,
+    PLAYER_LIMITED_FIELDS,
+    PLAYER_FIELDS,
+    GAME_FIELDS,
+    DEBUG_EXTRA_FIELDS,
+    card_to_dict,
+    combo_to_dict,
+    enemy_to_dict,
+    player_limited_to_dict,
+    player_to_dict,
+    game_to_dict,
+)
 
 
 def dump_game(game):
-    result = dict()
-    result["num_players"] = game.num_players
-    result["active_player_id"] = None
-    result["active_player"] = None
-    if game.active_player >= 0 and game.active_player < len(game.players):
-        result["active_player_id"] = game.active_player
-        result["active_player"] = dump_player(game.players[game.active_player])
-    result["phase_count"] = game.phase_count
-    result["phase_attacking"] = game.phase_attacking
-    result["hand_size"] = game.hand_size
-    result["players"] = [dump_player(player) for player in game.players]
-    result["past_yields"] = game.past_yields
-    result["status"] = str(game.status.name)
-    result["used_combos"] = [dump_combo(combo) for combo in game.used_combos if len(combo.parts) != 0]
-    result["current_enemy"] = None
-    result["current_block"] = 0
-    result["progress"] = 0
-    result["draw_pile_size"] = len(game.draw_pile)
-    result["discard_pile_size"] = len(game.discard_pile)
-    result["enemy_pile_size"] = len(game.enemy_pile)
-    if len(game.enemy_pile) > 0:
-        result["current_enemy"] = dump_enemy(game.enemy_pile[0])
-        result["current_block"] = game.get_current_block(game.enemy_pile[0])
-        result["progress"] = 360 - sum(e.hp for e in game.enemy_pile if e.hp > 0)
-    else:
-        result["progress"] = 360
-    result["enemy_pile"] = [str(x) for x in game.enemy_pile]
-    return result
+    return game_to_dict(game, debug=False)
 
 
 def dump_debug(game):
-    result = dump_game(game)
-    result["players"] = [dump_player(player) for player in game.players]
-    result["draw_pile"] = [str(x) for x in game.draw_pile]
-    result["discard_pile"] = [str(x) for x in game.discard_pile]
-    return result
+    return game_to_dict(game, debug=True)
 
 
-def dump_player_limited(player):
-    result = dict()
-    result["id"] = player.id
-    result["alive"] = player.alive
-    result["num_cards"] = len(player.cards)
-    result["strategy"] = player.strategy
-    return result
-
-
-def dump_player(player):
-    result = dump_player_limited(player)
-    result["cards"] = [str(card) for card in player.cards]
-    return result
-
-
-def dump_enemy(enemy):
-    result = dict()
-    result["value"] = str(enemy)
-    result["hp"] = enemy.hp
-    result["strength"] = enemy.strength
-    return result
-
-
-def dump_card(card):
-    result = dict()
-    result["value"] = str(card)
-    result["strength"] = card.strength
-    return result
-
-
-def dump_combo(combo):
-    result = [dump_card(card) for card in combo.parts]
-    return result
+dump_card = card_to_dict
+dump_combo = combo_to_dict
+dump_enemy = enemy_to_dict
+dump_player_limited = player_limited_to_dict
+dump_player = player_to_dict

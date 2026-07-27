@@ -135,6 +135,8 @@ void bind_enums(pybind11::object &m)
         .finalize();
 
     m.attr("MAX_CARDS_IN_GAME") = MAX_CARDS_IN_GAME;
+    m.attr("TOTAL_ENTRY_OPTIONS") = TOTAL_ENTRY_OPTIONS;
+    m.attr("TOTAL_SUIT_OPTIONS") = TOTAL_SUIT_OPTIONS;
 }
 
 static Card ctorFromLocation(i32 loc)
