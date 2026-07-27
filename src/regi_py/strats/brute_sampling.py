@@ -54,10 +54,7 @@ class BruteSamplingStrategy(BaseStrategy, RecommenderMixin):
         best = int(np.argmax(scores))
 
         best_move = moves[best]
-        for ind, c in enumerate(combos):
-            if c.bitwise == best_move.bitwise:
-                return ind
-        return -1
+        return index_of_bitwise(combos, best_move.bitwise)
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
         if len(combos) == 0:

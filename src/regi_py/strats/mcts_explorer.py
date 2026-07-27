@@ -233,10 +233,7 @@ class MCTSExplorerStrategy(BaseStrategy, RecommenderMixin):
         best_combo = root_node.best_combo
         # for i, x in enumerate(root_node.children):
         #    print(x.prev_combo, x.visits / root_node.visits)
-        for ind, c in enumerate(combos):
-            if c.bitwise == best_combo.bitwise:
-                return ind
-        return -1
+        return index_of_bitwise(combos, best_combo.bitwise)
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
         ind = self.process_phase(game.export_phaseinfo(), combos)
@@ -289,7 +286,4 @@ class MCTSSaverStrategy(MCTSExplorerStrategy):
         self.history.append(info)
         # for i, x in enumerate(root_node.children):
         #    print(x.prev_combo, x.visits / root_node.visits)
-        for ind, c in enumerate(combos):
-            if c.bitwise == best_combo.bitwise:
-                return ind
-        return -1
+        return index_of_bitwise(combos, best_combo.bitwise)

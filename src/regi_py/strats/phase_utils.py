@@ -140,10 +140,7 @@ class PhaseRecorderStrategy(BaseStrategy):
             subind = self.shortcut
             self.shortcut = None
             bts = self.root_combos[subind].bitwise
-            for i, c in enumerate(combos):
-                if c.bitwise == bts:
-                    ind = i
-                    break
+            ind = index_of_bitwise(combos, bts)
             self.update_prev(subind)
         else:
             ind = random.choice(range(len(combos)))
@@ -159,12 +156,27 @@ class PhaseRecorderStrategy(BaseStrategy):
         return ind
 
 
-def indexify(move, combos):
+def index_of_bitwise(combos, bitwise, default=-1):
+    """Position in ``combos`` of the combo whose ``bitwise`` identity matches.
+
+    ``bitwise`` is the canonical u64 combo identity (:pyattr:`Combo.bitwise`).
+    Within a single hand every card has a distinct location, so the location
+    bitmask uniquely identifies a combo -- this resolves a move chosen by
+    identity back to the engine's offered index without depending on enumeration
+    order.  Returns ``default`` when nothing matches (the engine reads a negative
+    index as "no legal move").
+    """
     for i, c in enumerate(combos):
-        if c.bitwise == move.bitwise:
+        if c.bitwise == bitwise:
             return i
-    raise RuntimeError("unable to index move")
-    return 0
+    return default
+
+
+def indexify(move, combos):
+    ind = index_of_bitwise(combos, move.bitwise)
+    if ind < 0:
+        raise RuntimeError("unable to index move")
+    return ind
 
 
 class _ExpansionStrategy(BaseStrategy):
@@ -205,9 +217,9 @@ class _ExpansionStrategy(BaseStrategy):
             self.root_offered = list(combos)
             self.at_root = False
             if self.force_bitwise is not None:
-                for i, c in enumerate(combos):
-                    if c.bitwise == self.force_bitwise:
-                        return i
+                # a forced combo always comes from this same offer set; fall back
+                # to combo 0 on the impossible miss (matches prior behavior)
+                return index_of_bitwise(combos, self.force_bitwise, default=0)
             return 0
         # first decision reached after the root combo == the child phase
         if self.captured is None:

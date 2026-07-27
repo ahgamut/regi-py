@@ -21,7 +21,12 @@ from regi_py.core import (
 from regi_py.logging import DummyLog, JSONLog, RegiEncoder
 from regi_py.logging.utils import dump_game, dump_debug, dump_player, dump_enemy, dump_card
 import regi_py.strats as strats
-from regi_py.strats.phase_utils import get_expansion_at, quick_game_value
+from regi_py.strats.phase_utils import (
+    get_expansion_at,
+    quick_game_value,
+    index_of_bitwise,
+    indexify,
+)
 from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
 
 from conftest import make_game
@@ -70,6 +75,35 @@ def test_custom_python_strategy_end_to_end():
     assert game.initialize() == GameStatus.RUNNING
     game.start_loop()
     assert game.status == GameStatus.ENDED
+
+
+# --------------------------------------------------------------------------- #
+# index_of_bitwise: the shared bitwise->index resolver behind the smart strats
+# --------------------------------------------------------------------------- #
+def test_index_of_bitwise_resolves_and_defaults(seeded):
+    combos = []
+    for _ in range(20):
+        phase = make_game(2).export_phaseinfo()
+        _, combos = get_expansion_at(phase)
+        if combos:
+            break
+    assert combos, "expected at least one offered combo"
+
+    # every offered combo resolves to its own position, order-independent
+    for i, c in enumerate(combos):
+        assert index_of_bitwise(combos, c.bitwise) == i
+        assert indexify(c, combos) == i
+
+    # bit 63 can never be set (card locations are 0..55) -> guaranteed absent
+    absent = 1 << 63
+    assert index_of_bitwise(combos, absent) == -1
+    assert index_of_bitwise(combos, absent, default=0) == 0
+
+    class _FakeMove:
+        bitwise = absent
+
+    with pytest.raises(RuntimeError):
+        indexify(_FakeMove, combos)
 
 
 # --------------------------------------------------------------------------- #
