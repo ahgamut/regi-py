@@ -172,6 +172,9 @@ class CombineNet(nn.Module):
 
 class BasicNet(nn.Module):
     __mname__ = "basic"
+    # history window length; a class attribute so callers (e.g. the brute
+    # recorder in rl.training) can read it without instantiating the net
+    max_history = 8
 
     # single source of truth for the training tensor field order, shared by
     # tensorify_training / ShardBuffer / run_epoch
@@ -188,7 +191,6 @@ class BasicNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.device = "cpu"
-        self.max_history = 8
         #
         self.loc_net = Conv2dBlock(
             channels=(self.max_history, 32),
