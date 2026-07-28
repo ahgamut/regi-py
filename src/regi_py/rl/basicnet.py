@@ -158,9 +158,9 @@ class CombineNet(nn.Module):
         self.wca1 = WidthCrossAttention(channels=channels, heads=4)
         self.wca2 = WidthCrossAttention(channels=channels, heads=4)
         self.net = Conv2dBlock(
-            channels=(channels, 64, 64, 64, 64, 64),
-            shapes=(1, 3, 3, 3, 3),
-            paddings=(0, 1, 1, 1, 1),
+            channels=(channels, 64, 64, 64, 64, 64, 64, 64, 64, 64),
+            shapes=(1, 3, 3, 1, 3, 3, 1, 3, 3),
+            paddings=(0, 1, 1, 0, 1, 1, 0, 1, 1),
         )
 
     def forward(self, usp, loc, cap):
@@ -229,7 +229,7 @@ class BasicNet(nn.Module):
         loss1a = torch.sum(-a * torch.log(a_hat.clamp_min(1e-9)), dim=(-2, -1))
         loss1 = torch.mean(loss1a * phase_atk)
         loss2 = nn.functional.mse_loss(v_hat, v)
-        loss3 = nn.functional.mse_loss(k_hat * k, k)
+        loss3 = nn.functional.mse_loss(k_hat, k)
         return loss1 + loss2 + loss3
 
     def predict(self, history, perspective=None):
