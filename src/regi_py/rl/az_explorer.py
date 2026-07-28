@@ -185,7 +185,9 @@ class AlphaZeroNode(MCTSNode):
             for card in combo.parts:
                 keepyness[card.location] -= N1
 
-        keepyness = np.maximum(0, keepyness)
+        # normalize both to visit fractions in [0, 1] (N0 = root visits), matching
+        # the sigmoid keepy head and the softmax action target
+        keepyness = np.maximum(0, keepyness) / N0
         atk_probs /= N0
 
         return AZNodeInfo(
