@@ -166,7 +166,7 @@ class CombineNet(nn.Module):
     def forward(self, usp, loc, cap):
         y1 = self.wca1(usp, loc)
         y2 = self.wca2(y1, cap)
-        y3 = self.net(y1)
+        y3 = self.net(y2)
         return y3
 
 
