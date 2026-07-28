@@ -101,9 +101,23 @@ class AlphaZeroNode(MCTSNode):
                 continue
             self.next_priors[i] = self.atk_probs[lp]
             self.atk_map[combo.bitwise] = lp
-        #
-        noise = self.rng.dirichlet([0.35] * len(self.next_combos))
-        self.next_priors = 0.8 * self.next_priors + 0.2 * noise
+
+    def add_dirichlet_noise(self, alpha=0.35, frac=0.2):
+        """Mix Dirichlet exploration noise into this node's child priors.
+
+        AlphaZero adds this only at the *search root*, so it lives here as an
+        explicit call (self-play drivers apply it per move) rather than in every
+        node's ``__init__`` -- internal nodes should search on the raw net priors,
+        and competitive play (``AZExplorerStrategy``) skips it entirely. No-op for
+        defense/terminal nodes (only attack nodes carry net atk priors).
+        """
+        n = len(self.next_combos)
+        if n == 0 or not self.root_phase.phase_attacking:
+            return
+        noise = self.rng.dirichlet([alpha] * n)
+        self.next_priors = normalize_probs(
+            (1 - frac) * self.next_priors + frac * noise
+        )
 
     @property
     def ucb1(self):
@@ -118,9 +132,9 @@ class AlphaZeroNode(MCTSNode):
 
     def expand(self):
         i = self.rem_exp_ind.pop()
-        phase = self.next_phases[i]
         combo = self.next_combos[i]
         prior = self.next_priors[i]
+        phase = self._expander.step(combo.bitwise)
         new_node = AlphaZeroNode(
             phase,
             history=self.history,
@@ -134,6 +148,8 @@ class AlphaZeroNode(MCTSNode):
         )
         self.children.append(new_node)
         self.childmap[combo.bitwise] = new_node
+        if not self.rem_exp_ind:
+            self._expander = None  # fully expanded: release the throwaway game
         return new_node
 
     def simulate(self):
@@ -172,7 +188,9 @@ class AlphaZeroNode(MCTSNode):
 
         return AZNodeInfo(
             history=self.history,
-            value=self.value / self.visits,
+            # placeholder: the self-play driver overwrites every info.value with
+            # the whole-game outcome z, so the search Q here is never used
+            value=0.0,
             keepyness=keepyness,
             atk_probs=atk_probs,
         )

@@ -40,7 +40,7 @@ class MCTSNode:
         self.prev_combo = prev_combo
         self.prev_index = prev_index
         #
-        self.next_phases = []
+        self._expander = None
         self.next_combos = []
         self.rem_exp_ind = []
         self.children = []
@@ -52,11 +52,11 @@ class MCTSNode:
     def _load_expansion(self):
         if self.root_phase.game_endvalue != 0:
             return
-        n, c = get_expansion_at(self.root_phase, trim=self.trim)
-        self.next_phases = n
-        self.next_combos = c
-        assert len(n) == len(c)
-        self.rem_exp_ind = list(range(len(c)))
+        # list the offered combos now; each child phase is stepped on demand in
+        # expand(), so unvisited children are never materialized
+        self._expander = PhaseExpander(self.root_phase)
+        self.next_combos = self._expander.offered(trim=self.trim)
+        self.rem_exp_ind = list(range(len(self.next_combos)))
         random.shuffle(self.rem_exp_ind)
 
     def can_expand_further(self):
@@ -126,8 +126,8 @@ class MCTSNode:
 
     def expand(self):
         i = self.rem_exp_ind.pop()
-        phase = self.next_phases[i]
         combo = self.next_combos[i]
+        phase = self._expander.step(combo.bitwise)
         new_node = MCTSNode(
             phase,
             trim=self.trim,
@@ -138,6 +138,8 @@ class MCTSNode:
         )
         self.children.append(new_node)
         self.childmap[combo.bitwise] = new_node
+        if not self.rem_exp_ind:
+            self._expander = None  # fully expanded: release the throwaway game
         return new_node
 
     def simulate(self, active_perspective):

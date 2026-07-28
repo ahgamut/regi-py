@@ -233,47 +233,70 @@ class _ExpansionStrategy(BaseStrategy):
         return self._choose(combos, game)
 
 
+class PhaseExpander:
+    """Lazily produces the children of one ``root_phase``.
+
+    ``offered(trim)`` lists the combos legally playable at the root; ``step(
+    bitwise)`` returns the phase at the next decision node reached after playing
+    one of them (or the terminal phase if the game ends). Each call re-seats one
+    throwaway ``GameState`` from the root, forces the chosen combo, and steps only
+    until the next decision -- not replaying a whole game. Holding the expander on
+    an MCTS node lets it materialize just the children the search actually visits,
+    instead of stepping all of them up front.
+    """
+
+    def __init__(self, root_phase):
+        self.root_phase = root_phase
+        self._tmp = GameState(DummyLog())
+        self._tmp.record_history = False  # throwaway: history is never read here
+        self._strat = _ExpansionStrategy()
+        for _ in range(root_phase.num_players):
+            self._tmp.add_player(self._strat)
+        self._offered = None
+
+    def _run(self, force_bitwise):
+        self._strat.arm(force_bitwise)
+        self._tmp._init_phaseinfo(self.root_phase)
+        if not self._tmp.is_runnable:
+            return None
+        self._tmp._step()  # the root decision (plays the forced combo)
+        # advance to the next decision node (or the end of the game)
+        while self._tmp.is_runnable and self._strat.captured is None:
+            self._tmp._step()
+        if self._strat.captured is not None:
+            return self._strat.captured
+        return self._tmp.export_phaseinfo()
+
+    def offered(self, trim=False):
+        if self._offered is None:
+            self._run(None)  # discover the combos offered at the root
+            combos = self._strat.root_offered
+            if combos is None:
+                combos = []
+            elif trim:
+                if self.root_phase.phase_attacking:
+                    combos = get_nonbad_attacks(None, combos)
+                else:
+                    combos = get_nonbad_defends(None, combos)
+            self._offered = combos
+        return self._offered
+
+    def step(self, combo_bitwise):
+        return self._run(combo_bitwise)
+
+
 def get_expansion_at(root_phase, trim=False):
     """Enumerate the children of ``root_phase``: the combos legally playable at
     the root and, for each, the phase at the next decision node reached after
     playing it (or the terminal phase if the game ends).
 
-    Each child is expanded by re-seating the root phase, forcing that combo, and
-    stepping only until the next decision -- not replaying a whole game.
+    Eager wrapper over :class:`PhaseExpander` (which MCTS uses directly to expand
+    children lazily); kept for callers that want the whole list at once. The call
+    sequence matches the expander's, so output stays byte-identical.
     """
-    tmp = GameState(DummyLog())
-    tmp.record_history = False  # throwaway: history is never read here
-    strat = _ExpansionStrategy()
-    for _ in range(root_phase.num_players):
-        tmp.add_player(strat)
-
-    def expand(force_bitwise):
-        strat.arm(force_bitwise)
-        tmp._init_phaseinfo(root_phase)
-        if not tmp.is_runnable:
-            return None
-        tmp._step()  # the root decision (plays the forced combo)
-        # advance to the next decision node (or the end of the game)
-        while tmp.is_runnable and strat.captured is None:
-            tmp._step()
-        if strat.captured is not None:
-            return strat.captured
-        return tmp.export_phaseinfo()
-
-    # discover the combos offered at the root
-    expand(None)
-    root_combos = strat.root_offered
-    if root_combos is None:
-        return [], []
-
-    if trim:
-        if root_phase.phase_attacking:
-            root_combos = get_nonbad_attacks(None, root_combos)
-        else:
-            root_combos = get_nonbad_defends(None, root_combos)
-
-    next_phases = [expand(combo.bitwise) for combo in root_combos]
-    assert len(next_phases) == len(root_combos)
+    expander = PhaseExpander(root_phase)
+    root_combos = expander.offered(trim=trim)
+    next_phases = [expander.step(combo.bitwise) for combo in root_combos]
     return next_phases, root_combos
 
 

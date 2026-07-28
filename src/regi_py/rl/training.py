@@ -104,6 +104,9 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     node = AlphaZeroNode(start_phase, net=net, history=[], prior=1.0, trim=False)
     s0 = enemy_hp_left(node.root_phase)
     while node.root_phase.game_endvalue == 0:
+        # root-only exploration noise: mix fresh Dirichlet into this move's
+        # search root before searching (self-play only, not competitive play)
+        node.add_dirichlet_noise()
         simulate_node(node, num_iterations)
         history.append(node.export())
         child = node.best_child_node
