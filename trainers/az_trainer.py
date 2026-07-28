@@ -23,7 +23,7 @@ from regi_py.rl.training import (
 )
 
 
-def trainer(tid, shared_model, exp_queue, eval_queue, train_device, params):
+def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, params):
     print(f"P{tid} on {train_device} to train")
     torch.set_num_threads(params.num_threads)
     with torch.device(train_device):
@@ -73,9 +73,13 @@ def trainer(tid, shared_model, exp_queue, eval_queue, train_device, params):
         shared_model.state_dict(), f"./weights/model_{shared_model.__mname__}_end.pt"
     )
     eval_queue.put(None)  # stop the evaluator
+    # a queued candidate is tensors backed by THIS process's shared memory, freed
+    # the instant the trainer exits -- which crashes the evaluator's get(). Stay
+    # alive until the evaluator has drained everything (it sets eval_done).
+    eval_done.wait()
 
 
-def evaluator(eval_queue, params):
+def evaluator(eval_queue, eval_done, params):
     print("Peval to evaluate")
     torch.set_num_threads(params.num_threads)
     old_model = BasicNet()
@@ -84,29 +88,36 @@ def evaluator(eval_queue, params):
     new_model.device = "cpu"
     have_baseline = False
 
-    while True:
-        item = eval_queue.get()
-        if item is None:
-            break
-        episode, state_dict = item
-        new_model.load_state_dict(state_dict)
-        new_model.eval()
-        # the first candidate becomes the baseline and is always checkpointed
-        if not have_baseline:
-            old_model.load_state_dict(state_dict)
-            have_baseline = True
-            test_model(episode, new_model, params.num_simulations)
-            continue
-        # otherwise only checkpoint when the candidate beats the last-saved one
-        if improved_gameplay(
-            episode,
-            new_model=new_model,
-            old_model=old_model,
-            num_simulations=10,
-            threshold=0.5,
-        ):
-            old_model.load_state_dict(state_dict)
-            test_model(episode, new_model, params.num_simulations)
+    try:
+        while True:
+            item = eval_queue.get()
+            if item is None:
+                break
+            episode, state_dict = item
+            new_model.load_state_dict(state_dict)
+            new_model.eval()
+            # done with the shared-memory tensors; promote from new_model below so
+            # nothing references the trainer's shared memory during the eval games
+            item = state_dict = None
+            # the first candidate becomes the baseline and is always checkpointed
+            if not have_baseline:
+                old_model.load_state_dict(new_model.state_dict())
+                have_baseline = True
+                test_model(episode, new_model, params.num_simulations)
+                continue
+            # otherwise only checkpoint when the candidate beats the last-saved one
+            if improved_gameplay(
+                episode,
+                new_model=new_model,
+                old_model=old_model,
+                num_simulations=10,
+                threshold=0.5,
+            ):
+                old_model.load_state_dict(new_model.state_dict())
+                test_model(episode, new_model, params.num_simulations)
+    finally:
+        # release the trainer (which is holding the shared memory alive for us)
+        eval_done.set()
 
 
 def explorer(tid, shared_model, exp_queue, device, params):
@@ -169,15 +180,16 @@ def submain(params):
     shared_model.share_memory()
     exp_queue = mp.Queue(maxsize=params.queue_size)
     eval_queue = mp.Queue(maxsize=2)
+    eval_done = mp.Event()  # evaluator -> trainer: "queue drained, safe to exit"
     processes = []
 
     p_trainer = mp.Process(
         target=trainer,
-        args=(0, shared_model, exp_queue, eval_queue, train_device, params),
+        args=(0, shared_model, exp_queue, eval_queue, eval_done, train_device, params),
     )
     p_trainer.start()
 
-    p_eval = mp.Process(target=evaluator, args=(eval_queue, params))
+    p_eval = mp.Process(target=evaluator, args=(eval_queue, eval_done, params))
     p_eval.start()
 
     for i in range(1, params.num_processes):
@@ -189,8 +201,9 @@ def submain(params):
         processes.append(p)
 
     p_trainer.join()
-    # the trainer sends its own None on a clean exit; this best-effort sentinel
-    # also unblocks the evaluator if the trainer died before sending one
+    # on a clean exit the trainer already sent None and waited on eval_done; this
+    # best-effort sentinel only matters if the trainer died first, to unblock the
+    # evaluator's get()
     try:
         eval_queue.put_nowait(None)
     except queue.Full:
