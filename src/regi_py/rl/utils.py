@@ -31,10 +31,8 @@ def hp_loss_penalty(enemy_hp):
     training target (``rl.training.run_single_game``). Lives here (torch-free)
     so ``az_explorer`` can use it without pulling in ``training``/torch.
     """
-    if enemy_hp > 280:
+    if enemy_hp > 320:
         return -1.0
-    if enemy_hp > 220:
-        return -0.75
-    if enemy_hp > 160:
-        return -0.25
-    return -0.0625
+    if enemy_hp > 280:
+        return -0.9
+    return (160 - enemy_hp) / 160
