@@ -235,13 +235,18 @@ def run_brute_game(tid, i, num_bots, iterations):
         game.add_player(strat)
     game.init_random()
     s0 = enemy_hp_left(game.export_phaseinfo())
+    if s0 < 130:
+        return None
     game.start_loop()
     end_phase = game.export_phaseinfo()
     s1 = enemy_hp_left(end_phase)
-    win = end_phase.game_endvalue == 1
     dt = time.time() - a
-    # only winning games are submitted as training data
-    if not win:
+    win = end_phase.game_endvalue == 1
+    large_progress = False
+    if s0 - s1 >= 130:
+        large_progress = True
+    # only games that progress a lot are submitted as training data
+    if not large_progress:
         return None
     print(
         f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr

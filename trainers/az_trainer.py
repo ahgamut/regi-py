@@ -143,7 +143,6 @@ def explorer(tid, shared_model, exp_queue, device, params):
                     iterations=params.num_simulations,
                 )
                 if examples is None:  # lost game -> no training data submitted
-                    count += 1
                     fails = 0
                     continue
             else:
