@@ -1,8 +1,8 @@
-from regi_py.core import PhaseInfo
-from regi_py.core import LocationInfo
-from regi_py.core import ComboTable
-from regi_py.core import Combo
+from regi_py.core import PhaseInfo, BaseStrategy
+from regi_py.combomap import cell_of_bitwise
 from regi_py.strats.mcts_explorer import MCTSNode
+from regi_py.strats.recommender import RecommenderMixin
+from regi_py.strats.phase_utils import index_of_bitwise
 from regi_py.rl.utils import *
 
 #
@@ -67,7 +67,7 @@ class AlphaZeroNode(MCTSNode):
 
     @staticmethod
     def _trimmed_history(history, phase, maxhist):
-        tmp = history + [phase]
+        tmp = list(history) + [phase]
         if len(tmp) >= maxhist:
             return tmp[-maxhist:]
         else:
@@ -80,20 +80,16 @@ class AlphaZeroNode(MCTSNode):
             self.next_priors[i] = max(0, 1 - wt)
 
     def _load_atk_priors(self):
-        # map each combo (by its canonical bitwise identity) to its ComboTable
-        # cell, then read the net's per-cell prior straight into combo order
-        avail = ComboTable.empty()
-        avail.add_used_pile(self.next_combos)
-        loc, pst = np.array(avail).nonzero()
-        cell = {ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)}
+        # each combo's ComboTable cell comes straight from its canonical bitwise
+        # identity (combomap); read the net's per-cell prior into combo order
         for i, combo in enumerate(self.next_combos):
-            lp = cell.get(combo.bitwise)
+            lp = cell_of_bitwise(combo.bitwise)
             if lp is None:
                 continue
             self.next_priors[i] = self.atk_probs[lp]
             self.atk_map[combo.bitwise] = lp
         #
-        noise = self.rng.dirichlet([0.35] * N)
+        noise = self.rng.dirichlet([0.35] * len(self.next_combos))
         self.next_priors = 0.8 * self.next_priors + 0.2 * noise
 
     @property
@@ -132,14 +128,7 @@ class AlphaZeroNode(MCTSNode):
         if end_value == 1:
             return 3.0
         if end_value == -1:
-            e = enemy_hp_left(self.root_phase)
-            if e > 280:
-                return -1
-            if e > 220:
-                return -0.75
-            if e > 160:
-                return -0.25
-            return -0.0625
+            return hp_loss_penalty(enemy_hp_left(self.root_phase))
         return self.value
 
     def export(self):
@@ -176,6 +165,17 @@ class AlphaZeroNode(MCTSNode):
         )
 
 
+def simulate_node(root_node, iterations):
+    """Run ``iterations`` of net-guided MCTS from ``root_node`` (in place)."""
+    for _ in range(iterations):
+        node = AlphaZeroNode.select(root_node)
+        if not node.is_terminal():
+            node = node.expand()
+        reward = node.simulate()
+        AlphaZeroNode.update(node, reward)
+    return root_node
+
+
 class NetDirectStrategy(BaseStrategy):
     __strat_name__ = "net-direct"
 
@@ -193,17 +193,14 @@ class NetDirectStrategy(BaseStrategy):
         history = AlphaZeroNode._trimmed_history(
             game.history, root_phase, self.net.max_history
         )
-        vals = [-100] * game.num_players
-        # TODO: how to randomize?
+        vals = [-100.0] * game.num_players
         for i in range(game.num_players):
             if i == game.active_player:
                 continue
-            root_phase._randomize()
             history[-1] = PhaseInfo.randomize_from(root_phase, i)
             v_hat, _, _ = self.net.predict(history, i)
             vals[i] = v_hat
-        ind = int(np.argmax(v_hat))
-        return ind
+        return int(np.argmax(vals))
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
         if len(combos) == 0:
@@ -214,18 +211,11 @@ class NetDirectStrategy(BaseStrategy):
         )
         v_hat, k_hat, a_hat = self.net.predict(history)
         atk_priors = np.zeros(len(combos), dtype=np.float32)
-        #
-        avail = ComboTable.empty()
-        avail.add_used_pile(combos)
-        loc, pst = np.array(avail).nonzero()
-        cell = {ComboTable.make_combo(l, p).bitwise: (l, p) for l, p in zip(loc, pst)}
         for i, combo in enumerate(combos):
-            lp = cell.get(combo.bitwise)
+            lp = cell_of_bitwise(combo.bitwise)
             if lp is not None:
                 atk_priors[i] = a_hat[lp]
-
-        ind = int(np.argmax(atk_priors))
-        return ind
+        return int(np.argmax(atk_priors))
 
     def getDefenseIndex(self, combos, player, damage, game):
         if len(combos) == 0:
@@ -239,5 +229,76 @@ class NetDirectStrategy(BaseStrategy):
         for i, combo in enumerate(combos):
             wt = sum(k_hat[card.location] for card in combo.parts)
             def_priors[i] = max(0, 1 - wt)
-        ind = int(np.argmax(def_priors))
-        return ind
+        return int(np.argmax(def_priors))
+
+
+class AZExplorerStrategy(BaseStrategy, RecommenderMixin):
+    """Net-guided MCTS as a playable strategy (the AlphaZero analogue of
+    ``strats.mcts_explorer.MCTSExplorerStrategy``): run search from the current
+    state and play the most-visited child."""
+
+    __strat_name__ = "az-explorer"
+
+    def __init__(self, net, iterations=64, trim=True, weight=math.sqrt(2)):
+        super(AZExplorerStrategy, self).__init__()
+        self.net = net
+        self.iterations = iterations
+        self.trim = trim
+        self.weight = weight
+        self.__strat_name__ = f"az-{net.__mname__}-{iterations}"
+
+    def setup(self, player, game):
+        self.net.eval()
+        return 0
+
+    def _root_from_game(self, game):
+        return AlphaZeroNode(
+            game.export_phaseinfo(),
+            history=list(game.history),
+            net=self.net,
+            prior=1.0,
+            trim=self.trim,
+            weight=self.weight,
+        )
+
+    def _search_index(self, game, combos):
+        if len(combos) == 0:
+            return -1
+        root = simulate_node(self._root_from_game(game), self.iterations)
+        if len(root.children) == 0:
+            return -1
+        return index_of_bitwise(combos, root.best_combo.bitwise)
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        return self._search_index(game, combos)
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        return self._search_index(game, combos)
+
+    def getRedirectIndex(self, player, game):
+        root = simulate_node(self._root_from_game(game), self.iterations)
+        if len(root.children) != 0:
+            best_phase = root.best_next_phase
+            if best_phase.active_player != player.id:
+                return best_phase.active_player
+        offset = random.randint(1, game.num_players - 1)
+        return (game.active_player + offset) % game.num_players
+
+    def getRecommendedMoves(self, phase, combos):
+        root = AlphaZeroNode(
+            phase,
+            history=[],
+            net=self.net,
+            prior=1.0,
+            trim=self.trim,
+            weight=self.weight,
+        )
+        simulate_node(root, self.iterations)
+        scored = []
+        for combo in root.next_combos:
+            node = root.childmap.get(combo.bitwise)
+            # bitwise is the canonical combo identity; str() is the serialized
+            # form the recommender payload carries (mirrors MCTSExplorerStrategy)
+            scored.append((node.visits if node is not None else 0, str(combo)))
+        scored.sort(key=lambda t: t[0], reverse=True)
+        return [combo for _, combo in scored]
