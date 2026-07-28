@@ -120,7 +120,7 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     reward = 1.0 if win else hp_loss_penalty(s1)
     for info in history:
         info.value = reward
-    # print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
+    print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     return BasicNet.tensorify_training(history)
 
 
@@ -168,7 +168,7 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
         diff1 = log1.e0 - log1.e1
         diff2 = log2.e0 - log2.e1
         #
-        print(f"{s} old: {diff1}, new: {diff2}")
+        print(f"{s} old: {diff1}, new: {diff2}", file=sys.stderr)
         if diff2 > diff1 and diff2 != 0:
             newer_better += 1
 
