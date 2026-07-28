@@ -5,8 +5,7 @@ multiprocessing orchestration (``submain``/``trainer``/``explorer``/``main``).
 Everything here is reusable, single-process, and free of any ``mp`` state:
 self-play data generation (``run_single_game``), the optimization step
 (``run_epoch``), evaluation (``test_model``/``improved_gameplay``), and small
-helpers (``EndGameLog``, ``total_enemy_hp``, ``get_split_optimizer``,
-``infinite``, ``drain``).
+helpers (``EndGameLog``, ``total_enemy_hp``, ``get_split_optimizer``, ``drain``).
 """
 import random
 import sys
@@ -67,12 +66,6 @@ def get_split_optimizer(model):
 
     optimizer = torch.optim.AdamW(grps, lr=5e-3)
     return optimizer
-
-
-def infinite(loader):
-    while True:
-        for batch in loader:
-            yield batch
 
 
 def drain(q, buf):

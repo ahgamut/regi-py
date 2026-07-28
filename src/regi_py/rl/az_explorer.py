@@ -52,7 +52,11 @@ class AlphaZeroNode(MCTSNode):
         )
         #
         v_hat, k_hat, a_hat = self.net.predict(self.history)
-        self.value = v_hat
+        # net value estimate for this leaf; kept separate from ``self.value``,
+        # which the base MCTSNode uses as the backed-up reward sum (W). Folding
+        # v_hat into self.value would double-count it: __init__ would seed W with
+        # v_hat and then update() would add it again on the leaf's own backup.
+        self.leaf_value = v_hat
         self.keepyness = k_hat
         self.atk_probs = a_hat
         self.next_priors = np.zeros(len(self.next_combos), dtype=np.float32)
@@ -129,7 +133,7 @@ class AlphaZeroNode(MCTSNode):
             return 3.0
         if end_value == -1:
             return hp_loss_penalty(enemy_hp_left(self.root_phase))
-        return self.value
+        return self.leaf_value
 
     def export(self):
         N0 = self.visits

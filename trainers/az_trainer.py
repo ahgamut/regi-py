@@ -1,5 +1,6 @@
 import argparse
 import os
+import queue
 import random
 import sys
 import time
@@ -9,7 +10,6 @@ import traceback
 import torch
 import torch.multiprocessing as mp
 import numpy as np
-from torch.utils.data import DataLoader
 
 from regi_py.rl.basicnet import BasicNet
 from regi_py.rl.loaders import ShardBuffer
@@ -19,12 +19,11 @@ from regi_py.rl.training import (
     get_split_optimizer,
     test_model,
     improved_gameplay,
-    infinite,
     drain,
 )
 
 
-def trainer(tid, shared_model, queue, train_device, test_device, params):
+def trainer(tid, shared_model, exp_queue, eval_queue, train_device, params):
     print(f"P{tid} on {train_device} to train")
     torch.set_num_threads(params.num_threads)
     with torch.device(train_device):
@@ -35,61 +34,86 @@ def trainer(tid, shared_model, queue, train_device, test_device, params):
         train_model.train()
         optimizer = get_split_optimizer(train_model)
 
-    with torch.device(test_device):
-        bench_model = BasicNet()
-        bench_model.device = test_device
-        bench_model.load_state_dict(shared_model.state_dict())
-        bench_model = bench_model.to(test_device)
-        bench_model.eval()
-
     ep = 0
     buf = ShardBuffer(capacity=params.memory_size)
     while ep < params.num_episodes:
-        drain(queue, buf)
+        drain(exp_queue, buf)
 
         if len(buf) < params.batch_size:
             time.sleep(1)
             continue
 
-        loader = DataLoader(
-            dataset=buf.dataset(),
-            batch_size=params.batch_size,
-            num_workers=1,
-        )
-        ldr = infinite(loader)
         losses = []
         for e in range(params.epochs):
-            batch = next(ldr)
+            batch = buf.sample_batch(params.batch_size)
             loss = run_epoch(train_model, batch, optimizer)
             losses.append(loss)
 
-        print(
-            "episode",
-            ep,
-            f"loss={np.mean(losses)}",
-            file=sys.stderr,
-        )
-        bench_model.load_state_dict(train_model.state_dict())
+        print("episode", ep, f"loss={np.mean(losses)}", file=sys.stderr)
         ep += 1
-        if improved_gameplay(
-            ep,
-            new_model=bench_model,
-            old_model=shared_model,
-            num_simulations=10,
-            threshold=0.5,
-        ):
-            test_model(ep, shared_model, params.num_simulations)
+
+        # publish the freshest weights so explorers self-play with the latest net
         shared_model.load_state_dict(train_model.state_dict())
+
+        # hand a candidate snapshot to the eval process; best-effort, so a busy
+        # evaluator never stalls training (stale candidates are simply skipped)
+        if ep % params.test_every == 0:
+            # clone: on a CPU trainer state_dict() aliases the live params, so a
+            # bare snapshot would keep mutating under the evaluator
+            cpu_state = {
+                k: v.detach().to("cpu").clone()
+                for k, v in train_model.state_dict().items()
+            }
+            try:
+                eval_queue.put_nowait((ep, cpu_state))
+            except queue.Full:
+                pass
 
     torch.save(
         shared_model.state_dict(), f"./weights/model_{shared_model.__mname__}_end.pt"
     )
+    eval_queue.put(None)  # stop the evaluator
 
 
-def explorer(tid, shared_model, queue, device, params):
+def evaluator(eval_queue, params):
+    print("Peval to evaluate")
+    torch.set_num_threads(params.num_threads)
+    old_model = BasicNet()
+    old_model.device = "cpu"
+    new_model = BasicNet()
+    new_model.device = "cpu"
+    have_baseline = False
+
+    while True:
+        item = eval_queue.get()
+        if item is None:
+            break
+        episode, state_dict = item
+        new_model.load_state_dict(state_dict)
+        new_model.eval()
+        # the first candidate becomes the baseline and is always checkpointed
+        if not have_baseline:
+            old_model.load_state_dict(state_dict)
+            have_baseline = True
+            test_model(episode, new_model, params.num_simulations)
+            continue
+        # otherwise only checkpoint when the candidate beats the last-saved one
+        if improved_gameplay(
+            episode,
+            new_model=new_model,
+            old_model=old_model,
+            num_simulations=10,
+            threshold=0.5,
+        ):
+            old_model.load_state_dict(state_dict)
+            test_model(episode, new_model, params.num_simulations)
+
+
+def explorer(tid, shared_model, exp_queue, device, params):
     print(f"P{tid} on {device} to explore")
     torch.set_num_threads(params.num_threads)
     count = 0
+    fails = 0
     while True:
         num_bots = random.randint(2, 4)
         try:
@@ -100,12 +124,24 @@ def explorer(tid, shared_model, queue, device, params):
                 num_bots=num_bots,
                 num_iterations=params.num_simulations,
             )
-            queue.put(examples)
+            exp_queue.put(examples)
             del examples
             count += 1
-        except Exception as e:
-            print(tid, "unable to explore game", count)
+            fails = 0
+        except Exception:
+            fails += 1
+            print(
+                f"P{tid} failed to explore game {count} (fail {fails})",
+                file=sys.stderr,
+            )
             traceback.print_exc()
+            if fails >= params.max_explore_fails:
+                print(
+                    f"P{tid} giving up after {fails} consecutive failures",
+                    file=sys.stderr,
+                )
+                return
+            time.sleep(min(fails, 5))  # brief backoff before retrying
 
 
 def submain(params):
@@ -132,13 +168,17 @@ def submain(params):
 
     shared_model.share_memory()
     exp_queue = mp.Queue(maxsize=params.queue_size)
+    eval_queue = mp.Queue(maxsize=2)
     processes = []
 
     p_trainer = mp.Process(
         target=trainer,
-        args=(0, shared_model, exp_queue, train_device, test_device, params),
+        args=(0, shared_model, exp_queue, eval_queue, train_device, params),
     )
     p_trainer.start()
+
+    p_eval = mp.Process(target=evaluator, args=(eval_queue, params))
+    p_eval.start()
 
     for i in range(1, params.num_processes):
         p = mp.Process(
@@ -149,6 +189,13 @@ def submain(params):
         processes.append(p)
 
     p_trainer.join()
+    # the trainer sends its own None on a clean exit; this best-effort sentinel
+    # also unblocks the evaluator if the trainer died before sending one
+    try:
+        eval_queue.put_nowait(None)
+    except queue.Full:
+        pass
+    p_eval.join()
     for p in processes:
         p.terminate()
 
@@ -165,12 +212,20 @@ def main():
         "--num-processes",
         default=4,
         type=int,
-        help="number of processes (1 used to train)",
+        help="number of processes (1 trains, the rest explore; eval is separate)",
     )
     parser.add_argument(
         "--num-threads", default=1, type=int, help="threads per process"
     )
-    parser.add_argument("--test-every", default=1, type=int, help="test every k epochs")
+    parser.add_argument(
+        "--test-every", default=1, type=int, help="offer a candidate to eval every k episodes"
+    )
+    parser.add_argument(
+        "--max-explore-fails",
+        default=5,
+        type=int,
+        help="explorer gives up after this many consecutive game failures",
+    )
     parser.add_argument("--queue-size", default=64, type=int, help="queue size")
     parser.add_argument("--memory-size", default=64, type=int, help="memory size")
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
