@@ -1,4 +1,4 @@
-from regi_py.core import PhaseInfo, LocationInfo, ComboTable, Card, Suit
+from regi_py.core import PhaseInfo, LocationInfo, ComboTable, Card
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_LOCATIONS, MAX_PLAYED_STATUS
 from regi_py.rl.az_explorer import AZNodeInfo
 from regi_py.rl.utils import *
@@ -13,36 +13,42 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-# per-card capability channels: [attack_potential, defense_potential]
+# per-card capability channels: [attack_capability, defense_capability]
 CAP_CHANNELS = 2
+# scale factor keeping capabilities roughly in [-1, 1]: a King has 40 HP -> -1.0
+# and deals 20 base damage -> -0.5
+CAP_SCALE = 40.0
 # flattened trunk width for the value/keepy heads (card axis x location axis)
 _TRUNK_FLAT = MAX_CARDS_IN_GAME * int(MAX_LOCATIONS)
 
-# static per-card strength / clubs flag (capability's suit-power varies only with
-# the current enemy, so the per-card part is precomputed once)
+# static raw per-card strength by location; enemy-pile cards override this each
+# phase (their HP / base damage), so only the non-enemy part is precomputed
 _STRENGTH = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
-_IS_CLUBS = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
 for _loc in range(MAX_CARDS_IN_GAME):
     try:
-        _card = Card.from_location(_loc)
-        _STRENGTH[_loc] = _card.strength / 20.0
-        _IS_CLUBS[_loc] = 1.0 if _card.suit == Suit.CLUBS else 0.0
+        _STRENGTH[_loc] = Card.from_location(_loc).strength
     except Exception:
         pass
 
 
 def card_capabilities(phase):
-    """Per-card ``(attack, defense)`` potential for ``phase``'s current enemy.
+    """Per-card ``(attack, defense)`` capability for ``phase``, on the 56-location
+    axis. Shape ``(MAX_CARDS_IN_GAME, CAP_CHANNELS)``, scaled by ``1/CAP_SCALE``.
 
-    Attack doubles for clubs unless the enemy is itself clubs (immune); defense
-    is the raw card strength. Shape ``(MAX_CARDS_IN_GAME, CAP_CHANNELS)``.
+    A card *not* in the enemy pile contributes its own (non-negative) strength to
+    both channels. A card *in* the enemy pile is a target, encoded negatively:
+    attack = ``-max(0, current HP)``, defense = ``-(base damage it deals)``.
     """
-    enemy = phase.enemy_pile[0] if len(phase.enemy_pile) else None
-    clubs_active = enemy is None or enemy.suit != Suit.CLUBS
-    caps = np.zeros((MAX_CARDS_IN_GAME, CAP_CHANNELS), dtype=np.float32)
-    mult = 1.0 + (_IS_CLUBS if clubs_active else 0.0)  # 2x clubs when active
-    caps[:, 0] = _STRENGTH * mult
-    caps[:, 1] = _STRENGTH
+    attack = _STRENGTH.copy()
+    defense = _STRENGTH.copy()
+    for enemy in phase.enemy_pile:
+        loc = enemy.location
+        attack[loc] = -max(0, enemy.hp)
+        defense[loc] = -enemy.strength
+    caps = np.empty((MAX_CARDS_IN_GAME, CAP_CHANNELS), dtype=np.float32)
+    caps[:, 0] = attack
+    caps[:, 1] = defense
+    caps /= CAP_SCALE
     return caps
 
 
