@@ -233,11 +233,15 @@ class BasicNet(nn.Module):
         return loss1 + loss2 + loss3
 
     def predict(self, history, perspective=None):
-        data = BasicNet.tensorify_phases(history, perspective, self.max_history)
-        v_hat0, k_hat0, a_hat0 = self.forward(data)
-        v_hat = float(v_hat0.detach().cpu().numpy()[0, 0])
-        k_hat = k_hat0.detach().cpu().numpy()[0, :]
-        a_hat = a_hat0.detach().cpu().numpy()[0, 0, :, :]
+        # inference_mode: self-play/eval never backprop through predict, so skip
+        # all autograd bookkeeping (a real CPU win, since every call otherwise
+        # builds a graph that's immediately discarded)
+        with torch.inference_mode():
+            data = BasicNet.tensorify_phases(history, perspective, self.max_history)
+            v_hat0, k_hat0, a_hat0 = self.forward(data)
+            v_hat = float(v_hat0.detach().cpu().numpy()[0, 0])
+            k_hat = k_hat0.detach().cpu().numpy()[0, :]
+            a_hat = a_hat0.detach().cpu().numpy()[0, 0, :, :]
         return v_hat, k_hat, a_hat
 
     @staticmethod

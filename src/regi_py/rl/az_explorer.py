@@ -50,6 +50,16 @@ class AlphaZeroNode(MCTSNode):
         self.history = AlphaZeroNode._trimmed_history(
             history, self.root_phase, self.net.max_history
         )
+        self.atk_map = dict()
+        #
+        # a terminal leaf has no children and its backup value comes from
+        # simulate()'s endgame reward, so the net eval is never read -- skip it
+        if self.root_phase.game_endvalue != 0:
+            self.leaf_value = 0.0
+            self.keepyness = None
+            self.atk_probs = None
+            self.next_priors = np.zeros(0, dtype=np.float32)
+            return
         #
         v_hat, k_hat, a_hat = self.net.predict(self.history)
         # net value estimate for this leaf; kept separate from ``self.value``,
@@ -60,7 +70,6 @@ class AlphaZeroNode(MCTSNode):
         self.keepyness = k_hat
         self.atk_probs = a_hat
         self.next_priors = np.zeros(len(self.next_combos), dtype=np.float32)
-        self.atk_map = dict()
 
         if len(self.next_combos) != 0:
             if self.root_phase.phase_attacking:
