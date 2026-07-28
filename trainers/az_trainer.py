@@ -16,6 +16,7 @@ from regi_py.rl.loaders import ShardBuffer
 from regi_py.rl.training import (
     run_epoch,
     run_single_game,
+    run_brute_game,
     get_split_optimizer,
     test_model,
     improved_gameplay,
@@ -121,20 +122,38 @@ def evaluator(eval_queue, eval_done, params):
 
 
 def explorer(tid, shared_model, exp_queue, device, params):
-    print(f"P{tid} on {device} to explore")
+    # even-tid explorers brute-sample from random mid-game states (win-only data,
+    # covering late-game positions AZ self-play never reaches); odd-tid explorers
+    # run net-guided AZ self-play. tid starts at 1, so tid 0 (the trainer) is not
+    # an explorer and this cleanly splits "every other explorer".
+    brute = (tid % 2) == 0
+    role = "brute-explore" if brute else "az-explore"
+    print(f"P{tid} on {device} to {role}")
     torch.set_num_threads(params.num_threads)
     count = 0
     fails = 0
     while True:
         num_bots = random.randint(2, 4)
         try:
-            examples = run_single_game(
-                tid,
-                count,
-                net=shared_model,
-                num_bots=num_bots,
-                num_iterations=params.num_simulations,
-            )
+            if brute:
+                examples = run_brute_game(
+                    tid,
+                    count,
+                    num_bots=num_bots,
+                    iterations=params.num_simulations,
+                )
+                if examples is None:  # lost game -> no training data submitted
+                    count += 1
+                    fails = 0
+                    continue
+            else:
+                examples = run_single_game(
+                    tid,
+                    count,
+                    net=shared_model,
+                    num_bots=num_bots,
+                    num_iterations=params.num_simulations,
+                )
             exp_queue.put(examples)
             del examples
             count += 1

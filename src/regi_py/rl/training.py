@@ -16,10 +16,13 @@ import torch
 import numpy as np
 
 from regi_py import GameState, DummyLog
-from regi_py.strats import RandomStrategy
+from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
+from regi_py.combomap import cell_of_bitwise
+from regi_py.strats import RandomStrategy, BruteSamplingStrategy
 from regi_py.rl.az_explorer import (
     NetDirectStrategy,
     AlphaZeroNode,
+    AZNodeInfo,
     simulate_node,
 )
 from regi_py.rl.basicnet import BasicNet
@@ -122,6 +125,132 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
         info.value = reward
     print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     return BasicNet.tensorify_training(history)
+
+
+class RecordingBruteStrategy(BruteSamplingStrategy):
+    """``BruteSamplingStrategy`` that records, per decision, ONLY the index of the
+    decision phase in ``game.history`` plus the played move -- all as plain values,
+    never a ``PhaseInfo`` reference.
+
+    ``game.history`` is a pybind view over a live ``std::vector<PhaseInfo>``: its
+    elements are references that DANGLE the moment the vector reallocates on the
+    next appended phase. The old design held those references (a window per move)
+    for the whole game and then segfaulted in ``to_string`` at tensorify time. Here
+    nothing but plain ints/bitwise are kept; the windows are rebuilt from the
+    stable post-game history in ``infos_from_game``. One instance is shared by all
+    players (Regicide is cooperative: every decision in a won game earns the win).
+    """
+
+    def __init__(self, iterations=64):
+        super().__init__(iterations=iterations)
+        self.moves = []  # (history_index, combo_bitwise, [part_location, ...])
+
+    def _record_and_pick(self, combos, game):
+        root_phase = game.export_phaseinfo()
+        # same fallback contract as the parent's getAttackIndex/getDefenseIndex:
+        # a brute failure still plays (and records) a concrete index
+        try:
+            ind = self.get_best_move(root_phase, combos)
+        except Exception as e:
+            print("failed to process moves", e, file=sys.stderr)
+            ind = random.randint(0, len(combos) - 1)
+        combo = combos[ind]
+        # start_loop records the current phase at the top of the iteration, before
+        # the strategy is consulted, so this decision phase is history[-1]; keep
+        # only its index (a plain int, safe to hold across the rest of the game)
+        idx = len(game.history) - 1
+        self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
+        return ind
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        if len(combos) == 0:
+            return -1
+        return self._record_and_pick(combos, game)
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        if len(combos) == 0:
+            return -1
+        return self._record_and_pick(combos, game)
+
+
+def infos_from_game(game, moves, value):
+    """Build the ``AZNodeInfo`` training list AFTER a brute game finishes.
+
+    Rebuilds each decision's history window from the now-stable ``game.history``.
+    Safe because the game is over (the underlying vector no longer reallocates) and
+    tensorify runs before ``run_brute_game`` returns, while ``game`` -- which keeps
+    those references alive -- is still in scope.
+
+    One-shot analogue of ``AlphaZeroNode.export()`` (N0 = 1): ``keepyness`` is 1 for
+    kept hand cards / 0 for the cards spent in the played combo; ``atk_probs`` is a
+    one-hot at the played combo's ComboTable cell on attack phases (defense phases
+    keep it all-zero -- the action loss is masked by ``attacking``). Reuses the
+    sanctioned tensor path via ``BasicNet.tensorify_training(infos_from_game(...))``.
+    """
+    hist = list(game.history)
+    maxhist = BasicNet.max_history
+    infos = []
+    for idx, bitwise, part_locs in moves:
+        root_phase = hist[idx]
+        # dense window ending at this decision, matching NetDirectStrategy's
+        # inference window (the last ``maxhist`` phases of game.history)
+        window = AlphaZeroNode._trimmed_history(hist[:idx], root_phase, maxhist)
+        #
+        keepyness = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
+        for card in root_phase.player_cards[root_phase.active_player]:
+            keepyness[card.location] = 1.0
+        for loc in part_locs:
+            keepyness[loc] = 0.0
+        #
+        atk_probs = np.zeros((MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS), dtype=np.float32)
+        if root_phase.phase_attacking:
+            lp = cell_of_bitwise(bitwise)
+            if lp is not None:
+                atk_probs[lp] = 1.0
+        #
+        infos.append(
+            AZNodeInfo(
+                history=window,
+                value=value,
+                atk_probs=atk_probs,
+                keepyness=keepyness,
+            )
+        )
+    return infos
+
+
+def run_brute_game(tid, i, num_bots, iterations):
+    """Play one brute-sampling game from a random mid-game state; return training
+    tensors only if it was WON (else ``None``).
+
+    ``init_random`` seeds a random mid-game position (partial deck, fewer
+    enemies), so brute wins here yield short, diverse *late-game* trajectories --
+    the data AZ self-play (always from a fresh ``initialize()``) never produces.
+    """
+    a = time.time()
+    log = EndGameLog()
+    strat = RecordingBruteStrategy(iterations=iterations)
+    game = GameState(log)
+    for _ in range(num_bots):
+        game.add_player(strat)
+    game.init_random()
+    s0 = enemy_hp_left(game.export_phaseinfo())
+    game.start_loop()
+    end_phase = game.export_phaseinfo()
+    s1 = enemy_hp_left(end_phase)
+    win = end_phase.game_endvalue == 1
+    dt = time.time() - a
+    # only winning games are submitted as training data
+    if not win:
+        return None
+    print(
+        f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr
+    )
+    # build the training records AFTER the game, from the now-stable game.history
+    infos = infos_from_game(game, strat.moves, value=1.0)
+    if not infos:
+        return None
+    return BasicNet.tensorify_training(infos)
 
 
 def test_model(episode, model, num_simulations):
