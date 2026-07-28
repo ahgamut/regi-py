@@ -154,8 +154,10 @@ class AlphaZeroNode(MCTSNode):
 
     def simulate(self):
         end_value = self.root_phase.game_endvalue
+        # keep backups on the same [-1, 1] scale as the tanh value head and the
+        # z training target: win -> 1.0, loss -> shaped negative, else net estimate
         if end_value == 1:
-            return 3.0
+            return 1.0
         if end_value == -1:
             return hp_loss_penalty(enemy_hp_left(self.root_phase))
         return self.leaf_value

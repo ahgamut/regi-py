@@ -98,7 +98,7 @@ class ValueNet(nn.Module):
         super().__init__()
         self.net1 = Conv2dBlock(channels=(64, 8, 1), shapes=(3, 1), paddings=(1, 0))
         self.net2 = nn.Linear(in_features=_TRUNK_FLAT, out_features=1)
-        self.ac = nn.Sigmoid()
+        self.ac = nn.Tanh()
 
     def forward(self, x):
         x = self.net1(x).reshape(x.shape[0], -1)
@@ -112,7 +112,7 @@ class KeepyNet(nn.Module):
         super().__init__()
         self.net1 = Conv2dBlock(channels=(64, 8, 1), shapes=(3, 1), paddings=(1, 0))
         self.net2 = nn.Linear(in_features=_TRUNK_FLAT, out_features=MAX_CARDS_IN_GAME)
-        self.ac = nn.Tanh()
+        self.ac = nn.Sigmoid()
 
     def forward(self, x):
         x = self.net1(x).reshape(x.shape[0], -1)
