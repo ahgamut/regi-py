@@ -18,8 +18,9 @@ CAP_CHANNELS = 2
 # scale factor keeping capabilities roughly in [-1, 1]: a King has 40 HP -> -1.0
 # and deals 20 base damage -> -0.5
 CAP_SCALE = 40.0
-# flattened trunk width for the value/keepy heads (card axis x location axis)
-_TRUNK_FLAT = MAX_CARDS_IN_GAME * int(MAX_LOCATIONS)
+# flattened trunk width for the value/keepy heads: the trunk now lives on the
+# used-pile grid (card axis x played-status axis), so 56 x 22
+_TRUNK_FLAT = MAX_CARDS_IN_GAME * int(MAX_PLAYED_STATUS)
 
 # static raw per-card strength by location; enemy-pile cards override this each
 # phase (their HP / base damage), so only the non-enemy part is precomputed
@@ -124,11 +125,13 @@ class ActionNet(nn.Module):
     def __init__(self):
         super().__init__()
         n = MAX_CARDS_IN_GAME
-        self.net1 = Conv2dBlock(channels=(64, 16, 4), shapes=(3, 1), paddings=(1, 0))
-        self.net2 = Conv1dBlock(
-            channels=(n, n, n, n), shapes=(7, 7, 3), paddings=(0, 0, 0)
-        )
-        self.wca = WidthCrossAttention(channels=MAX_CARDS_IN_GAME, heads=5)
+        # trunk (N, 64, 56, 22) -> one logit per (card, played_status) cell, with
+        # the 56 x 22 grid preserved throughout
+        self.net1 = Conv2dBlock(channels=(64, 16, 1), shapes=(3, 1), paddings=(1, 0))
+        # mix along the played-status axis (56 cards as channels), width preserved
+        self.net2 = Conv1dBlock(channels=(n, n, n), shapes=(3, 3), paddings=(1, 1))
+        # fuse per-card keepyness into the per-card action logits; 56 % 8 == 0
+        self.wca = WidthCrossAttention(channels=MAX_CARDS_IN_GAME, heads=8)
         # additive softmax mask over the flattened (56 x 22) action grid: 0 on
         # structurally-valid (location, played_status) cells, -inf on impossible
         # ones. Built once here so the softmax just adds it (no per-forward fill).
@@ -137,9 +140,9 @@ class ActionNet(nn.Module):
         self.register_buffer("invalid_mask", torch.from_numpy(add_mask))
 
     def forward(self, x0, k):
-        x = self.net1(x0)
-        x = x.reshape(x0.shape[0], MAX_CARDS_IN_GAME, -1)
-        x = self.net2(x)
+        x = self.net1(x0)  # (N, 1, 56, 22)
+        x = x.reshape(x0.shape[0], MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)  # (N, 56, 22)
+        x = self.net2(x)  # (N, 56, 22)
         x = x.reshape(x.shape[0], MAX_CARDS_IN_GAME, 1, MAX_PLAYED_STATUS)
         k2 = k.reshape(x.shape[0], MAX_CARDS_IN_GAME, 1, 1)
         logits = self.wca(x, k2).reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
@@ -152,17 +155,19 @@ class ActionNet(nn.Module):
 class CombineNet(nn.Module):
     def __init__(self, channels=32, reduction=4):
         super().__init__()
-        self.wca = WidthCrossAttention(channels=channels, heads=4)
+        self.wca1 = WidthCrossAttention(channels=channels, heads=4)
+        self.wca2 = WidthCrossAttention(channels=channels, heads=4)
         self.net = Conv2dBlock(
             channels=(channels, 64, 64, 64, 64, 64),
             shapes=(1, 3, 3, 3, 3),
             paddings=(0, 1, 1, 1, 1),
         )
 
-    def forward(self, x1, x2):
-        y1 = self.wca(x1, x2)
-        y2 = self.net(y1)
-        return y2
+    def forward(self, usp, loc, cap):
+        y1 = self.wca1(usp, loc)
+        y2 = self.wca2(y1, cap)
+        y3 = self.net(y1)
+        return y3
 
 
 class BasicNet(nn.Module):
@@ -196,25 +201,21 @@ class BasicNet(nn.Module):
             paddings=(0,),
         )
         self.cap_net = Conv2dBlock(
-            channels=(self.max_history, 64),
+            channels=(self.max_history, 32),
             shapes=(1,),
             paddings=(0,),
         )
 
         self.combiner = CombineNet(channels=32)
-        # fuse per-card capability into the trunk; query is the trunk, so the
-        # width-9 axis (and the value/keepy/action heads) are unchanged
-        self.cap_combiner = WidthCrossAttention(channels=64, heads=4)
         self.v_net = ValueNet()
         self.k_net = KeepyNet()
         self.a_net = ActionNet()
 
     def forward(self, data):
-        x1 = self.loc_net(data["location"])
-        x2 = self.usp_net(data["used_pile"])
+        x1 = self.usp_net(data["used_pile"])
+        x2 = self.loc_net(data["location"])
         x3 = self.cap_net(data["capability"])
-        x = self.combiner(x1, x2)
-        x = self.cap_combiner(x, x3)
+        x = self.combiner(x1, x2, x3)
         v = self.v_net(x)
         k = self.k_net(x)
         a = self.a_net(x, k)
