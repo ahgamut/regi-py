@@ -129,10 +129,12 @@ class ActionNet(nn.Module):
             channels=(n, n, n, n), shapes=(7, 7, 3), paddings=(0, 0, 0)
         )
         self.wca = WidthCrossAttention(channels=MAX_CARDS_IN_GAME, heads=5)
-        # structurally-valid (location, played_status) cells; softmax is masked to
-        # these so probability isn't spread over impossible actions
-        mask = np.array(ComboTable.all_entries(), dtype=np.float32)  # (56, 22)
-        self.register_buffer("valid_mask", torch.from_numpy(mask))
+        # additive softmax mask over the flattened (56 x 22) action grid: 0 on
+        # structurally-valid (location, played_status) cells, -inf on impossible
+        # ones. Built once here so the softmax just adds it (no per-forward fill).
+        valid = np.array(ComboTable.all_entries(), dtype=np.float32)  # (56, 22)
+        add_mask = np.where(valid == 0, -np.inf, 0.0).astype(np.float32).reshape(1, -1)
+        self.register_buffer("invalid_mask", torch.from_numpy(add_mask))
 
     def forward(self, x0, k):
         x = self.net1(x0)
@@ -143,10 +145,7 @@ class ActionNet(nn.Module):
         logits = self.wca(x, k2).reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
         # masked softmax over the whole (56 x 22) action grid
         n = logits.shape[0]
-        flat = logits.reshape(n, -1)
-        m = self.valid_mask.reshape(1, -1)
-        flat = flat.masked_fill(m == 0, float("-inf"))
-        flat = torch.softmax(flat, dim=-1)
+        flat = torch.softmax(logits.reshape(n, -1) + self.invalid_mask, dim=-1)
         return flat.reshape(-1, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
 
 
