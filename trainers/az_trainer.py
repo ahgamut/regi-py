@@ -210,9 +210,10 @@ def main():
     )
     parser.add_argument(
         "--num-processes",
-        default=4,
+        default=0,
         type=int,
-        help="number of processes (1 trains, the rest explore; eval is separate)",
+        help="worker procs: 1 trains, the rest explore (eval is a separate proc); "
+        "0 = auto-size to fill the CPU",
     )
     parser.add_argument(
         "--num-threads", default=1, type=int, help="threads per process"
@@ -232,10 +233,16 @@ def main():
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
     parser.add_argument("--weights-path", default="", help="weights")
     params = parser.parse_args()
+    ncpu = os.cpu_count() or 2
+    if params.num_processes <= 0:
+        # fill the CPU with explorers: 1 trainer + (n-1) explorers + 1 evaluator,
+        # so n = ncpu - 1 keeps the box saturated without oversubscribing
+        params.num_processes = max(2, ncpu - 1)
+        print("setting num-processes to", params.num_processes, file=sys.stderr)
     assert params.num_processes >= 2
     if params.num_threads == 0:
-        params.num_threads = os.cpu_count() // params.num_processes
-        print("setting threads to", params.num_threads)
+        params.num_threads = max(1, ncpu // params.num_processes)
+        print("setting threads to", params.num_threads, file=sys.stderr)
     submain(params)
 
 

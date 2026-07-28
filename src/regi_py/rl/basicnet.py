@@ -54,7 +54,9 @@ def card_capabilities(phase):
 
 
 # content-keyed caches (by phase.to_string()) so the rolling history window and
-# sibling MCTS nodes don't re-tensorize the same phase repeatedly
+# sibling MCTS nodes don't re-tensorize the same phase repeatedly. The caller
+# computes `pstr = phase.to_string()` ONCE per phase and threads it into all
+# three helpers -- the serialization is the dominant per-lookup cost.
 _CACHE_CAP = 8192
 _LOC_CACHE = {}  # (phase_str, perspective) -> np (56, 9)
 _USP_CACHE = {}  # phase_str -> np (56, 22)
@@ -68,8 +70,8 @@ def _cache_put(cache, key, val):
     return val
 
 
-def _location_array(phase, perspective):
-    key = (phase.to_string(), perspective)
+def _location_array(phase, perspective, pstr):
+    key = (pstr, perspective)
     a = _LOC_CACHE.get(key)
     if a is None:
         loca0 = np.array(LocationInfo.from_current(phase, perspective), dtype=np.float32)
@@ -77,19 +79,17 @@ def _location_array(phase, perspective):
     return a
 
 
-def _used_pile_array(phase):
-    key = phase.to_string()
-    a = _USP_CACHE.get(key)
+def _used_pile_array(phase, pstr):
+    a = _USP_CACHE.get(pstr)
     if a is None:
-        a = _cache_put(_USP_CACHE, key, np.array(ComboTable.from_phase(phase), dtype=np.float32))
+        a = _cache_put(_USP_CACHE, pstr, np.array(ComboTable.from_phase(phase), dtype=np.float32))
     return a
 
 
-def _capability_array(phase):
-    key = phase.to_string()
-    a = _CAP_CACHE.get(key)
+def _capability_array(phase, pstr):
+    a = _CAP_CACHE.get(pstr)
     if a is None:
-        a = _cache_put(_CAP_CACHE, key, card_capabilities(phase))
+        a = _cache_put(_CAP_CACHE, pstr, card_capabilities(phase))
     return a
 
 
@@ -256,9 +256,10 @@ class BasicNet(nn.Module):
         #
         for j in range(window):
             phase = history[j]
-            result["location"][0, j] = torch.from_numpy(_location_array(phase, perspective))
-            result["used_pile"][0, j] = torch.from_numpy(_used_pile_array(phase))
-            result["capability"][0, j] = torch.from_numpy(_capability_array(phase))
+            pstr = phase.to_string()  # serialize once; shared cache key for all 3
+            result["location"][0, j] = torch.from_numpy(_location_array(phase, perspective, pstr))
+            result["used_pile"][0, j] = torch.from_numpy(_used_pile_array(phase, pstr))
+            result["capability"][0, j] = torch.from_numpy(_capability_array(phase, pstr))
         return result
 
     @staticmethod
@@ -286,8 +287,9 @@ class BasicNet(nn.Module):
             perspective = cur_phase.active_player
             for j in range(window, 0, -1):
                 phase = info.history[-j]
-                result["location"][i, -j] = torch.from_numpy(_location_array(phase, perspective))
-                result["used_pile"][i, -j] = torch.from_numpy(_used_pile_array(phase))
-                result["capability"][i, -j] = torch.from_numpy(_capability_array(phase))
+                pstr = phase.to_string()  # serialize once; shared cache key for all 3
+                result["location"][i, -j] = torch.from_numpy(_location_array(phase, perspective, pstr))
+                result["used_pile"][i, -j] = torch.from_numpy(_used_pile_array(phase, pstr))
+                result["capability"][i, -j] = torch.from_numpy(_capability_array(phase, pstr))
 
         return result
