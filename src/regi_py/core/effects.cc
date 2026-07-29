@@ -71,11 +71,15 @@ namespace regi
         }
     }
 
-    /* defense */
-    i32 GameState::calcBlockOfCombo(Enemy &enemy, Combo &curcombo)
+    /* defense -- the combo-effect math depends only on (enemy, combo, usedPile),
+     * so it lives in these free functions (declared in regi.h) and is shared by
+     * GameState, PhaseInfo, and the DFS enumerator. The immunity (STAB) and
+     * JOKER_NERF logic is written once here. */
+    i32 comboBlock(const Enemy &enemy, const Combo &curcombo,
+                   const std::vector<Combo> &usedPile)
     {
         u32 epow = getPower(enemy) & SPADES_BLOCK;
-        for (auto &combo : usedPile)
+        for (const auto &combo : usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
@@ -93,10 +97,10 @@ namespace regi
         return blk;
     }
 
-    i32 GameState::calcBlock(Enemy &enemy)
+    i32 currentBlock(const Enemy &enemy, const std::vector<Combo> &usedPile)
     {
         u32 epow = getPower(enemy) & SPADES_BLOCK;
-        for (auto &combo : usedPile)
+        for (const auto &combo : usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
@@ -107,7 +111,7 @@ namespace regi
         }
 
         i32 blk = 0;
-        for (auto &combo : usedPile)
+        for (const auto &combo : usedPile)
         {
             if ((combo.getPowers() & SPADES_BLOCK) != 0)
             {
@@ -116,6 +120,13 @@ namespace regi
         }
         return blk;
     }
+
+    i32 GameState::calcBlockOfCombo(Enemy &enemy, Combo &curcombo)
+    {
+        return comboBlock(enemy, curcombo, usedPile);
+    }
+
+    i32 GameState::calcBlock(Enemy &enemy) { return currentBlock(enemy, usedPile); }
 
     void GameState::defensePhase(Player &player, Enemy &enemy)
     {
@@ -140,12 +151,13 @@ namespace regi
         selectDefense(player, damage);
     }
 
-    /* attack */
+    /* attack -- shared combo-damage math (see the defense note above / regi.h) */
 
-    i32 GameState::calcDamageOfCombo(Enemy &enemy, Combo &curcombo)
+    i32 comboDamage(const Enemy &enemy, const Combo &curcombo,
+                    const std::vector<Combo> &usedPile)
     {
         u32 epow = getPower(enemy) & CLUBS_DOUBLE;
-        for (auto &combo : usedPile)
+        for (const auto &combo : usedPile)
         {
             if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
         }
@@ -155,6 +167,11 @@ namespace regi
         bool dbl = ((curcombo.getPowers() & CLUBS_DOUBLE) & (~epow)) != 0;
         if (dbl) { dmg += curcombo.getBaseDamage(); }
         return dmg;
+    }
+
+    i32 GameState::calcDamageOfCombo(Enemy &enemy, Combo &curcombo)
+    {
+        return comboDamage(enemy, curcombo, usedPile);
     }
 
     i32 GameState::calcDamage(Enemy &enemy)

@@ -47,6 +47,13 @@ namespace regi
 
     struct BaseLog;
     struct PhaseInfo;
+
+    /* Combo-effect math depending only on (enemy, combo, usedPile) -- the immunity
+     * (SPADES_BLOCK / CLUBS_DOUBLE) and JOKER_NERF logic, lifted out of GameState so
+     * a PhaseInfo can answer it too (defined in effects.cc). */
+    i32 comboDamage(const Enemy &, const Combo &, const std::vector<Combo> &);
+    i32 comboBlock(const Enemy &, const Combo &, const std::vector<Combo> &);
+    i32 currentBlock(const Enemy &, const std::vector<Combo> &);
     //
     struct GameState
     {
