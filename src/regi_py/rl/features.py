@@ -188,6 +188,78 @@ def move_structure(max_parts=MOVE_MAX_PARTS):
     return cell_flat, card_idx, card_mask
 
 
+# ---- ADZ candidate (offered-subset) featurization ----
+#
+# Every card-play decision offers a *variable* list of legal subsets (attacks or
+# defenses). The DouZero-style ADZ nets score each offered subset, so each needs a
+# per-candidate feature row. These features are NET-AGNOSTIC (both the multi-hot and
+# the index+mask encodings consume the same block) and come only from the offered
+# ``Combo`` + the phase's current enemy / used pile -- so the identical values are
+# available at self-play export, at inference, and stored in the training record
+# (defense combos can't be rebuilt from a bare ``bitwise`` at tensorify time).
+
+# feature columns, in order; F = CAND_FEATURE_DIM
+CAND_FEATURE_NAMES = (
+    "combo_damage",   # immunity-adjusted attack damage vs the current enemy (PhaseInfo)
+    "combo_block",    # immunity-adjusted block this combo adds (PhaseInfo)
+    "base_damage",    # combo's intrinsic (pre-immunity) damage
+    "base_defense",   # combo's intrinsic defense value
+    "can_attack",     # 1.0 if the combo is a legal attack
+    "num_parts",      # cards in the subset, / _PARTS_SCALE
+    "is_yield",       # 1.0 for the empty (yield) combo (bitwise == 0)
+    "is_lethal",      # 1.0 if combo_damage kills the current enemy
+    "damage_frac",    # min(combo_damage / enemy_hp, 1): graded lethality
+)
+CAND_FEATURE_DIM = len(CAND_FEATURE_NAMES)
+
+# max cards in a hand; scales num_parts into ~[0, 1]
+_PARTS_SCALE = 7.0
+
+
+def candidate_semantics(phase, combos):
+    """Per-candidate feature block for a phase's offered subsets: ``(K, F)`` float32,
+    K = ``len(combos)``, F = :data:`CAND_FEATURE_DIM` (columns = :data:`CAND_FEATURE_NAMES`).
+
+    Damages/blocks are the immunity-adjusted values from the phase's own combo-effect
+    methods (``phase.combo_damage/combo_block``), scaled by ``1/CAP_SCALE``. Safe when
+    no enemy remains (``combo_damage/block`` return 0, lethality features are 0). The
+    same call is used at self-play export and at inference; ``K`` may be 0.
+    """
+    enemy_hp = phase.enemy_pile[0].hp if len(phase.enemy_pile) else 0
+    feats = np.zeros((len(combos), CAND_FEATURE_DIM), dtype=np.float32)
+    for i, c in enumerate(combos):
+        dmg = phase.combo_damage(c)
+        blk = phase.combo_block(c)
+        feats[i, 0] = dmg / CAP_SCALE
+        feats[i, 1] = blk / CAP_SCALE
+        feats[i, 2] = c.base_damage / CAP_SCALE
+        feats[i, 3] = c.base_defense / CAP_SCALE
+        feats[i, 4] = 1.0 if c.can_attack else 0.0
+        feats[i, 5] = len(c.parts) / _PARTS_SCALE
+        feats[i, 6] = 1.0 if c.bitwise == 0 else 0.0
+        feats[i, 7] = 1.0 if (enemy_hp > 0 and dmg >= enemy_hp) else 0.0
+        feats[i, 8] = min(dmg / enemy_hp, 1.0) if enemy_hp > 0 else 0.0
+    return feats
+
+
+def keepy_marginal(bitwises, policy):
+    """Derived per-card "keepyness" CFR hint (56,): the probability each card LOCATION
+    is *kept* (not spent) under the MCTS policy over the offered subsets,
+    ``keepyness[card] = 1 − Σ_c policy[c]·[card ∈ subset c]``. ``bitwises`` are the
+    offered combos' ``bitwise`` masks aligned to ``policy``; a card in no played subset
+    stays 1.0, a card in every played subset -> 0.0. Game-free; the ADZ aux target."""
+    played = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
+    for prob, bw in zip(policy, bitwises):
+        if prob == 0.0:
+            continue
+        b = int(bw)
+        while b:
+            loc = (b & -b).bit_length() - 1  # index of the lowest set bit
+            played[loc] += prob
+            b &= b - 1
+    return np.clip(1.0 - played, 0.0, 1.0).astype(np.float32)
+
+
 def shared_targets(info, cur_phase):
     """The architecture-independent training targets from an ``AZNodeInfo`` and the
     decision phase: ``value`` (scalar z), ``attacking`` (0/1 phase flag),
