@@ -77,6 +77,10 @@ class AlphaZeroNode(MCTSNode):
             else:
                 self._load_def_priors()
             self.next_priors = normalize_probs(1e-3 + self.next_priors)
+            # order expansion by prior once, ascending, so expand() pop()s the
+            # highest-prior child first in O(1) (no per-expand scan). Stable sort:
+            # equal-prior children keep the base class's random shuffle order.
+            self.rem_exp_ind.sort(key=lambda j: self.next_priors[j])
 
     @staticmethod
     def _trimmed_history(history, phase, maxhist):
@@ -131,6 +135,12 @@ class AlphaZeroNode(MCTSNode):
         return v1 + self.prior * self.weight * v2
 
     def expand(self):
+        # rem_exp_ind is pre-sorted ascending by prior in __init__, so pop() takes
+        # the highest-prior unexpanded child first. This makes the net policy -- not
+        # the base MCTSNode's random shuffle -- order exploration, which is what
+        # makes the PUCT prior steer search at the many deep nodes that never fully
+        # expand within the budget (ucb1's PUCT term only governs already-expanded
+        # children). O(1) per expand, no per-node scan.
         i = self.rem_exp_ind.pop()
         combo = self.next_combos[i]
         prior = self.next_priors[i]
