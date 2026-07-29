@@ -26,7 +26,6 @@ from regi_py.rl.az_explorer import (
     AZNodeInfo,
     simulate_node,
 )
-from regi_py.rl.basicnet import BasicNet
 from regi_py.rl.utils import enemy_hp_left, hp_loss_penalty
 
 
@@ -85,9 +84,9 @@ def drain(q, buf):
 
 
 def run_epoch(model, batch, optimizer):
-    # a batch is a tuple of tensors in ``BasicNet.TRAIN_FIELDS`` order (that is
+    # a batch is a tuple of tensors in the model's ``TRAIN_FIELDS`` order (that is
     # how ``ShardBuffer`` packs each shard's ``TensorDataset``)
-    data = {k: v.to(model.device) for k, v in zip(BasicNet.TRAIN_FIELDS, batch)}
+    data = {k: v.to(model.device) for k, v in zip(type(model).TRAIN_FIELDS, batch)}
     v_hat, k_hat, a_hat = model(data)
     v, k, a = data["value"], data["keepyness"], data["atk_probs"]
     loss, (loss1, loss2, loss3) = model.calculate_loss(
@@ -159,7 +158,7 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     for j, info in enumerate(history):
         info.value = reward * (VALUE_DISCOUNT ** (last - j))
     print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
-    return BasicNet.tensorify_training(history)
+    return type(net).tensorify_training(history)
 
 
 class RecordingBruteStrategy(BruteSamplingStrategy):
@@ -208,7 +207,7 @@ class RecordingBruteStrategy(BruteSamplingStrategy):
         return self._record_and_pick(combos, game)
 
 
-def infos_from_game(game, moves, value):
+def infos_from_game(game, moves, value, net_cls):
     """Build the ``AZNodeInfo`` training list AFTER a brute game finishes.
 
     Rebuilds each decision's history window from the now-stable ``game.history``.
@@ -219,11 +218,11 @@ def infos_from_game(game, moves, value):
     One-shot analogue of ``AlphaZeroNode.export()`` (N0 = 1): ``keepyness`` is 1 for
     kept hand cards / 0 for the cards spent in the played combo; ``atk_probs`` is a
     one-hot at the played combo's ComboTable cell on attack phases (defense phases
-    keep it all-zero -- the action loss is masked by ``attacking``). Reuses the
-    sanctioned tensor path via ``BasicNet.tensorify_training(infos_from_game(...))``.
+    keep it all-zero -- the action loss is masked by ``attacking``). The window
+    length is ``net_cls.max_history`` (matches its inference window).
     """
     hist = list(game.history)
-    maxhist = BasicNet.max_history
+    maxhist = net_cls.max_history
     infos = []
     for idx, bitwise, part_locs in moves:
         root_phase = hist[idx]
@@ -254,7 +253,7 @@ def infos_from_game(game, moves, value):
     return infos
 
 
-def run_brute_game(tid, i, num_bots, iterations):
+def run_brute_game(tid, i, net_cls, num_bots, iterations):
     """Play one brute-sampling game from a random mid-game state; return training
     tensors only if it was WON (else ``None``).
 
@@ -291,10 +290,10 @@ def run_brute_game(tid, i, num_bots, iterations):
     # AZ explorers agree on the value target over the states they both visit --
     # a high-progress loss is not labelled as good as a win.
     value = 1.0 if win else hp_loss_penalty(s1)
-    infos = infos_from_game(game, strat.moves, value=value)
+    infos = infos_from_game(game, strat.moves, value=value, net_cls=net_cls)
     if not infos:
         return None
-    return BasicNet.tensorify_training(infos)
+    return net_cls.tensorify_training(infos)
 
 
 def test_model(episode, model, num_simulations):

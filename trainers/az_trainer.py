@@ -11,7 +11,7 @@ import torch
 import torch.multiprocessing as mp
 import numpy as np
 
-from regi_py.rl.basicnet import BasicNet
+from regi_py.rl.nets import get_net, net_names
 from regi_py.rl.loaders import ShardBuffer
 from regi_py.rl.training import (
     run_epoch,
@@ -28,7 +28,7 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
     print(f"P{tid} on {train_device} to train")
     torch.set_num_threads(params.num_threads)
     with torch.device(train_device):
-        train_model = BasicNet()
+        train_model = params.net_cls()
         train_model.device = train_device
         train_model.load_state_dict(shared_model.state_dict())
         train_model = train_model.to(train_device)
@@ -36,7 +36,7 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
         optimizer = get_split_optimizer(train_model)
 
     ep = 0
-    buf = ShardBuffer(capacity=params.memory_size)
+    buf = ShardBuffer(capacity=params.memory_size, train_fields=params.net_cls.TRAIN_FIELDS)
     while ep < params.num_episodes:
         drain(exp_queue, buf)
 
@@ -92,9 +92,9 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
 def evaluator(eval_queue, eval_done, params):
     print("Peval to evaluate")
     torch.set_num_threads(params.num_threads)
-    old_model = BasicNet()
+    old_model = params.net_cls()
     old_model.device = "cpu"
-    new_model = BasicNet()
+    new_model = params.net_cls()
     new_model.device = "cpu"
     have_baseline = False
 
@@ -148,6 +148,7 @@ def explorer(tid, shared_model, exp_queue, device, params):
                 examples = run_brute_game(
                     tid,
                     count,
+                    net_cls=params.net_cls,
                     num_bots=num_bots,
                     iterations=params.num_simulations,
                 )
@@ -194,7 +195,7 @@ def submain(params):
     test_device = "cpu"
 
     with torch.device(test_device):
-        shared_model = BasicNet()
+        shared_model = params.net_cls()
         if os.path.isfile(params.weights_path):
             shared_model.load_state_dict(
                 torch.load(
@@ -272,7 +273,11 @@ def main():
     parser.add_argument("--batch-size", default=8, type=int, help="batch size")
     parser.add_argument("--epochs", default=1, type=int, help="epochs")
     parser.add_argument("--weights-path", default="", help="weights")
+    parser.add_argument(
+        "--net", default="basic", choices=net_names(), help="net architecture"
+    )
     params = parser.parse_args()
+    params.net_cls = get_net(params.net)
     ncpu = os.cpu_count() or 2
     if params.num_processes <= 0:
         # fill the CPU with explorers: 1 trainer + (n-1) explorers + 1 evaluator,
