@@ -128,6 +128,27 @@ def raw_window_arrays(history, perspective, window):
     return loc, usp, cap
 
 
+# per-card token feature width: one frame contributes location(9) + used_pile(22)
+# + capability(2) = 33 features; a card token stacks these over the window frames
+FEATURE_WIDTH = MAX_LOCATIONS + int(MAX_PLAYED_STATUS) + CAP_CHANNELS
+
+
+def fuse_card_tokens(loc, usp, cap):
+    """Fuse the three raw window arrays into one token per card. Each of the 56
+    cards becomes a row whose features are the window frames'
+    ``[location | used_pile | capability]`` concatenated (frame-major within the
+    row: frame 0's ``FEATURE_WIDTH`` features, then frame 1's, ...).
+
+    ``loc(window,56,9) usp(window,56,22) cap(window,56,2)`` ->
+    ``(56, window*FEATURE_WIDTH)`` float32. This is the shared card-token layout
+    for the set-structured nets (CardTransformer / PerCardMLP / Mixer); each wraps
+    it with ``torch.from_numpy(...).unsqueeze(0)`` in its ``_assemble``.
+    """
+    fused = np.concatenate([loc, usp, cap], axis=-1)   # (window, 56, FEATURE_WIDTH)
+    fused = np.transpose(fused, (1, 0, 2))             # (56, window, FEATURE_WIDTH)
+    return np.ascontiguousarray(fused.reshape(MAX_CARDS_IN_GAME, -1))
+
+
 def shared_targets(info, cur_phase):
     """The architecture-independent training targets from an ``AZNodeInfo`` and the
     decision phase: ``value`` (scalar z), ``attacking`` (0/1 phase flag),

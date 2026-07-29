@@ -1,3 +1,7 @@
+from regi_py.core import ComboTable
+from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
+
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -172,3 +176,34 @@ class CardSelfAttention(nn.Module):
         out = out.transpose(1, 2).reshape(N * W, S, C)
         out = self.proj(out)
         return out.reshape(N, W, S, C).permute(0, 3, 2, 1)  # (N, C, S, W)
+
+
+class PerCardHeads(nn.Module):
+    """Value / keepyness / action heads over a per-card feature map ``(N, 56, D)``.
+
+    Shared by the set-structured nets (CardTransformer / PerCardMLP / Mixer), which
+    each produce a length-``D`` feature per card. Emits BasicNet's head contract:
+    value ``(N, 1)`` Tanh (mean-pooled over cards), keepyness ``(N, 56)`` Sigmoid
+    (per card), action ``(N, 1, 56, 22)`` masked-softmax over the structurally-valid
+    ``(location, played_status)`` cells (the same static mask ``ActionNet`` uses)."""
+
+    def __init__(self, dim):
+        super().__init__()
+        self.keepy = nn.Linear(dim, 1)
+        self.action = nn.Linear(dim, MAX_PLAYED_STATUS)
+        self.value = nn.Linear(dim, 1)
+        # additive softmax mask over the flattened (56 x 22) action grid: 0 on
+        # structurally-valid cells, -inf on impossible ones (built once at init).
+        valid = np.array(ComboTable.all_entries(), dtype=np.float32)  # (56, 22)
+        add_mask = np.where(valid == 0, -np.inf, 0.0).astype(np.float32).reshape(1, -1)
+        self.register_buffer("invalid_mask", torch.from_numpy(add_mask))
+
+    def forward(self, feats):
+        # feats: (N, 56, D)
+        n = feats.shape[0]
+        k = torch.sigmoid(self.keepy(feats).squeeze(-1))        # (N, 56)
+        logits = self.action(feats).reshape(n, -1)              # (N, 56*22)
+        a = torch.softmax(logits + self.invalid_mask, dim=-1)
+        a = a.reshape(n, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
+        v = torch.tanh(self.value(feats.mean(dim=1)))           # (N, 1)
+        return v, k, a
