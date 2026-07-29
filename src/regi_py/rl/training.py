@@ -15,12 +15,13 @@ import time
 import torch
 import numpy as np
 
-from regi_py import GameState, DummyLog
+from regi_py import GameState, DummyLog, seed
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.combomap import cell_of_bitwise
 from regi_py.strats import RandomStrategy, BruteSamplingStrategy
 from regi_py.rl.az_explorer import (
     NetDirectStrategy,
+    AZExplorerStrategy,
     AlphaZeroNode,
     AZNodeInfo,
     simulate_node,
@@ -282,8 +283,10 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
     log2 = EndGameLog()
 
     newer_better = 0
-    old_strat = NetDirectStrategy(old_model)
-    new_strat = NetDirectStrategy(new_model)
+    # evaluate with net-guided MCTS (fixed 64 iters/move), not the search-free
+    # NetDirectStrategy, so the comparison reflects competitive play
+    old_strat = AZExplorerStrategy(old_model, iterations=64)
+    new_strat = AZExplorerStrategy(new_model, iterations=64)
 
     for s in range(num_simulations):
         game1 = GameState(log1)
@@ -293,10 +296,19 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
         for i in range(num_players):
             game1.add_player(old_strat)
             game2.add_player(new_strat)
+        # both games get the SAME starting RNG seed: identical deal, and each loop
+        # replays from the same C++/Python rng stream, so the only difference is
+        # which model drives the search (not luck of the draw or rollout order)
+        game_seed = random.randint(0, 2**31 - 1)
+        seed(game_seed)
         game1.initialize()
         game2.init_phaseinfo(game1.export_phaseinfo())
         #
+        seed(game_seed)
+        random.seed(game_seed)
         game1.start_loop()
+        seed(game_seed)
+        random.seed(game_seed)
         game2.start_loop()
         #
         diff1 = log1.e0 - log1.e1
