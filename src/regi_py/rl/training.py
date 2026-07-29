@@ -97,6 +97,23 @@ def run_epoch(model, batch, optimizer):
     return loss.item(), (loss1.item(), loss2.item(), loss3.item())
 
 
+# self-play move selection: for the first SELFPLAY_TEMP_MOVES moves, sample the
+# next move in proportion to child visit counts (AlphaZero temperature tau=1) so
+# self-play games diversify and the replay buffer covers more distinct states;
+# after that play greedily (tau -> 0) toward the strongest line. Greedy-from-move-1
+# collapsed every game onto ~one trajectory.
+SELFPLAY_TEMP_MOVES = 12
+
+
+def _sample_selfplay_child(node, move_num):
+    if move_num >= SELFPLAY_TEMP_MOVES:
+        return node.best_child_node
+    weights = [c.visits for c in node.children]
+    if sum(weights) <= 0:
+        return node.best_child_node
+    return random.choices(node.children, weights=weights, k=1)[0]
+
+
 def run_single_game(tid, i, net, num_bots, num_iterations):
     a = time.time()
     log = DummyLog()
@@ -110,15 +127,17 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     history = []
     node = AlphaZeroNode(start_phase, net=net, history=[], prior=1.0, trim=False)
     s0 = enemy_hp_left(node.root_phase)
+    move_num = 0
     while node.root_phase.game_endvalue == 0:
         # root-only exploration noise: mix fresh Dirichlet into this move's
         # search root before searching (self-play only, not competitive play)
         node.add_dirichlet_noise()
         simulate_node(node, num_iterations)
         history.append(node.export())
-        child = node.best_child_node
+        child = _sample_selfplay_child(node, move_num)
         child.parent = None
         node = child
+        move_num += 1
     history.append(node.export())
     win = node.root_phase.game_endvalue == 1
     s1 = enemy_hp_left(node.root_phase)
