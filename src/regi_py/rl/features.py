@@ -14,6 +14,7 @@ Targets (also architecture-independent): value, keepyness (56,), atk_probs
 """
 from regi_py.core import LocationInfo, ComboTable, Card
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_LOCATIONS, MAX_PLAYED_STATUS
+from regi_py import combomap
 
 import numpy as np
 
@@ -147,6 +148,44 @@ def fuse_card_tokens(loc, usp, cap):
     fused = np.concatenate([loc, usp, cap], axis=-1)   # (window, 56, FEATURE_WIDTH)
     fused = np.transpose(fused, (1, 0, 2))             # (56, window, FEATURE_WIDTH)
     return np.ascontiguousarray(fused.reshape(MAX_CARDS_IN_GAME, -1))
+
+
+# the longest legal combo is a same-number 4-set (4 card locations)
+MOVE_MAX_PARTS = 4
+
+
+def move_structure(max_parts=MOVE_MAX_PARTS):
+    """Static move->grid/cards structure for the move-token net. Every legal move
+    is one of the ``ComboTable.all_entries()`` valid ``(location, played_status)``
+    cells; a move's member card locations are the set bits of its ``bitwise`` (the
+    combomap ``bitwise_of_cell`` inverse). Returns three numpy arrays over the
+    ``M`` (=286) moves, in row-major cell order:
+
+      cell_flat  (M,)          flat index ``loc*22 + pst`` of each move's grid cell
+      card_idx   (M, max_parts) member card locations, zero-padded
+      card_mask  (M, max_parts) 1.0 for real parts, 0.0 for padding
+
+    A move logit scatters into a ``56*22`` grid at ``cell_flat``; a move token's
+    input is the masked mean of its member cards' features (the yield move has no
+    cards -> an all-zero mask, so clamp the denominator). ``cell_flat`` covers
+    exactly the structurally-valid cells (same set as ``ActionNet.invalid_mask`` /
+    ``PerCardHeads.invalid_mask``), so the move-token action head stays on the same
+    ``atk_probs`` (56, 22) target contract as every other net."""
+    valid = np.array(ComboTable.all_entries())  # (56, 22), nonzero => valid cell
+    cells = [(int(l), int(p)) for l, p in zip(*np.nonzero(valid))]
+    M = len(cells)
+    W = int(MAX_PLAYED_STATUS)
+    cell_flat = np.zeros(M, dtype=np.int64)
+    card_idx = np.zeros((M, max_parts), dtype=np.int64)
+    card_mask = np.zeros((M, max_parts), dtype=np.float32)
+    for m, (loc, pst) in enumerate(cells):
+        cell_flat[m] = loc * W + pst
+        bitwise = combomap.bitwise_of_cell(loc, pst)
+        parts = [b for b in range(MAX_CARDS_IN_GAME) if (bitwise >> b) & 1]
+        for j, b in enumerate(parts):
+            card_idx[m, j] = b
+            card_mask[m, j] = 1.0
+    return cell_flat, card_idx, card_mask
 
 
 def shared_targets(info, cur_phase):

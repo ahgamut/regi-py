@@ -33,12 +33,14 @@ from regi_py.rl.nets.attntrunk import AttnTrunkNet  # noqa: E402
 from regi_py.rl.nets.cardtx import CardTransformerNet  # noqa: E402
 from regi_py.rl.nets.percardmlp import PerCardMLPNet  # noqa: E402
 from regi_py.rl.nets.mixer import MixerNet  # noqa: E402
+from regi_py.rl.nets.movetoken import MoveTokenNet  # noqa: E402
 
 register(BasicNet)
 register(AttnTrunkNet)
 register(CardTransformerNet)
 register(PerCardMLPNet)
 register(MixerNet)
+register(MoveTokenNet)
 
 __all__ = [
     "BaseNet",
@@ -47,6 +49,7 @@ __all__ = [
     "CardTransformerNet",
     "PerCardMLPNet",
     "MixerNet",
+    "MoveTokenNet",
     "register",
     "get_net",
     "net_names",
