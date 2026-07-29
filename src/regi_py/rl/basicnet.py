@@ -229,7 +229,11 @@ class BasicNet(nn.Module):
         # clamp inside log: masked cells make a_hat exactly 0, and the target a is
         # also 0 there, so 0*log(0) must not become nan
         loss1a = torch.sum(-a * torch.log(a_hat.clamp_min(1e-9)), dim=(-2, -1))
-        loss1 = torch.mean(loss1a * phase_atk)
+        # normalize the masked policy CE by the number of attack phases in the
+        # batch, not the batch size -- a plain mean divides by every sample and so
+        # dilutes (and down-weights) the CE by the non-attacking fraction. clamp
+        # the denominator so an all-defense batch does not divide by zero.
+        loss1 = torch.sum(loss1a * phase_atk) / phase_atk.sum().clamp_min(1.0)
         loss2 = nn.functional.mse_loss(v_hat, v)
         loss3 = nn.functional.mse_loss(k_hat, k)
         # return the total (for backward) plus the (policy, value, keepy)
