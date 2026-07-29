@@ -58,7 +58,10 @@ def get_split_optimizer(model):
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        if "bias" in name or "bn" in name or "batchnorm" in name:
+        # keep all 1-D params out of weight decay: biases plus every norm-layer
+        # affine weight/bias (GroupNorm now, was BatchNorm). Matching by ndim is
+        # robust to layer renames, unlike the old "bn"/"batchnorm" name check.
+        if param.ndim <= 1:
             no_decay.append(param)
         else:
             decay.append(param)

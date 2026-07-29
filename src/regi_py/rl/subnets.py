@@ -2,6 +2,15 @@ import torch
 import torch.nn as nn
 
 
+def _norm_groups(channels, target=8):
+    """Largest group count <= target that divides ``channels`` (so GroupNorm is
+    valid for every channel width used here: 1, 8, 16, 32, 56, 64)."""
+    g = min(target, channels)
+    while channels % g != 0:
+        g -= 1
+    return g
+
+
 class LinearBlock(nn.Module):
     def __init__(self, shapes):
         super(LinearBlock, self).__init__()
@@ -27,7 +36,9 @@ class Conv1dBlock(nn.Module):
     def __init__(self, shapes, channels, paddings):
         super(Conv1dBlock, self).__init__()
         self.ac = nn.ReLU()
-        # nn.ModuleList so the conv/bn layers are registered params
+        # nn.ModuleList so the conv/norm layers are registered params. GroupNorm
+        # (not BatchNorm) so the single-sample predict() the CPU explorers/eval run
+        # normalizes identically to training -- no running-stat train/infer mismatch.
         self.nets = nn.ModuleList(
             nn.Sequential(
                 nn.Conv1d(
@@ -37,7 +48,10 @@ class Conv1dBlock(nn.Module):
                     padding=paddings[i],
                     bias=False,
                 ),
-                nn.BatchNorm1d(num_features=channels[i + 1]),
+                nn.GroupNorm(
+                    num_groups=_norm_groups(channels[i + 1]),
+                    num_channels=channels[i + 1],
+                ),
             )
             for i in range(len(channels) - 1)
         )
@@ -57,7 +71,9 @@ class Conv2dBlock(nn.Module):
     def __init__(self, shapes, channels, paddings):
         super(Conv2dBlock, self).__init__()
         self.ac = nn.ReLU()
-        # nn.ModuleList so the conv/bn layers are registered params
+        # nn.ModuleList so the conv/norm layers are registered params. GroupNorm
+        # (not BatchNorm) so the single-sample predict() the CPU explorers/eval run
+        # normalizes identically to training -- no running-stat train/infer mismatch.
         self.nets = nn.ModuleList(
             nn.Sequential(
                 nn.Conv2d(
@@ -67,7 +83,10 @@ class Conv2dBlock(nn.Module):
                     padding=paddings[i],
                     bias=False,
                 ),
-                nn.BatchNorm2d(num_features=channels[i + 1]),
+                nn.GroupNorm(
+                    num_groups=_norm_groups(channels[i + 1]),
+                    num_channels=channels[i + 1],
+                ),
             )
             for i in range(len(channels) - 1)
         )
