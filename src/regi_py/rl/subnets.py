@@ -178,6 +178,39 @@ class CardSelfAttention(nn.Module):
         return out.reshape(N, W, S, C).permute(0, 3, 2, 1)  # (N, C, S, W)
 
 
+class MixerBlock(nn.Module):
+    """One MLP-Mixer block over card tokens ``(N, 56, dim)``: a token-mixing MLP
+    (mixes across the 56 cards -- a static, learned global card-to-card interaction,
+    as opposed to attention's content-dependent one) followed by a channel-mixing
+    MLP (mixes the per-card features), each residual and LayerNorm-pre-normed.
+    LayerNorm is train/eval identical, so single-sample ``predict`` matches training
+    (same rationale as GroupNorm in the conv blocks)."""
+
+    def __init__(self, tokens, dim, token_hidden, channel_hidden):
+        super().__init__()
+        self.norm1 = nn.LayerNorm(dim)
+        self.token_mlp = nn.Sequential(
+            nn.Linear(tokens, token_hidden),
+            nn.GELU(),
+            nn.Linear(token_hidden, tokens),
+        )
+        self.norm2 = nn.LayerNorm(dim)
+        self.channel_mlp = nn.Sequential(
+            nn.Linear(dim, channel_hidden),
+            nn.GELU(),
+            nn.Linear(channel_hidden, dim),
+        )
+
+    def forward(self, x):
+        # token mixing: transpose so the Linear runs over the 56-card axis
+        y = self.norm1(x).transpose(1, 2)          # (N, dim, tokens)
+        y = self.token_mlp(y).transpose(1, 2)      # (N, tokens, dim)
+        x = x + y
+        # channel mixing: Linear over the feature axis, per card
+        x = x + self.channel_mlp(self.norm2(x))
+        return x
+
+
 class PerCardHeads(nn.Module):
     """Value / keepyness / action heads over a per-card feature map ``(N, 56, D)``.
 
