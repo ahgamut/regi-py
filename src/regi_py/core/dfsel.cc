@@ -134,16 +134,8 @@ namespace regi
 
     i32 calcDamage(const Combo &cur, const Enemy &enemy, const GameState &g)
     {
-        u32 epow = getPower(enemy) & CLUBS_DOUBLE;
-        for (const auto &combo : g.usedPile)
-        {
-            if ((combo.getPowers() & JOKER_NERF) != 0) { epow = 0; }
-        }
-        i32 dmg = 0;
-        dmg += cur.getBaseDamage();
-        bool dbl = ((cur.getPowers() & CLUBS_DOUBLE) & (~epow)) != 0;
-        if (dbl) { dmg += cur.getBaseDamage(); }
-        return dmg;
+        // same immunity/nerf math as GameState/PhaseInfo -- delegate to the one copy
+        return comboDamage(enemy, cur, g.usedPile);
     }
 
     i32 RandomStrategy::setup(const Player &player, const GameState &g)
