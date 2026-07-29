@@ -29,7 +29,9 @@ def net_names():
 
 # concrete architectures (import + register here; add future nets alongside)
 from regi_py.rl.nets.basicnet import BasicNet  # noqa: E402
+from regi_py.rl.nets.attntrunk import AttnTrunkNet  # noqa: E402
 
 register(BasicNet)
+register(AttnTrunkNet)
 
-__all__ = ["BaseNet", "BasicNet", "register", "get_net", "net_names"]
+__all__ = ["BaseNet", "BasicNet", "AttnTrunkNet", "register", "get_net", "net_names"]

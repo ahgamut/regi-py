@@ -132,3 +132,43 @@ class WidthCrossAttention(nn.Module):
         out = out.transpose(1, 2).reshape(N * H, y1, C)
         out = self.proj(out)
         return out.reshape(N, H, y1, C).permute(0, 3, 1, 2)  # (N, C, H, y1)
+
+
+class CardSelfAttention(nn.Module):
+    """Global self-attention over the card axis of a ``(N, C, S, W)`` trunk.
+
+    The 56-card axis ``S`` is the token sequence, each token carrying a length-``C``
+    feature, attended independently for every width column ``W``. This is the
+    global, content-based card-to-card mixing the conv trunk lacks -- convs only mix
+    cards locally along the (bogus-locality) card axis and ``WidthCrossAttention``
+    mixes *within* a card, never across cards. ``heads`` divides the feature ``C``
+    (the token count ``S`` is unconstrained). Returns the same ``(N, C, S, W)``
+    shape so it drops into a residual trunk.
+    """
+
+    def __init__(self, channels, heads=8):
+        super().__init__()
+        assert channels % heads == 0
+        self.h = heads
+        self.dk = channels // heads
+        self.q = nn.Linear(channels, channels)
+        self.k = nn.Linear(channels, channels)
+        self.v = nn.Linear(channels, channels)
+        self.proj = nn.Linear(channels, channels)
+
+    def forward(self, x):
+        # x: (N, C, S, W); tokens are the S cards, feature C, per width column W
+        N, C, S, W = x.shape
+        t = x.permute(0, 3, 2, 1).reshape(N * W, S, C)  # (N*W, S, C)
+
+        q = self.q(t).view(N * W, S, self.h, self.dk).transpose(1, 2)
+        k = self.k(t).view(N * W, S, self.h, self.dk).transpose(1, 2)
+        v = self.v(t).view(N * W, S, self.h, self.dk).transpose(1, 2)
+
+        scores = (q @ k.transpose(-2, -1)) / self.dk**0.5  # (N*W, h, S, S)
+        attn = scores.softmax(dim=-1)
+        out = attn @ v  # (N*W, h, S, dk)
+
+        out = out.transpose(1, 2).reshape(N * W, S, C)
+        out = self.proj(out)
+        return out.reshape(N, W, S, C).permute(0, 3, 2, 1)  # (N, C, S, W)
