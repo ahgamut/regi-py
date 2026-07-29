@@ -104,6 +104,12 @@ def run_epoch(model, batch, optimizer):
 # collapsed every game onto ~one trajectory.
 SELFPLAY_TEMP_MOVES = 12
 
+# discount the game outcome back toward earlier moves: the value target for a
+# position d moves before the end is reward * VALUE_DISCOUNT**d. Early play has
+# little control over the eventual win/loss, so a raw-outcome target broadcast to
+# every position is needlessly high-variance and overconfident on distant states.
+VALUE_DISCOUNT = 0.98
+
 
 def _sample_selfplay_child(node, move_num):
     if move_num >= SELFPLAY_TEMP_MOVES:
@@ -144,8 +150,11 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     #
     dt = time.time() - a
     reward = 1.0 if win else hp_loss_penalty(s1)
-    for info in history:
-        info.value = reward
+    # the last move keeps the full reward; each earlier move is discounted by its
+    # distance to the terminal position (see VALUE_DISCOUNT)
+    last = len(history) - 1
+    for j, info in enumerate(history):
+        info.value = reward * (VALUE_DISCOUNT ** (last - j))
     print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     return BasicNet.tensorify_training(history)
 
