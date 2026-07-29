@@ -87,11 +87,14 @@ def run_epoch(model, batch, optimizer):
     data = {k: v.to(model.device) for k, v in zip(BasicNet.TRAIN_FIELDS, batch)}
     v_hat, k_hat, a_hat = model(data)
     v, k, a = data["value"], data["keepyness"], data["atk_probs"]
-    loss = model.calculate_loss((v, k, a), (v_hat, k_hat, a_hat), data["attacking"])
+    loss, (loss1, loss2, loss3) = model.calculate_loss(
+        (v, k, a), (v_hat, k_hat, a_hat), data["attacking"]
+    )
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
-    return loss.item()
+    # total plus (policy, value, keepy) components for per-head logging
+    return loss.item(), (loss1.item(), loss2.item(), loss3.item())
 
 
 def run_single_game(tid, i, net, num_bots, num_iterations):

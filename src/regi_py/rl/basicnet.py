@@ -232,7 +232,9 @@ class BasicNet(nn.Module):
         loss1 = torch.mean(loss1a * phase_atk)
         loss2 = nn.functional.mse_loss(v_hat, v)
         loss3 = nn.functional.mse_loss(k_hat, k)
-        return loss1 + loss2 + loss3
+        # return the total (for backward) plus the (policy, value, keepy)
+        # components so the trainer can log which head is (not) converging
+        return loss1 + loss2 + loss3, (loss1, loss2, loss3)
 
     def predict(self, history, perspective=None):
         # inference_mode: self-play/eval never backprop through predict, so skip

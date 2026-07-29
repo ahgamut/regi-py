@@ -45,12 +45,21 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
             continue
 
         losses = []
+        comps = []
         for e in range(params.epochs):
             batch = buf.sample_batch(params.batch_size)
-            loss = run_epoch(train_model, batch, optimizer)
+            loss, parts = run_epoch(train_model, batch, optimizer)
             losses.append(loss)
+            comps.append(parts)
 
-        print("episode", ep, f"loss={np.mean(losses)}", file=sys.stderr)
+        policy, value, keepy = np.mean(comps, axis=0)
+        print(
+            "episode",
+            ep,
+            f"loss={np.mean(losses):.4f} policy={policy:.4f} "
+            f"value={value:.4f} keepy={keepy:.4f}",
+            file=sys.stderr,
+        )
         ep += 1
 
         # publish the freshest weights so explorers self-play with the latest net
