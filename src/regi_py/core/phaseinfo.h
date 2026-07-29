@@ -31,6 +31,13 @@ namespace regi
         bool loadFromString(std::string);
         void randomize(i32);
         std::string toString() const;
+
+        /* Immunity-adjusted combo effects against the current enemy (enemyPile[0]),
+         * given this phase's usedPile. Mirror GameState's calc*, but answerable from
+         * a snapshot alone; return 0 when no enemy remains. */
+        i32 comboDamage(const Combo &) const;
+        i32 comboBlock(const Combo &) const;
+        i32 currentBlock() const;
     };
 
     void loadPhaseInfoOrFail(PhaseInfo &, std::string);

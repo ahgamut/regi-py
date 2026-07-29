@@ -413,6 +413,15 @@ void bind_phaseinfo(pybind11::object &m)
         .def_readonly("discard_pile", &PhaseInfo::discardPile)
         .def_readonly("enemy_pile", &PhaseInfo::enemyPile)
         .def_readonly("used_combos", &PhaseInfo::usedPile)
+        .def("combo_damage", &PhaseInfo::comboDamage, py::arg("combo"),
+             "Immunity-adjusted attack damage this combo deals to the current "
+             "enemy given this phase's used pile (0 if no enemy remains).")
+        .def("combo_block", &PhaseInfo::comboBlock, py::arg("combo"),
+             "Immunity-adjusted block this combo adds against the current enemy "
+             "(0 if the enemy nullifies spades / no enemy remains).")
+        .def("current_block", &PhaseInfo::currentBlock,
+             "Immunity-adjusted block already accumulated against the current "
+             "enemy from this phase's used pile.")
         .def("__hash__",
              [](const PhaseInfo &info) { return std::hash<std::string>{}(info.toString()); })
         .def("to_string", &PhaseInfo::toString)

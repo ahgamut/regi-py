@@ -285,6 +285,24 @@ namespace regi
         std::copy(usedPile.begin(), usedPile.end(), std::back_inserter(info.usedPile));
     }
 
+    i32 PhaseInfo::comboDamage(const Combo &combo) const
+    {
+        if (enemyPile.empty()) return 0;
+        return regi::comboDamage(enemyPile[0], combo, usedPile);
+    }
+
+    i32 PhaseInfo::comboBlock(const Combo &combo) const
+    {
+        if (enemyPile.empty()) return 0;
+        return regi::comboBlock(enemyPile[0], combo, usedPile);
+    }
+
+    i32 PhaseInfo::currentBlock() const
+    {
+        if (enemyPile.empty()) return 0;
+        return regi::currentBlock(enemyPile[0], usedPile);
+    }
+
     void loadPhaseInfoOrFail(PhaseInfo &info, std::string s)
     {
         if (!info.loadFromString(s))
