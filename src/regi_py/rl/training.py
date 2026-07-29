@@ -252,8 +252,12 @@ def run_brute_game(tid, i, num_bots, iterations):
     print(
         f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr
     )
-    # build the training records AFTER the game, from the now-stable game.history
-    infos = infos_from_game(game, strat.moves, value=1.0)
+    # build the training records AFTER the game, from the now-stable game.history.
+    # score losses by the hp penalty (matching run_single_game) so the brute and
+    # AZ explorers agree on the value target over the states they both visit --
+    # a high-progress loss is not labelled as good as a win.
+    value = 1.0 if win else hp_loss_penalty(s1)
+    infos = infos_from_game(game, strat.moves, value=value)
     if not infos:
         return None
     return BasicNet.tensorify_training(infos)
