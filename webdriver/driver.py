@@ -29,6 +29,7 @@ from common import (
     make_app,
     make_recommender,
     validate_reco,
+    GameInterruptedError,
 )
 
 logger = logging.getLogger("regi")
@@ -48,18 +49,24 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     async def disconnect(self, websocket: WebSocket):
-        await websocket.close(code=1000, reason=None)
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        try:
+            await websocket.close(code=1000, reason=None)
+        except Exception:
+            pass  # already closed by the peer -- nothing to do
 
     async def send_dict(self, message: dict, websocket: WebSocket):
         await send_encoded(websocket, message)
 
-    async def send_string(self, message: str, websocket: WebSocket):
-        await self.send_dict({"type": "message", "data": message}, websocket)
-
     async def broadcast_dict(self, message: dict):
-        for connection in self.active_connections:
-            await self.send_dict(message, connection)
+        # tolerate a stale socket (peer dropped but not yet cleaned up) so one
+        # dead connection can't starve the broadcast to everyone else
+        for connection in list(self.active_connections):
+            try:
+                await self.send_dict(message, connection)
+            except Exception:
+                pass
 
     async def broadcast_string(self, message: str):
         await self.broadcast_dict({"type": "message", "data": message})
@@ -165,11 +172,28 @@ def game_loop():
             print("we are waiting for players")
             time.sleep(1)
 
-        CTX.load_game()
+        try:
+            CTX.load_game()
+        except GameInterruptedError:
+            # a human dropped mid-game (their strat was flagged disconnected).
+            # There is no resume: end the session and stop the loop. Remaining
+            # clients were already told via the game-over broadcast.
+            print("player disconnected; ending the game session")
+            CTX.end_game()
+            return
         CTX.end_game()
 
         while CTX.game is None:
             time.sleep(1)
+
+
+def end_session_on_disconnect(ctx):
+    """A human dropped: flag every human strat so the game thread unwinds at the
+    next human decision (GameInterruptedError), whoever's turn it is. Bots have
+    no such flag, so they're left alone."""
+    for strat in ctx.strats:
+        if isinstance(strat, WebPlayerStrategy):
+            strat.disconnected = True
 
 
 def player_join(userid, username, websocket):
@@ -292,6 +316,11 @@ def enter_custom(
     )
 
 
+@app.get("/disconnected", response_class=HTMLResponse)
+def disconnected_page(request: Request):
+    return templates.TemplateResponse("pages/disconnected.html", {"request": request})
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def get_favicon():
     return Response(status_code=204)
@@ -342,9 +371,16 @@ async def websocket_endpoint(websocket: WebSocket, userid: str):
             raw = await websocket.receive_text()
             await process_data(raw, websocket)
     except WebSocketDisconnect:
-        await app.state.CTX.manager.disconnect(websocket)
-        username = app.state.CTX.usernames.get(userid, "Unknown Player")
-        await app.state.CTX.manager.broadcast_string(f"Client {username} left the chat")
+        CTX = app.state.CTX
+        await CTX.manager.disconnect(websocket)
+        # flag the human strats so the game thread unwinds (GameInterruptedError)
+        end_session_on_disconnect(CTX)
+        # tell any remaining players the game is over (they stay put and show
+        # the end screen; the dropped client is redirected by its own onclose).
+        username = CTX.usernames.get(userid, "Unknown Player")
+        await CTX.manager.broadcast_dict(
+            {"type": "game-over", "reason": f"{username} disconnected — the game has ended."}
+        )
 
 
 def make_CTX(app, d):

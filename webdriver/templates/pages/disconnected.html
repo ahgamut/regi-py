@@ -1,0 +1,26 @@
+{% extends 'layouts/base.html' %}
+{% block title %}
+Regicide - Disconnected
+{% endblock %}
+
+{% block includes %}
+<link rel="stylesheet" href="/static/minimal.css">
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    <div class="columns is-centered">
+        <div class="column is-one-third">
+            <div class="login-card page-top-spacing has-text-centered">
+                <h1 class="title">Connection lost</h1>
+                <p class="subtitle">The game has ended.</p>
+                <div class="field has-text-centered">
+                    <div class="control">
+                        <a class="button is-primary is-medium" href="/">Start over</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

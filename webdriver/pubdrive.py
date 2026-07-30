@@ -341,6 +341,11 @@ def enter_custom(
     )
 
 
+@app.get("/disconnected", response_class=HTMLResponse)
+def disconnected_page(request: Request):
+    return templates.TemplateResponse("pages/disconnected.html", {"request": request})
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def get_favicon():
     return Response(status_code=204)

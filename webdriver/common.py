@@ -134,6 +134,10 @@ class WebPlayerStrategy(BaseStrategy):
 
     @staticmethod
     async def comms_twoway(self, websocket, obj):
+        # already-dropped player: unwind the game thread before sending a prompt
+        # to a socket that is gone (no resume -- the game is ending).
+        if self.disconnected:
+            raise GameInterruptedError("player disconnected")
         enrich_with_usernames(obj, self._ctx.resolve_name)
         logger.debug("sending %s", obj.get("type"))
         try:

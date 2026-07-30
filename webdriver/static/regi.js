@@ -1,4 +1,9 @@
 // websocket functions
+
+// set when we tear the socket down on purpose (invalid session), so the
+// onclose handler doesn't also bounce us to the disconnected page.
+let _wsClosing = false;
+
 function init_ws() {
     let g = Alpine.store('gamestate');
     let serverIP = window.location.host.toString();
@@ -6,6 +11,12 @@ function init_ws() {
     g.ws.onmessage = receive_ws;
     g.ws.onopen = function() {
         request_start();
+    };
+    // an unexpected drop ends the game: there is no resume, so send the player
+    // to the disconnected page (the server tears the game down server-side).
+    g.ws.onclose = function() {
+        if (_wsClosing) return;
+        window.location.href = "/disconnected";
     };
 }
 
@@ -61,6 +72,7 @@ function receive_ws(event) {
     let info = JSON.parse(event.data);
 
     if (info.type === "invalid-session") {
+        _wsClosing = true;
         clearGameCookies();
         window.location.href = "/";
         return;
@@ -112,6 +124,13 @@ function _handleMessage(info) {
         case "select-redirect":
             logMessage(`select who plays next`, 'is-primary');
             selectRedirect(info.data);
+            break;
+        case "game-over":
+            // another player dropped; this client stays put and shows the end
+            // screen (the dropped client is redirected away by its onclose).
+            g.playerShould = info.reason || "The game has ended.";
+            logMessage(info.reason || "The game has ended.", 'is-danger');
+            endGameStatusUpdate();
             break;
         default:
             logMessage("fug", 'is-danger');
