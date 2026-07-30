@@ -141,7 +141,11 @@ std::ostream& operator<<(std::ostream& os, const Entry e)
 
 std::ostream& operator<<(std::ostream& os, const Card& c)
 {
-    os << c.e << c.s;
+    if (c.e == JOKER) {
+        os << c.e << "!";
+    } else {
+        os << c.e << c.s;
+    }
     return os;
 }
 
