@@ -13,7 +13,7 @@ Because inputs, heads, targets and training layout are unchanged, this subclasse
 / ``tensorify_*`` / ``predict`` / ``calculate_loss`` -- only ``__init__`` (add the
 attention block) and ``forward`` (apply it) differ.
 """
-from regi_py.rl.nets.basicnet import BasicNet
+from regi_py.rl.az.nets.basicnet import BasicNet
 from regi_py.rl.subnets import CardSelfAttention, _norm_groups
 
 import torch.nn as nn

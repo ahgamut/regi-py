@@ -9,7 +9,7 @@ over a net that sees each card in isolation?" -- a fair A/B control for
 ``CardTransformerNet`` / ``MixerNet`` since input, heads and capacity are matched.
 """
 from regi_py.rl import features
-from regi_py.rl.nets.base import BaseNet
+from regi_py.rl.az.nets.base import BaseNet
 from regi_py.rl.subnets import PerCardHeads
 
 import torch

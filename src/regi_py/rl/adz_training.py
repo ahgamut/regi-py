@@ -19,7 +19,7 @@ import numpy as np
 from regi_py import GameState, DummyLog, seed
 from regi_py.strats import RandomStrategy, BruteSamplingStrategy
 from regi_py.rl.features import candidate_semantics
-from regi_py.rl.adz_explorer import (
+from regi_py.rl.adz.explorer import (
     ADZNode,
     ADZNodeInfo,
     ADZDirectStrategy,

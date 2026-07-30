@@ -1,13 +1,13 @@
 """Registry of AlphaDouZero (ADZ) candidate-scoring net architectures, keyed by
 ``__mname__``.
 
-Deliberately SEPARATE from ``rl.nets`` (the card-space AZ registry): an ADZ net
+Deliberately SEPARATE from ``rl.az.nets`` (the card-space AZ registry): an ADZ net
 and an AZ net have incompatible predict/search/tensorify contracts, so
 ``adz_trainer --net`` must never be able to instantiate a card-space ``BaseNet``
 and vice versa. ``get_adz_net(name)`` returns the class for ``--net <name>``;
 ``adz_net_names()`` lists the registered names.
 """
-from regi_py.rl.adz_nets.base import CandidateBaseNet
+from regi_py.rl.adz.nets.base import CandidateBaseNet
 
 _ADZ_REGISTRY = {}
 
@@ -30,8 +30,8 @@ def adz_net_names():
 
 
 # concrete architectures (imported here so their @register_adz runs on
-# ``import regi_py.rl.adz_nets``; add future ADZ nets alongside)
-from regi_py.rl.adz_nets.douzero import MultiHotActionNet  # noqa: E402,F401
+# ``import regi_py.rl.adz.nets``; add future ADZ nets alongside)
+from regi_py.rl.adz.nets.douzero import MultiHotActionNet  # noqa: E402,F401
 
 __all__ = [
     "CandidateBaseNet",

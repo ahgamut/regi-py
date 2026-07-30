@@ -9,7 +9,7 @@ and loss now live in ``features`` / ``nets.base``; this file keeps only the layo
 """
 from regi_py.core import ComboTable
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
-from regi_py.rl.nets.base import BaseNet
+from regi_py.rl.az.nets.base import BaseNet
 from regi_py.rl.subnets import (
     Conv1dBlock,
     Conv2dBlock,

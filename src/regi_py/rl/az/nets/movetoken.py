@@ -9,7 +9,7 @@ identity embedding; the move tokens are mixed by a small Transformer so the net 
 compare alternative moves, then scored to one logit each. The logits scatter back
 into the ``56 x 22`` grid (each move at its own cell) and go through the same masked
 softmax as every other net, so the ``atk_probs`` (56, 22) target, the structural
-mask and the ``(56, 22)`` predict contract are all unchanged -- and ``az_explorer``
+mask and the ``(56, 22)`` predict contract are all unchanged -- and ``az.explorer``
 / ``AZNodeInfo`` need no changes.
 
 Value and keepyness stay card-space heads over the per-card encoder features (the
@@ -17,7 +17,7 @@ same encoder that feeds the move tokens); only the ACTION head reasons over move
 """
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.rl import features
-from regi_py.rl.nets.base import BaseNet
+from regi_py.rl.az.nets.base import BaseNet
 
 import torch
 import torch.nn as nn

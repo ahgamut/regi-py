@@ -16,8 +16,8 @@ import math
 
 from regi_py.core import MAX_CARDS_IN_GAME
 from regi_py.rl import features
-from regi_py.rl.adz_nets import register_adz
-from regi_py.rl.adz_nets.base import CandidateBaseNet
+from regi_py.rl.adz.nets import register_adz
+from regi_py.rl.adz.nets.base import CandidateBaseNet
 from regi_py.rl.subnets import MultiHotActionEncoder
 
 import numpy as np

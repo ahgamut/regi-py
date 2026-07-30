@@ -19,7 +19,7 @@ from regi_py import GameState, DummyLog, seed
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.combomap import cell_of_bitwise
 from regi_py.strats import RandomStrategy, BruteSamplingStrategy
-from regi_py.rl.az_explorer import (
+from regi_py.rl.az.explorer import (
     NetDirectStrategy,
     AZExplorerStrategy,
     AlphaZeroNode,

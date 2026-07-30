@@ -16,8 +16,8 @@ from regi_py.core import (  # noqa: E402
     MAX_PLAYED_STATUS,
 )
 from regi_py.logging import DummyLog  # noqa: E402
-from regi_py.rl.nets import net_names, get_net  # noqa: E402
-from regi_py.rl.az_explorer import AlphaZeroNode, AZNodeInfo  # noqa: E402
+from regi_py.rl.az.nets import net_names, get_net  # noqa: E402
+from regi_py.rl.az.explorer import AlphaZeroNode, AZNodeInfo  # noqa: E402
 from regi_py.rl.training import run_epoch, get_split_optimizer  # noqa: E402
 
 

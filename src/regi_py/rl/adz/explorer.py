@@ -1,6 +1,6 @@
 """AlphaDouZero (ADZ) MCTS node + playable strategies.
 
-The AZ analogue lives in ``az_explorer.py``; this is the forked candidate-scoring
+The AZ analogue lives in ``az/explorer.py``; this is the forked candidate-scoring
 stack. ``ADZNode`` subclasses ``strats.mcts_explorer.MCTSNode`` (reusing the lazy
 ``PhaseExpander`` expansion and the base value accounting) but reads its child
 priors from a ``CandidateBaseNet`` (``net.predict(history, offered, phase)`` ->
@@ -203,7 +203,7 @@ def _random_redirect(game):
 
 class ADZDirectStrategy(BaseStrategy):
     """ADZ net policy with NO search: play the highest-prior offered subset. The
-    analogue of ``az_explorer.NetDirectStrategy``. ``getRedirectIndex`` is out of
+    analogue of ``az.explorer.NetDirectStrategy``. ``getRedirectIndex`` is out of
     scope for the candidate stack, so it just picks a random other player."""
 
     __strat_name__ = "adz-direct"

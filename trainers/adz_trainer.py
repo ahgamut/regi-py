@@ -22,7 +22,7 @@ import torch
 import torch.multiprocessing as mp
 import numpy as np
 
-from regi_py.rl.adz_nets import get_adz_net, adz_net_names
+from regi_py.rl.adz.nets import get_adz_net, adz_net_names
 from regi_py.rl.loaders import ShardBuffer
 from regi_py.rl.training import run_epoch, get_split_optimizer, drain
 from regi_py.rl.adz_training import (

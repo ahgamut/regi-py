@@ -1,6 +1,6 @@
-"""Torch-free tests for the ADZ node/explorer stack (``rl/adz_explorer.py``).
+"""Torch-free tests for the ADZ node/explorer stack (``rl/adz/explorer.py``).
 
-``adz_explorer`` itself is torch-free (core + strats + ``rl.features``/``rl.utils``,
+``adz.explorer`` itself is torch-free (core + strats + ``rl.features``/``rl.utils``,
 all numpy), but importing the ``regi_py.rl`` package runs its ``__init__`` which
 pulls in the torch-dependent nets. To keep these runnable wherever the C++
 extension is built (torch NOT required), we shadow ``regi_py.rl`` with a torch-free
@@ -39,7 +39,7 @@ from regi_py.core import RandomStrategy  # noqa: E402
 from regi_py.logging import DummyLog  # noqa: E402
 from regi_py.strats.phase_utils import PhaseExpander  # noqa: E402
 
-import regi_py.rl.adz_explorer as adz  # noqa: E402
+import regi_py.rl.adz.explorer as adz  # noqa: E402
 
 MAX_CANDIDATES = 128
 

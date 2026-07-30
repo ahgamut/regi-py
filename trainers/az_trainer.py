@@ -11,7 +11,7 @@ import torch
 import torch.multiprocessing as mp
 import numpy as np
 
-from regi_py.rl.nets import get_net, net_names
+from regi_py.rl.az.nets import get_net, net_names
 from regi_py.rl.loaders import ShardBuffer
 from regi_py.rl.training import (
     run_epoch,

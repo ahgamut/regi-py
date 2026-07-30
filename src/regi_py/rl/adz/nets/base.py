@@ -5,7 +5,7 @@ Where an AZ ``BaseNet`` emits a fixed ``(56, 22)`` policy grid (which *is* the
 attack ``ComboTable``, so defense has no head), an ADZ net models EVERY card-play
 decision -- attack AND defense -- as a masked softmax over the phase's *ragged*
 list of offered subsets (DouZero-style ``(state, action)`` scoring wrapped in
-AlphaZero search). The node (`adz_explorer.ADZNode`) stays agnostic to how a net
+AlphaZero search). The node (`adz.explorer.ADZNode`) stays agnostic to how a net
 encodes a candidate subset: it stores the offered ``bitwise``s, a net-agnostic
 per-candidate feature block, and the visit policy, and each net decides its own
 membership encoding via the ``_assemble_membership`` hook (multi-hot first;

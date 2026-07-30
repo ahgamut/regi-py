@@ -15,8 +15,8 @@ from regi_py.core import GameState, RandomStrategy, MAX_CARDS_IN_GAME  # noqa: E
 from regi_py.logging import DummyLog  # noqa: E402
 from regi_py.strats.phase_utils import PhaseExpander  # noqa: E402
 from regi_py.rl.features import candidate_semantics  # noqa: E402
-from regi_py.rl.adz_nets import adz_net_names, get_adz_net  # noqa: E402
-from regi_py.rl.adz_explorer import ADZNode, ADZNodeInfo, trimmed_history  # noqa: E402
+from regi_py.rl.adz.nets import adz_net_names, get_adz_net  # noqa: E402
+from regi_py.rl.adz.explorer import ADZNode, ADZNodeInfo, trimmed_history  # noqa: E402
 from regi_py.rl.training import run_epoch, get_split_optimizer  # noqa: E402
 
 

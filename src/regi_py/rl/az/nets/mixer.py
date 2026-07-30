@@ -15,7 +15,7 @@ the essential inductive bias here is the static global card mixing.
 """
 from regi_py.core import MAX_CARDS_IN_GAME
 from regi_py.rl import features
-from regi_py.rl.nets.base import BaseNet
+from regi_py.rl.az.nets.base import BaseNet
 from regi_py.rl.subnets import MixerBlock, PerCardHeads
 
 import torch

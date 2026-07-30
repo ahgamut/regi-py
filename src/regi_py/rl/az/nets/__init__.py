@@ -2,9 +2,9 @@
 
 ``get_net(name)`` returns the class for ``--net <name>``; ``net_names()`` lists the
 registered names. Each concrete net module is imported here so it is registered on
-``import regi_py.rl.nets`` (import order is controlled centrally to avoid cycles).
+``import regi_py.rl.az.nets`` (import order is controlled centrally to avoid cycles).
 """
-from regi_py.rl.nets.base import BaseNet
+from regi_py.rl.az.nets.base import BaseNet
 
 _REGISTRY = {}
 
@@ -28,12 +28,12 @@ def net_names():
 
 
 # concrete architectures (import + register here; add future nets alongside)
-from regi_py.rl.nets.basicnet import BasicNet  # noqa: E402
-from regi_py.rl.nets.attntrunk import AttnTrunkNet  # noqa: E402
-from regi_py.rl.nets.cardtx import CardTransformerNet  # noqa: E402
-from regi_py.rl.nets.percardmlp import PerCardMLPNet  # noqa: E402
-from regi_py.rl.nets.mixer import MixerNet  # noqa: E402
-from regi_py.rl.nets.movetoken import MoveTokenNet  # noqa: E402
+from regi_py.rl.az.nets.basicnet import BasicNet  # noqa: E402
+from regi_py.rl.az.nets.attntrunk import AttnTrunkNet  # noqa: E402
+from regi_py.rl.az.nets.cardtx import CardTransformerNet  # noqa: E402
+from regi_py.rl.az.nets.percardmlp import PerCardMLPNet  # noqa: E402
+from regi_py.rl.az.nets.mixer import MixerNet  # noqa: E402
+from regi_py.rl.az.nets.movetoken import MoveTokenNet  # noqa: E402
 
 register(BasicNet)
 register(AttnTrunkNet)

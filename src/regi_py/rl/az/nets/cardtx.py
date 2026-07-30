@@ -13,7 +13,7 @@ identically to training (LayerNorm is already train/eval invariant).
 """
 from regi_py.core import MAX_CARDS_IN_GAME
 from regi_py.rl import features
-from regi_py.rl.nets.base import BaseNet
+from regi_py.rl.az.nets.base import BaseNet
 from regi_py.rl.subnets import PerCardHeads
 
 import torch
