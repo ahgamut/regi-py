@@ -1,47 +1,38 @@
 import contextlib
-import datetime
 import json
 import logging
 import os
 import sqlite3
-import sys
 import threading
 import time
-import traceback
 from typing import Optional
 from uuid import uuid4
 
-logger = logging.getLogger("regi")
-
-import anyio
-from anyio.from_thread import BlockingPortalProvider
 from fastapi import Cookie, Form
 from fastapi import FastAPI
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
 from fastapi import Request
 from fastapi import status
-from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py.strats import BaseStrategy
-from regi_py import get_strategy_map
-from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus, write_json_array
+from regi_py import get_strategy_map, GameState
+from webdriver.common import (
+    send_encoded,
+    WebPlayerStrategy,
+    WebPlayerLog,
+    make_app,
+    GameInterruptedError,
+)
+
+logger = logging.getLogger("regi")
 
 
 ###
-class GameInterruptedError(Exception):
-    """Raised when the WebSocket disconnects mid-game to unwind the game thread."""
-    pass
-
-
 class SessionStore:
     """SQLite-backed session store for cross-worker session sharing."""
 
@@ -106,6 +97,8 @@ class SessionStore:
 
 ###
 class ConnectionManager:
+    """Single-socket manager for one user's session."""
+
     def __init__(self):
         self.websocket: Optional[WebSocket] = None
 
@@ -121,183 +114,10 @@ class ConnectionManager:
     async def send_dict(self, message: dict, websocket: Optional[WebSocket] = None):
         ws = websocket or self.websocket
         if ws is not None:
-            raw = json.dumps(message, cls=RegiEncoder)
-            await ws.send_json(raw)
+            await send_encoded(ws, message)
 
     async def broadcast_dict(self, message: dict):
         await self.send_dict(message)
-
-
-class WebPlayerStrategy(BaseStrategy):
-    __strat_name__ = "player-webui"
-
-    def __init__(self, userid, username, websocket, ctx):
-        super().__init__()
-        self.__strat_name__ = f"player-webui-{username}"
-        self.userid = userid
-        self.username = username
-        self.websocket = websocket
-        self._ctx = ctx
-        self.portal_provider = BlockingPortalProvider()
-        self.response = None
-        self.ready = False
-        self.disconnected = False
-
-    @staticmethod
-    async def comms_twoway(self, websocket, obj):
-        enrich_with_usernames(obj, self._ctx)
-        logger.debug("sending %s", obj)
-        try:
-            await self._ctx.manager.send_dict(obj, websocket)
-        except Exception:
-            raise GameInterruptedError("WS send failed")
-
-        while self.response is None:
-            if self.disconnected:
-                raise GameInterruptedError("player disconnected")
-            await anyio.sleep(0.5)
-
-        resp = self.response
-        self.response = None
-        return resp
-
-    def setup(self, player, game):
-        if self.ready:
-            return 0
-        msg = {"type": "ready", "player": player, "game": game}
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, msg
-            )
-        option = int(response.get("choice", -1))
-        if option < 0:
-            option = -1
-        return option
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        if len(combos) == 0:
-            return -1
-
-        data = {
-            "userid": self.userid,
-            "player": player,
-            "combos": combos,
-            "yield_allowed": yield_allowed,
-            "game": game,
-        }
-        result = {"type": "select-attack", "data": data}
-
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, result
-            )
-
-        option = int(response.get("choice", -1))
-        if option < 0 or option > len(combos):
-            option = -1
-        return option
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        if len(combos) == 0:
-            return -1
-
-        data = {
-            "userid": self.userid,
-            "player": player,
-            "combos": combos,
-            "damage": damage,
-            "game": game,
-        }
-        result = {"type": "select-defend", "data": data}
-
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, result
-            )
-
-        option = int(response.get("choice", -1))
-        if option < 0 or option > len(combos):
-            option = -1
-        return option
-
-    def getRedirectIndex(self, player, game):
-        data = {
-            "userid": self.userid,
-            "player": player,
-            "game": game,
-        }
-        result = {"type": "select-redirect", "data": data}
-
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, result
-            )
-
-        option = int(response.get("choice", -1))
-        if option < 0 or option > game.num_players or option == player.id:
-            option = -1
-        return option
-
-
-def enrich_player(player_dict, ctx):
-    if isinstance(player_dict, dict) and "id" in player_dict:
-        if player_dict["id"] == 0 and ctx.username:
-            player_dict["username"] = ctx.username
-
-
-def enrich_with_usernames(data, ctx):
-    if isinstance(data, dict):
-        if "player" in data and isinstance(data["player"], dict):
-            enrich_player(data["player"], ctx)
-        if "active_player" in data and isinstance(data["active_player"], dict):
-            enrich_player(data["active_player"], ctx)
-        if "players" in data and isinstance(data["players"], list):
-            for p in data["players"]:
-                enrich_player(p, ctx)
-        for key, value in data.items():
-            if key not in ("player", "active_player", "players"):
-                data[key] = enrich_with_usernames(value, ctx)
-    elif isinstance(data, list):
-        data = [enrich_with_usernames(item, ctx) for item in data]
-    return data
-
-
-class WebPlayerLog(JSONBaseLog):
-    def __init__(self, manager, ctx=None, history_folder=None):
-        super().__init__()
-        self.manager = manager
-        self._ctx = ctx
-        self.count = 0
-        self.portal_provider = BlockingPortalProvider()
-        self.history = []
-        self.history_folder = history_folder
-
-    def startgame(self, game):
-        self.history.clear()
-        super().startgame(game)
-
-    def postgame(self, game):
-        super().postgame(game)
-        if self.history_folder:
-            os.makedirs(self.history_folder, exist_ok=True)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filepath = os.path.join(self.history_folder, f"game_{timestamp}.json")
-            write_json_array(filepath, self.history, indent=2)
-
-    @staticmethod
-    async def log_actual(manager, obj, ctx):
-        result = {}
-        result["type"] = "log"
-
-        enriched_obj = enrich_with_usernames(obj, ctx)
-        result["data"] = enriched_obj
-        await manager.broadcast_dict(result)
-
-    def log(self, obj):
-        self.history.append(obj)
-        with self.portal_provider as portal:
-            portal.call(WebPlayerLog.log_actual, self.manager, obj, self._ctx)
-        self.count += 1
 
 
 ###
@@ -316,34 +136,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(docs_url=None, lifespan=lifespan)
-app.mount(
-    "/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"))
-)
-templates = Jinja2Templates(
-    directory=os.path.join(os.path.dirname(__file__), "templates")
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.exception_handler(Exception)
-async def catchall_exception_handler(request: Request, exc: Exception):
-    _, _, exc_traceback = sys.exc_info()
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=jsonable_encoder(
-            {
-                "error": True,
-                "traceback": "".join(traceback.format_tb(exc_traceback)),
-            }
-        ),
-    )
+app, templates = make_app(lifespan=lifespan)
 
 
 ###
@@ -352,7 +145,9 @@ async def catchall_exception_handler(request: Request, exc: Exception):
 class Context:
     def __init__(self, userid, username, bots, history_folder=None):
         self.manager = ConnectionManager()
-        self.playerlog = WebPlayerLog(self.manager, ctx=self, history_folder=history_folder)
+        self.playerlog = WebPlayerLog(
+            self.manager, self.resolve_name, history_folder=history_folder
+        )
         self.game = GameState(self.playerlog)
         self.strats = []
         self.bots = bots
@@ -361,6 +156,10 @@ class Context:
         self.ALT_STARTED = False
         self.GLOB_THREAD = None
         self.disconnected = False
+
+    def resolve_name(self, player_id):
+        # single-user session: the human is always player 0
+        return self.username if player_id == 0 else None
 
     @property
     def needs_bot_selection(self):
@@ -447,7 +246,9 @@ def player_join(ctx, websocket):
 # pylint: disable=W0613
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
-    return templates.TemplateResponse("pages/login.html", {"request": request})
+    return templates.TemplateResponse(
+        "pages/login.html", {"request": request, "require_password": True}
+    )
 
 
 @app.post("/login", response_class=RedirectResponse)
@@ -455,11 +256,16 @@ async def login(request: Request, username: str = Form(...), password: str = For
     if len(username) > 16 or len(password) > 16:
         return templates.TemplateResponse(
             "pages/login.html",
-            {"request": request, "error": "Username and password must be 16 characters or less."},
+            {
+                "request": request,
+                "require_password": True,
+                "error": "Username and password must be 16 characters or less.",
+            },
         )
     if password != app.state.config["password"]:
         return templates.TemplateResponse(
-            "pages/login.html", {"request": request, "error": "Incorrect password."}
+            "pages/login.html",
+            {"request": request, "require_password": True, "error": "Incorrect password."},
         )
     userid = str(uuid4())
     app.state.session_store.create(userid, username)
@@ -470,10 +276,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
 
 @app.get("/select-bots", response_class=HTMLResponse)
-def select_bots_page(
-    request: Request,
-    userid: Optional[str] = Cookie(None),
-):
+def select_bots_page(request: Request, userid: Optional[str] = Cookie(None)):
     if userid is None:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     session = app.state.session_store.load(userid)
@@ -492,10 +295,7 @@ def select_bots_page(
 
 
 @app.post("/select-bots", response_class=RedirectResponse)
-async def select_bots_submit(
-    request: Request,
-    userid: Optional[str] = Cookie(None),
-):
+async def select_bots_submit(request: Request, userid: Optional[str] = Cookie(None)):
     if userid is None:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     session = app.state.session_store.load(userid)
@@ -560,7 +360,7 @@ async def process_data(data, websocket, ctx):
     if "type" not in pkg:
         return
 
-    logger.debug("ws recv: %s", pkg)
+    logger.debug("ws recv: %s", pkg.get("type"))
     if pkg["type"] == "player-join":
         player_join(ctx, websocket)
         await ctx.manager.send_dict({"type": "loading", "remain": 1}, websocket)
@@ -583,7 +383,7 @@ async def websocket_endpoint(websocket: WebSocket, userid: str):
     session = app.state.session_store.load(userid)
     if session is None:
         await websocket.accept()
-        await websocket.send_json(json.dumps({"type": "invalid-session"}))
+        await send_encoded(websocket, {"type": "invalid-session"})
         await websocket.close(code=1000)
         return
 

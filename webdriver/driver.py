@@ -1,52 +1,43 @@
 import argparse
-import asyncio
-import datetime
 import json
 import logging
 import os
 import sys
 import threading
 import time
-import tempfile
-import traceback
-from logging import FileHandler
 from typing import Optional
 from uuid import uuid4
-import contextlib
 
 #
-import anyio
 import uvicorn
-import fastapi
-
-#
-from anyio.from_thread import BlockingPortalProvider
-from anyio import from_thread, to_thread
 from fastapi import Cookie, Form
-from fastapi import FastAPI
 from fastapi import WebSocket
 from fastapi import WebSocketDisconnect
 from fastapi import Request
 from fastapi import status
-from fastapi.encoders import jsonable_encoder
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, FileResponse
+from fastapi.responses import Response
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
-from fastapi.responses import StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 ###
-from regi_py.strats import BaseStrategy, BruteSamplingStrategy
-from regi_py.strats.mcts_explorer import MCTSExplorerStrategy
-from regi_py import get_strategy_map
-from regi_py import RegiEncoder, JSONBaseLog, GameState, GameStatus, write_json_array
+from regi_py import get_strategy_map, GameState
+from webdriver.common import (
+    send_encoded,
+    WebPlayerStrategy,
+    WebPlayerLog,
+    make_app,
+    make_recommender,
+    validate_reco,
+)
+
+logger = logging.getLogger("regi")
 
 
 ###
 class ConnectionManager:
+    """Multiplayer manager: a list of connected sockets with broadcast."""
+
     def __init__(self, num_players, num_bots):
         self.active_connections: list[WebSocket] = []
         self.num_players = num_players
@@ -60,264 +51,22 @@ class ConnectionManager:
         await websocket.close(code=1000, reason=None)
         self.active_connections.remove(websocket)
 
-    async def send_string(self, message: str, websocket: WebSocket):
-        result = {"type": "message", "data": message}
-        await self.send_dict(result, websocket)
-
     async def send_dict(self, message: dict, websocket: WebSocket):
-        raw = json.dumps(message, cls=RegiEncoder)
-        await websocket.send_json(raw)
+        await send_encoded(websocket, message)
 
-    async def broadcast_string(self, message: str):
-        result = {"type": "message", "data": message}
-        for connection in self.active_connections:
-            await self.send_dict(result, connection)
+    async def send_string(self, message: str, websocket: WebSocket):
+        await self.send_dict({"type": "message", "data": message}, websocket)
 
     async def broadcast_dict(self, message: dict):
         for connection in self.active_connections:
             await self.send_dict(message, connection)
 
-
-def validate_reco_bot(value):
-    parts = value.split("-", 1)
-    if len(parts) != 2 or parts[0] not in ("brute", "mcts"):
-        return False, "--reco-bot must be TYPE-N where TYPE is 'brute' or 'mcts' (e.g. brute-128)"
-    try:
-        int(parts[1])
-    except ValueError:
-        return False, "--reco-bot N must be an integer (e.g. brute-128)"
-    return True, None
-
-
-def make_reco_bot(reco_klassname):
-    parts = reco_klassname.split("-", 1)
-    reco_type = parts[0]
-    reco_param = int(parts[1])
-    if reco_type == "mcts":
-        return MCTSExplorerStrategy(reco_param)
-    return BruteSamplingStrategy(reco_param)
-
-
-class WebPlayerStrategy(BaseStrategy):
-    __strat_name__ = "player-webui"
-
-    def __init__(self, userid, username, websocket, reco_klassname="brute-128"):
-        super().__init__()
-        self.__strat_name__ = f"player-webui-{username}"
-        self.userid = userid
-        self.username = username
-        self.websocket = websocket
-        self.portal_provider = BlockingPortalProvider()
-        self.response = None
-        self.ready = False
-        self.reco_bot = make_reco_bot(reco_klassname)
-
-    @staticmethod
-    async def comms_twoway(self, websocket, obj):
-        enrich_with_usernames(obj)
-        print("sending", obj)
-        await app.state.CTX.manager.send_dict(obj, websocket)
-
-        while self.response is None:
-            # print(self.userid, "waiting", obj["type"])
-            await anyio.sleep(1)
-
-        resp = self.response
-        self.response = None
-        return resp
-
-    def setup(self, player, game):
-        if self.ready:
-            return 0
-        msg = {"type": "ready", "player": player, "game": game}
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, msg
-            )
-        option = int(response.get("choice", -1))
-        if option < 0:
-            option = -1
-        return option
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        # print("player: ", player.id, "available attacks: ", combos)
-        if len(combos) == 0:
-            return -1
-
-        data = {
-            "userid": self.userid,
-            "player": player,
-            "combos": combos,
-            "yield_allowed": yield_allowed,
-            "game": game,
-            "reco": self.reco_bot.getRecommendedMoves(game.export_phaseinfo(), combos),
-        }
-        result = {"type": "select-attack", "data": data}
-
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, result
-            )
-
-        option = int(response.get("choice", -1))
-        if option < 0 or option > len(combos):
-            option = -1
-        return option
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        # print("player: ", player.id, "available defenses: ", combos)
-        if len(combos) == 0:
-            return -1
-
-        data = {
-            "userid": self.userid,
-            "player": player,
-            "combos": combos,
-            "damage": damage,
-            "game": game,
-            "reco": self.reco_bot.getRecommendedMoves(game.export_phaseinfo(), combos),
-        }
-        result = {"type": "select-defend", "data": data}
-
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, result
-            )
-
-        option = int(response.get("choice", -1))
-        if option < 0 or option > len(combos):
-            option = -1
-        return option
-
-    def getRedirectIndex(self, player, game):
-        # print("player: ", player.id, "needs to redirect: ")
-        data = {
-            "userid": self.userid,
-            "player": player,
-            "game": game,
-        }
-        result = {"type": "select-redirect", "data": data}
-
-        with self.portal_provider as portal:
-            response = portal.call(
-                WebPlayerStrategy.comms_twoway, self, self.websocket, result
-            )
-
-        option = int(response.get("choice", -1))
-        if option < 0 or option > game.num_players or option == player.id:
-            option = -1
-        return option
-
-
-def enrich_player(player_dict):
-    if isinstance(player_dict, dict) and "id" in player_dict:
-        player_id = player_dict["id"]
-        if player_id < len(app.state.CTX.userids):
-            userid = app.state.CTX.userids[player_id]
-            username = app.state.CTX.usernames.get(userid)
-            if username:
-                player_dict["username"] = username
-
-
-def enrich_with_usernames(data):
-    if isinstance(data, dict):
-        if "player" in data and isinstance(data["player"], dict):
-            enrich_player(data["player"])
-        if "active_player" in data and isinstance(data["active_player"], dict):
-            enrich_player(data["active_player"])
-        if "players" in data and isinstance(data["players"], list):
-            for p in data["players"]:
-                enrich_player(p)
-        for key, value in data.items():
-            if key not in ("player", "active_player", "players"):
-                data[key] = enrich_with_usernames(value)
-    elif isinstance(data, list):
-        data = [enrich_with_usernames(item) for item in data]
-    return data
-
-
-class WebPlayerLog(JSONBaseLog):
-    def __init__(self, manager, history_folder=None):
-        super().__init__()
-        self.manager = manager
-        self.count = 0
-        self.portal_provider = BlockingPortalProvider()
-        self.history = []
-        self.history_folder = history_folder
-
-    def startgame(self, game):
-        self.history.clear()
-        super().startgame(game)
-
-    def postgame(self, game):
-        super().postgame(game)
-        if self.history_folder:
-            os.makedirs(self.history_folder, exist_ok=True)
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filepath = os.path.join(self.history_folder, f"game_{timestamp}.json")
-            write_json_array(filepath, self.history, indent=2)
-
-    @staticmethod
-    async def log_actual(manager, obj):
-        result = {}
-        result["type"] = "log"
-
-        enriched_obj = enrich_with_usernames(obj)
-        result["data"] = enriched_obj
-        await manager.broadcast_dict(result)
-
-    def log(self, obj):
-        self.history.append(obj)
-        with self.portal_provider as portal:
-            portal.call(WebPlayerLog.log_actual, self.manager, obj)
-        self.count += 1
+    async def broadcast_string(self, message: str):
+        await self.broadcast_dict({"type": "message", "data": message})
 
 
 ###
-app = FastAPI(docs_url=None)
-app.mount(
-    "/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static"))
-)
-templates = Jinja2Templates(
-    directory=os.path.join(os.path.dirname(__file__), "templates")
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# if os.getenv("TMPDIR") is not None:
-#    DEBUG_DIR_NAME = os.getenv("TMPDIR")
-# else:
-# DEBUG_DIR = tempfile.TemporaryDirectory(prefix="regipy-")  # pylint: disable=R1732
-# DEBUG_DIR_NAME = DEBUG_DIR.name
-
-
-def debugwrap(*args):
-    if len(args) > 1:
-        folder = args[:-1]
-        os.makedirs(os.path.join(DEBUG_DIR_NAME, *folder), exist_ok=True)
-    return os.path.join(DEBUG_DIR_NAME, *args)
-
-
-@app.exception_handler(Exception)
-async def catchall_exception_handler(request: Request, exc: Exception):
-    _, _, exc_traceback = sys.exc_info()
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content=jsonable_encoder(
-            {
-                "error": True,
-                "traceback": "".join(traceback.format_tb(exc_traceback)),
-            }
-        ),
-    )
-
-
-###
+app, templates = make_app()
 
 
 class Context:
@@ -329,10 +78,12 @@ class Context:
         skip_bots=False,
         no_download=False,
         history_folder=None,
-        reco_bot="brute-128",
+        recommender=None,
     ):
         self.manager = ConnectionManager(num_players, len(bots))
-        self.playerlog = WebPlayerLog(self.manager, history_folder=history_folder)
+        self.playerlog = WebPlayerLog(
+            self.manager, self.resolve_name, history_folder=history_folder
+        )
         self.game = GameState(self.playerlog)
         self.num_players = num_players
         self.strats = []
@@ -340,13 +91,17 @@ class Context:
         self.password = password
         self.skip_bots = skip_bots
         self.no_download = no_download
-        self.reco_bot = reco_bot
+        self.recommender = recommender
         self.userids = []
         self.usernames = {}
         self.ALT_STARTED = False
-        self.FUG_RESPONSE = None
         self.GLOB_THREAD = None
         self.bot_options = list(get_strategy_map(rl_mods=False).keys())
+
+    def resolve_name(self, player_id):
+        if 0 <= player_id < len(self.userids):
+            return self.usernames.get(self.userids[player_id])
+        return None
 
     @property
     def needs_bot_selection(self):
@@ -361,20 +116,16 @@ class Context:
         self.manager.num_bots = len(bots)
 
     def load_game(self):
-        # assert len(self.userids) == self.num_players
         assert app.state.CTX.ALT_STARTED
         strategy_map = get_strategy_map(rl_mods=False)
         if len(self.strats) != self.num_players + len(self.bots):
-            # print("this is non-reset game")
             for i in range(self.num_players):
                 self.game.add_player(self.strats[i])
-
             for b in self.bots:
                 strat = strategy_map[b]()
                 self.strats.append(strat)
                 self.game.add_player(self.strats[-1])
         else:
-            # print("we already have strats, in a reset game")
             for s in self.strats:
                 self.game.add_player(s)
 
@@ -397,7 +148,6 @@ class Context:
         assert self.game is not None
         del self.game
         self.game = None
-        # self.strats.clear()
 
     def reset_game(self):
         self.game = GameState(self.playerlog)
@@ -413,29 +163,23 @@ def game_loop():
 
         while CTX.num_players > len(CTX.strats):
             print("we are waiting for players")
-            # print(CTX.num_players, CTX.strats)
             time.sleep(1)
 
-        # print("OMG! Game loop can start???")
         CTX.load_game()
         CTX.end_game()
 
-        # game should have ended
         while CTX.game is None:
-            # print("we have no game")
             time.sleep(1)
 
 
 def player_join(userid, username, websocket):
-    if len(app.state.CTX.strats) == len(app.state.CTX.userids):
+    ctx = app.state.CTX
+    if len(ctx.strats) == len(ctx.userids):
         return
     strat = WebPlayerStrategy(
-        userid,
-        username,
-        websocket,
-        reco_klassname=app.state.CTX.reco_bot,
+        userid, username, websocket, ctx, recommender=ctx.recommender
     )
-    app.state.CTX.strats.append(strat)
+    ctx.strats.append(strat)
 
 
 ###
@@ -444,22 +188,32 @@ def player_join(userid, username, websocket):
 # pylint: disable=W0613
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request):
-    return templates.TemplateResponse("pages/login.html", {"request": request})
+    return templates.TemplateResponse(
+        "pages/login.html",
+        {"request": request, "require_password": app.state.CTX.password is not None},
+    )
 
 
 @app.post("/login", response_class=RedirectResponse)
-async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+async def login(request: Request, username: str = Form(...), password: str = Form("")):
+    require_password = app.state.CTX.password is not None
     if len(username) > 16 or len(password) > 16:
         return templates.TemplateResponse(
             "pages/login.html",
             {
                 "request": request,
+                "require_password": require_password,
                 "error": "Username and password must be 16 characters or less.",
             },
         )
-    if password != app.state.CTX.password:
+    if require_password and password != app.state.CTX.password:
         return templates.TemplateResponse(
-            "pages/login.html", {"request": request, "error": "Incorrect password."}
+            "pages/login.html",
+            {
+                "request": request,
+                "require_password": require_password,
+                "error": "Incorrect password.",
+            },
         )
     userid = str(uuid4())
     app.state.CTX.userids.append(userid)
@@ -477,10 +231,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
 
 @app.get("/select-bots", response_class=HTMLResponse)
-def select_bots_page(
-    request: Request,
-    userid: Optional[str] = Cookie(None),
-):
+def select_bots_page(request: Request, userid: Optional[str] = Cookie(None)):
     if userid is None or userid not in app.state.CTX.userids:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(
@@ -494,18 +245,12 @@ def select_bots_page(
 
 
 @app.get("/wait-bots", response_class=HTMLResponse)
-def wait_bots_page(
-    request: Request,
-    userid: Optional[str] = Cookie(None),
-):
+def wait_bots_page(request: Request, userid: Optional[str] = Cookie(None)):
     if userid is None or userid not in app.state.CTX.userids:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     if not app.state.CTX.needs_bot_selection:
         return RedirectResponse(url="/game", status_code=status.HTTP_302_FOUND)
-    return templates.TemplateResponse(
-        "pages/wait_bots.html",
-        {"request": request},
-    )
+    return templates.TemplateResponse("pages/wait_bots.html", {"request": request})
 
 
 @app.get("/api/bots-ready", response_class=JSONResponse)
@@ -514,10 +259,7 @@ def bots_ready():
 
 
 @app.post("/select-bots", response_class=RedirectResponse)
-async def select_bots_submit(
-    request: Request,
-    userid: Optional[str] = Cookie(None),
-):
+async def select_bots_submit(request: Request, userid: Optional[str] = Cookie(None)):
     if userid is None or userid not in app.state.CTX.userids:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     form = await request.form()
@@ -538,7 +280,7 @@ def enter_custom(
         response.delete_cookie("username")
         return response
 
-    response = templates.TemplateResponse(
+    return templates.TemplateResponse(
         "pages/index.html",
         {
             "request": request,
@@ -548,7 +290,6 @@ def enter_custom(
             "no_download": app.state.CTX.no_download,
         },
     )
-    return response
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -570,31 +311,29 @@ async def process_data(data, websocket):
     if "type" not in pkg:
         return
 
-    print(pkg)
+    logger.debug("ws recv: %s", pkg.get("type"))
     if pkg["type"] == "player-join":
         username = CTX.usernames.get(pkg["userid"], "Unknown Player")
         player_join(pkg["userid"], username, websocket)
         await CTX.manager.send_dict({"type": "loading", "remain": 1}, websocket)
-    elif pkg["type"] in ["player-ready"]:
+    elif pkg["type"] == "player-ready":
         playerid = CTX.manager.active_connections.index(websocket)
         CTX.strats[playerid].response = pkg
         CTX.strats[playerid].ready = True
-    elif pkg["type"] in ["player-move"]:
+    elif pkg["type"] == "player-move":
         playerid = CTX.manager.active_connections.index(websocket)
         CTX.strats[playerid].response = pkg
-    elif pkg["type"] in ["player-reset"]:
-        print("should reset")
+    elif pkg["type"] == "player-reset":
         CTX.reset_game()
     else:
-        print("FUG")
+        logger.warning("unknown message type: %s", pkg.get("type"))
 
 
 @app.websocket("/ws/{userid}")
 async def websocket_endpoint(websocket: WebSocket, userid: str):
-    print("got message from ", userid)
     if userid not in app.state.CTX.userids:
         await websocket.accept()
-        await websocket.send_json(json.dumps({"type": "invalid-session"}))
+        await send_encoded(websocket, {"type": "invalid-session"})
         await websocket.close(code=1000)
         return
     await app.state.CTX.manager.connect(websocket)
@@ -608,30 +347,30 @@ async def websocket_endpoint(websocket: WebSocket, userid: str):
         await app.state.CTX.manager.broadcast_string(f"Client {username} left the chat")
 
 
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
-    args = load_args()
-    make_CTX(app, args)
-
-
 def make_CTX(app, d):
     if app.state.CTX is not None:
         return
-    #
+    # build the recommender ONCE, shared across players; torch is imported only if
+    # d.reco names an NN net (brute/mcts stay torch-free)
+    recommender = make_recommender(d.reco_name, d.reco_iters, d.reco_weights)
     app.state.CTX = Context(
-        d.num_players, d.bots, d.password, d.skip_bots, d.no_download, d.history_folder,
-        d.reco_bot,
+        d.num_players,
+        d.bots,
+        d.password,
+        d.skip_bots,
+        d.no_download,
+        d.history_folder,
+        recommender=recommender,
     )
-    #
+    pw = "no password" if d.password is None else "password required"
     print(
-        f"\n\n\nTemporary files ignored\n",
+        f"\n\n\nreco={d.reco} ({pw})\n"
         f"Go to http://{d.host}:{d.port} on your browser to view webserver\n\n\n",
         sep="",
     )
 
 
 def load_args():
-    # TODO: nested flag so rl_mods can be shown in help
     strategy_map = get_strategy_map(rl_mods=False)
     parser = argparse.ArgumentParser(
         prog="regi-webserver",
@@ -644,7 +383,9 @@ def load_args():
         "-n", "--num-players", type=int, default=1, help="number of players"
     )
     parser.add_argument(
-        "--password", default="regi", help="password required to join the game"
+        "--password",
+        default=None,
+        help="password required to join the game (default: no password)",
     )
     parser.add_argument(
         "-b",
@@ -675,11 +416,19 @@ def load_args():
         help="folder to save game history JSON files after each game",
     )
     parser.add_argument(
-        "--reco-bot",
-        dest="reco_bot",
+        "--reco",
+        dest="reco",
         default="brute-128",
-        help="recommender bot as TYPE-N (e.g. brute-128, mcts-64). "
-             "TYPE is 'brute' or 'mcts', N is an integer parameter for the bot",
+        help="recommender as NAME-ITERS (e.g. brute-128, mcts-64, basic-0, adzmulti-64). "
+        "NAME is 'brute'/'mcts' or a trained net name; ITERS is the search budget "
+        "(0 => search-free direct-net for NN nets). NN nets require --reco-weights "
+        "and are the only case that imports torch.",
+    )
+    parser.add_argument(
+        "--reco-weights",
+        dest="reco_weights",
+        default=None,
+        help="path to a .pt checkpoint (required when --reco names an NN net)",
     )
     d = parser.parse_args()
     total_players = d.num_players + len(d.bots)
@@ -692,8 +441,9 @@ def load_args():
         print("ERROR can't have more than 4 players!\n\n")
         parser.print_help()
         sys.exit(1)
-    valid, err = validate_reco_bot(d.reco_bot)
-    if not valid:
+    try:
+        d.reco_name, d.reco_iters = validate_reco(d.reco, d.reco_weights)
+    except ValueError as err:
         print(f"ERROR {err}\n\n")
         parser.print_help()
         sys.exit(1)
