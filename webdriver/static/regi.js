@@ -161,9 +161,12 @@ function updateRecommendations(reco) {
     container.replaceChildren();
     container.style.display = 'none';
     if (toggle) toggle.textContent = 'Show Recommendations';
+    // the whole control only exists when recommendations are enabled + present
     if (!reco || reco.length === 0) {
+        wrapper.style.display = 'none';
         return;
     }
+    wrapper.style.display = '';
     let header = document.createElement('div');
     header.className = 'reco-header';
     header.textContent = 'Recommendations';
@@ -202,27 +205,15 @@ function toggleRecommendations() {
 }
 
 function clearRecommendations() {
+    let wrapper = document.getElementById('reco-wrapper');
     let container = document.getElementById('reco-popup');
     let toggle = document.getElementById('reco-toggle');
+    if (wrapper) wrapper.style.display = 'none';
     if (container) {
         container.replaceChildren();
         container.style.display = 'none';
     }
     if (toggle) toggle.textContent = 'Show Recommendations';
-    highlightRecommendedCards(null);
-}
-
-// Subtly mark the hand cards that make up the top recommended combo, in addition
-// to the popup. Matches by card value against the already-rendered hand.
-function highlightRecommendedCards(reco) {
-    let target = document.getElementById('player-cards');
-    if (!target) return;
-    target.querySelectorAll('.reco-suggested').forEach(el => el.classList.remove('reco-suggested'));
-    if (!reco || reco.length === 0) return;
-    let values = new Set(reco[0].map(card => card.value));
-    for (let el of target.querySelectorAll('.game-card-selectable')) {
-        if (values.has(el.textContent)) el.classList.add('reco-suggested');
-    }
 }
 
 function submit_option() {
@@ -561,7 +552,6 @@ function selectAttack(data) {
     updateBoard(data.game);
     updateCards(data.player);
     updateRecommendations(data.reco);
-    highlightRecommendedCards(data.reco);
 }
 function selectDefend(data) {
     let g = Alpine.store('gamestate');
@@ -577,7 +567,6 @@ function selectDefend(data) {
     updateBoard(data.game);
     updateCards(data.player);
     updateRecommendations(data.reco);
-    highlightRecommendedCards(data.reco);
 }
 function selectRedirect(data) {
     let g = Alpine.store('gamestate');

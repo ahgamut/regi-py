@@ -36,6 +36,14 @@ The `pytorch` training code (`regi_py.rl`, `trainers/`) and the web app
 (`webdriver/`) are exercised separately; their tests skip automatically when those
 dependencies are unavailable.
 
+The web app tests live outside the main suite (`webdriver/` is not part of the
+installed `regi_py` package). Run them from the repo root with `python -m` so the
+`webdriver` package is importable:
+
+```sh
+python -m pytest webdriver/tests   # NOT bare `pytest webdriver/tests`
+```
+
 ## Viewing a basic simulation
 
 Run the `driver.py` to see a basic command-line simulation of the game, where

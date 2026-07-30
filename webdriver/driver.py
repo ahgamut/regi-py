@@ -22,7 +22,7 @@ from fastapi.responses import RedirectResponse
 
 ###
 from regi_py import get_strategy_map, GameState
-from webdriver.common import (
+from common import (
     send_encoded,
     WebPlayerStrategy,
     WebPlayerLog,
@@ -350,9 +350,12 @@ async def websocket_endpoint(websocket: WebSocket, userid: str):
 def make_CTX(app, d):
     if app.state.CTX is not None:
         return
-    # build the recommender ONCE, shared across players; torch is imported only if
-    # d.reco names an NN net (brute/mcts stay torch-free)
-    recommender = make_recommender(d.reco_name, d.reco_iters, d.reco_weights)
+    # recommendations are opt-in: build the recommender ONCE (shared across players)
+    # only when --reco was given; torch is imported only if d.reco names an NN net
+    # (brute/mcts stay torch-free)
+    recommender = None
+    if d.reco is not None:
+        recommender = make_recommender(d.reco_name, d.reco_iters, d.reco_weights)
     app.state.CTX = Context(
         d.num_players,
         d.bots,
@@ -363,8 +366,9 @@ def make_CTX(app, d):
         recommender=recommender,
     )
     pw = "no password" if d.password is None else "password required"
+    reco = "off" if d.reco is None else d.reco
     print(
-        f"\n\n\nreco={d.reco} ({pw})\n"
+        f"\n\n\nreco={reco} ({pw})\n"
         f"Go to http://{d.host}:{d.port} on your browser to view webserver\n\n\n",
         sep="",
     )
@@ -418,11 +422,11 @@ def load_args():
     parser.add_argument(
         "--reco",
         dest="reco",
-        default="brute-128",
-        help="recommender as NAME-ITERS (e.g. brute-128, mcts-64, basic-0, adzmulti-64). "
-        "NAME is 'brute'/'mcts' or a trained net name; ITERS is the search budget "
-        "(0 => search-free direct-net for NN nets). NN nets require --reco-weights "
-        "and are the only case that imports torch.",
+        default=None,
+        help="enable move recommendations, as NAME-ITERS (e.g. brute-128, mcts-64, "
+        "basic-0, adzmulti-64). Off by default. NAME is 'brute'/'mcts' or a trained "
+        "net name; ITERS is the search budget (0 => search-free direct-net for NN "
+        "nets). NN nets require --reco-weights and are the only case that imports torch.",
     )
     parser.add_argument(
         "--reco-weights",
@@ -441,12 +445,15 @@ def load_args():
         print("ERROR can't have more than 4 players!\n\n")
         parser.print_help()
         sys.exit(1)
-    try:
-        d.reco_name, d.reco_iters = validate_reco(d.reco, d.reco_weights)
-    except ValueError as err:
-        print(f"ERROR {err}\n\n")
-        parser.print_help()
-        sys.exit(1)
+    # recommendations are opt-in: only validate/parse a spec when --reco is given
+    d.reco_name, d.reco_iters = None, None
+    if d.reco is not None:
+        try:
+            d.reco_name, d.reco_iters = validate_reco(d.reco, d.reco_weights)
+        except ValueError as err:
+            print(f"ERROR {err}\n\n")
+            parser.print_help()
+            sys.exit(1)
     return d
 
 
