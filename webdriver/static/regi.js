@@ -770,16 +770,10 @@ function scheduleDismiss(el, delay) {
 function addNotification(content, subtype) {
     let tray = document.getElementById('turn-message');
     setupTurnMessageHover();
-    //
-    let trayHeight = tray.offsetHeight;
-    let inset = 12;
-    let notifHeight = trayHeight - (inset * 2);
 
     let res = document.createElement('div');
     res.className = `notification is-light is-size-5 notif-overlay ${subtype}`;
     res.role = "alert";
-    res.style.height = (notifHeight / 16) + 'rem';
-    res.style.maxHeight = (notifHeight / 16) + 'rem';
 
     let delButton = document.createElement('button');
     delButton.classList.add('delete');
@@ -790,10 +784,8 @@ function addNotification(content, subtype) {
     res.appendChild(delButton);
     res.appendChild(document.createTextNode(content));
 
-    // Ensure newest is always on top
-    let existing = tray.querySelectorAll('.notification');
-    existing.forEach(n => { n.style.zIndex = '1'; });
-    res.style.zIndex = '10';
+    // The overlays share one spot and size from CSS; appended last, this one
+    // paints on top (absolute positioning + source order), so it's the newest.
     res.classList.add('notif-slide-in');
     tray.appendChild(res);
     dismissOldNotifications(600);
