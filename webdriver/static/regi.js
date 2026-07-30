@@ -125,6 +125,11 @@ function _handleMessage(info) {
             logMessage(`select who plays next`, 'is-primary');
             selectRedirect(info.data);
             break;
+        case "assign-id":
+            // seating is shuffled each game, so the server tells us which seat
+            // (game player id) we drew; track it for 'my turn'/'my cards'.
+            g.playerid = info.playerid;
+            break;
         case "game-over":
             // another player dropped; this client stays put and shows the end
             // screen (the dropped client is redirected away by its onclose).

@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+import random
 import sys
 import threading
 import time
@@ -101,14 +102,16 @@ class Context:
         self.recommender = recommender
         self.userids = []
         self.usernames = {}
+        # seat (game player id) -> userid, rebuilt each game since seating is
+        # shuffled; bots have no entry
+        self.seat_to_userid = {}
         self.ALT_STARTED = False
         self.GLOB_THREAD = None
         self.bot_options = list(get_strategy_map(rl_mods=False).keys())
 
     def resolve_name(self, player_id):
-        if 0 <= player_id < len(self.userids):
-            return self.usernames.get(self.userids[player_id])
-        return None
+        userid = self.seat_to_userid.get(player_id)
+        return self.usernames.get(userid) if userid is not None else None
 
     @property
     def needs_bot_selection(self):
@@ -125,20 +128,28 @@ class Context:
     def load_game(self):
         assert app.state.CTX.ALT_STARTED
         strategy_map = get_strategy_map(rl_mods=False)
+        # self.strats holds the humans (appended on join) then the bots; create
+        # the bot strats once. self.strats order is NOT touched -- it maps a
+        # connection index to its human strat for input routing.
         if len(self.strats) != self.num_players + len(self.bots):
-            for i in range(self.num_players):
-                self.game.add_player(self.strats[i])
             for b in self.bots:
-                strat = strategy_map[b]()
-                self.strats.append(strat)
-                self.game.add_player(self.strats[-1])
-        else:
-            for s in self.strats:
-                self.game.add_player(s)
+                self.strats.append(strategy_map[b]())
 
-        print("starting with", [x.__strat_name__ for x in self.strats])
-        assert len(self.strats) >= 2
-        assert len(self.strats) <= 4
+        # shuffle the SEATING every game so turn order differs each start/restart.
+        # We seat a shuffled copy and record which seat each human drew; the game
+        # assigns player ids in add_player() order.
+        seating = list(self.strats)
+        random.shuffle(seating)
+        self.seat_to_userid = {}
+        for seat, strat in enumerate(seating):
+            self.game.add_player(strat)
+            if isinstance(strat, WebPlayerStrategy):
+                self.seat_to_userid[seat] = strat.userid
+                strat.notify_playerid(seat)
+
+        print("starting with", [x.__strat_name__ for x in seating])
+        assert len(seating) >= 2
+        assert len(seating) <= 4
         if self.num_players == 1 and len(self.bots) > 0:
             print("solo player with bots, skipping ready check")
             self.strats[0].ready = True

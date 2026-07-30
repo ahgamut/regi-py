@@ -160,6 +160,21 @@ class WebPlayerStrategy(BaseStrategy):
                 WebPlayerStrategy.comms_twoway, self, self.websocket, result
             )
 
+    @staticmethod
+    async def _send_assign(manager, websocket, playerid):
+        try:
+            await manager.send_dict({"type": "assign-id", "playerid": playerid}, websocket)
+        except Exception:
+            pass  # a failed seat notice must not crash game startup
+
+    def notify_playerid(self, playerid):
+        """Tell this player's client which seat (game player id) it drew this
+        game, so the frontend tracks 'my turn'/'my cards' after a seat shuffle."""
+        with self.portal_provider as portal:
+            portal.call(
+                WebPlayerStrategy._send_assign, self._ctx.manager, self.websocket, playerid
+            )
+
     def _reco(self, combos, game):
         if self.recommender is None:
             return None
