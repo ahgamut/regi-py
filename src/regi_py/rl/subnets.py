@@ -211,6 +211,30 @@ class MixerBlock(nn.Module):
         return x
 
 
+class MultiHotActionEncoder(nn.Module):
+    """DouZero-literal action encoder for the ADZ candidate nets.
+
+    Each offered subset is encoded as multi-hot card membership over the 56 card
+    locations concatenated with its net-agnostic semantic features
+    (``features.candidate_semantics``), then an MLP maps that to a per-candidate
+    key vector. The candidate axis is batched: ``members (N, K, 56)`` +
+    ``feats (N, K, F)`` -> keys ``(N, K, out_dim)``. A scorer dots these against a
+    pooled state query to produce one logit per candidate (masked-softmaxed over
+    the real, unpadded candidates)."""
+
+    def __init__(self, feat_dim, out_dim, hidden=128, num_cards=MAX_CARDS_IN_GAME):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(num_cards + feat_dim, hidden),
+            nn.ReLU(),
+            nn.Linear(hidden, out_dim),
+        )
+
+    def forward(self, members, feats):
+        x = torch.cat([members, feats], dim=-1)  # (N, K, 56 + F)
+        return self.mlp(x)                       # (N, K, out_dim)
+
+
 class PerCardHeads(nn.Module):
     """Value / keepyness / action heads over a per-card feature map ``(N, 56, D)``.
 

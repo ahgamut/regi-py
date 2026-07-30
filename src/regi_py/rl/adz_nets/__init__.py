@@ -29,10 +29,13 @@ def adz_net_names():
     return sorted(_ADZ_REGISTRY)
 
 
-# concrete architectures register here (added alongside as they land)
+# concrete architectures (imported here so their @register_adz runs on
+# ``import regi_py.rl.adz_nets``; add future ADZ nets alongside)
+from regi_py.rl.adz_nets.douzero import MultiHotActionNet  # noqa: E402,F401
 
 __all__ = [
     "CandidateBaseNet",
+    "MultiHotActionNet",
     "register_adz",
     "get_adz_net",
     "adz_net_names",
