@@ -353,7 +353,7 @@ function setButtonActivity(button, active) {
     }
 }
 
-function makeEnemyPileWithInfo(ce, enemyPileSize) {
+function makeEnemyPileWithInfo(ce, enemyPileSize, currentBlock) {
     let wrapper = document.createElement("div");
     wrapper.className = "card-wrapper";
 
@@ -376,6 +376,14 @@ function makeEnemyPileWithInfo(ce, enemyPileSize) {
     hp.className = "is-size-6";
     hp.textContent = ce ? `${ce.hp} HP` : "defeated";
     pile.appendChild(hp);
+
+    // spades block accumulated against the current enemy's attack
+    if (ce) {
+        let blk = document.createElement("div");
+        blk.className = "is-size-7 enemy-block";
+        blk.textContent = `Block ${currentBlock || 0}`;
+        pile.appendChild(blk);
+    }
 
     let lbl = document.createElement("div");
     lbl.className = "is-size-7 label-below";
@@ -490,7 +498,7 @@ function updateBoard(game) {
 
     let enemy_view = document.getElementById('enemy-view');
     enemy_view.replaceChildren();
-    enemy_view.appendChild(makeEnemyPileWithInfo(game.current_enemy, game.enemy_pile_size));
+    enemy_view.appendChild(makeEnemyPileWithInfo(game.current_enemy, game.enemy_pile_size, game.current_block));
 
     let combos_view = document.getElementById('combos-view');
     combos_view.replaceChildren();

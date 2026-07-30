@@ -195,6 +195,12 @@ button.game-card-selectable {
     flex-direction: column;
 }
 
+/* spades-block accumulated against the current enemy (shown in the enemy card) */
+.enemy-block {
+    color: #2c5282;
+    font-weight: 600;
+}
+
 .combo-card {
     width: 4.375rem;
     min-height: 5.9375rem;
