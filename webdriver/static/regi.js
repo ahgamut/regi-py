@@ -474,33 +474,39 @@ function updateBoard(game) {
 }
 
 function getCardButton(card) {
-    let b = document.createElement("div");
+    let b = document.createElement("button");
+    b.type = "button";
     b.className = "game-card game-card-selectable has-text-weight-bold is-size-6";
     b.textContent = card;
+    b.setAttribute("aria-pressed", "false");
     b.addEventListener("click", () => {
-        b.classList.toggle("is-focused");
+        let on = b.classList.toggle("is-focused");
+        b.setAttribute("aria-pressed", on ? "true" : "false");
     });
     return b;
 }
 
+function setPlayerButtonPressed(b, pressed) {
+    b.classList.toggle("is-focused", pressed);
+    b.classList.toggle("is-dark", pressed);
+    b.classList.toggle("is-link", !pressed);
+    b.setAttribute("aria-pressed", pressed ? "true" : "false");
+}
+
 function getPlayerButton(player, block) {
-    let b = document.createElement("div");
+    let b = document.createElement("button");
+    b.type = "button";
     b.className = "button is-link";
-    b.addEventListener("click", () => { 
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
         if (b.classList.contains("is-focused")) {
-            b.classList.remove("is-focused") 
-            b.classList.remove("is-dark")
-            b.classList.add("is-link")
+            setPlayerButtonPressed(b, false);
         } else {
-            // mutually exclusive
+            // mutually exclusive: clear the others, then select this one
             for (const otherb of block.children) {
-                otherb.classList.remove("is-focused") 
-                otherb.classList.remove("is-dark")
-                otherb.classList.add("is-link")
+                setPlayerButtonPressed(otherb, false);
             }
-            b.classList.add("is-focused")
-            b.classList.add("is-dark")
-            b.classList.remove("is-link")
+            setPlayerButtonPressed(b, true);
         }
     });
     b.dataset.playerId = player.id;

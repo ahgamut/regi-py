@@ -172,6 +172,17 @@
     border-radius: 0.375rem;
 }
 
+/* card selectors are real <button>s (keyboard/AT focusable); strip the native
+   button chrome so they render exactly like the card. Only font-family is
+   inherited -- size/weight stay with the is-size-6/has-text-weight-bold classes. */
+button.game-card-selectable {
+    -webkit-appearance: none;
+    appearance: none;
+    font-family: inherit;
+    line-height: inherit;
+    margin: 0;
+}
+
 .game-card-selectable.is-focused {
     background-color: #363636;
     color: white;
