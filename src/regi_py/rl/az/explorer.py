@@ -221,8 +221,9 @@ def simulate_node(root_node, iterations):
     return root_node
 
 
-class NetDirectStrategy(BaseStrategy):
+class NetDirectStrategy(BaseStrategy, RecommenderMixin):
     __strat_name__ = "net-direct"
+    num_recos = 5
 
     def __init__(self, net):
         super(NetDirectStrategy, self).__init__()
@@ -232,6 +233,28 @@ class NetDirectStrategy(BaseStrategy):
     def setup(self, player, game):
         self.net.eval()
         return 0
+
+    def getRecommendedMoves(self, phase, combos):
+        # rank the offered combos by the net's own priors (no search): attack
+        # phases use the atk-cell priors, defense phases fall back to the
+        # keepyness-derived score (the AZ net has no defense policy head). Returns
+        # Combo objects, the unified recommender contract.
+        if len(combos) == 0:
+            return []
+        history = AlphaZeroNode._trimmed_history([], phase, self.net.max_history)
+        _, k_hat, a_hat = self.net.predict(history)
+        scores = np.zeros(len(combos), dtype=np.float32)
+        if phase.phase_attacking:
+            for i, combo in enumerate(combos):
+                lp = cell_of_bitwise(combo.bitwise)
+                if lp is not None:
+                    scores[i] = a_hat[lp]
+        else:
+            for i, combo in enumerate(combos):
+                wt = sum(k_hat[card.location] for card in combo.parts)
+                scores[i] = max(0.0, 1 - wt)
+        order = np.argsort(scores)[::-1][: self.num_recos]
+        return [combos[int(i)] for i in order]
 
     def getRedirectIndex(self, player, game):
         root_phase = game.export_phaseinfo()
@@ -342,8 +365,8 @@ class AZExplorerStrategy(BaseStrategy, RecommenderMixin):
         scored = []
         for combo in root.next_combos:
             node = root.childmap.get(combo.bitwise)
-            # bitwise is the canonical combo identity; str() is the serialized
-            # form the recommender payload carries (mirrors MCTSExplorerStrategy)
-            scored.append((node.visits if node is not None else 0, str(combo)))
+            # return Combo objects (the unified recommender contract); the caller
+            # serializes them via RegiEncoder -> combo_to_dict for the wire
+            scored.append((node.visits if node is not None else 0, combo))
         scored.sort(key=lambda t: t[0], reverse=True)
         return [combo for _, combo in scored]

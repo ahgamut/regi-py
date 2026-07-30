@@ -250,14 +250,17 @@ class MCTSExplorerStrategy(BaseStrategy, RecommenderMixin):
         return ind
 
     def getRecommendedMoves(self, phase, combos):
+        # return Combo objects (the unified recommender contract), ranked by MCTS
+        # visit counts -- read straight off the node's next_combos, not the
+        # serialized info.combos strings
         root_node = self.simulate_node(phase)
-        info = root_node.export()
-        moves = info.combos
-        scores = info.N1
+        scores = [
+            root_node.childmap[c.bitwise].visits if c.bitwise in root_node.childmap else 0
+            for c in root_node.next_combos
+        ]
         sinds = np.argsort(scores)[::-1]
         nr = min(self.num_recos, len(scores))
-        recos = [moves[int(x)] for x in sinds[:nr]]
-        return recos
+        return [root_node.next_combos[int(x)] for x in sinds[:nr]]
 
 
 class MCTSSaverStrategy(MCTSExplorerStrategy):

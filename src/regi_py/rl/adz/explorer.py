@@ -201,12 +201,13 @@ def _random_redirect(game):
     return (game.active_player + offset) % game.num_players
 
 
-class ADZDirectStrategy(BaseStrategy):
+class ADZDirectStrategy(BaseStrategy, RecommenderMixin):
     """ADZ net policy with NO search: play the highest-prior offered subset. The
     analogue of ``az.explorer.NetDirectStrategy``. ``getRedirectIndex`` is out of
     scope for the candidate stack, so it just picks a random other player."""
 
     __strat_name__ = "adz-direct"
+    num_recos = 5
 
     def __init__(self, net):
         super(ADZDirectStrategy, self).__init__()
@@ -219,6 +220,16 @@ class ADZDirectStrategy(BaseStrategy):
 
     def getRedirectIndex(self, player, game):
         return _random_redirect(game)
+
+    def getRecommendedMoves(self, phase, combos):
+        # rank the offered subsets by the net's priors (no search); returns Combo
+        # objects, the unified recommender contract
+        if len(combos) == 0:
+            return []
+        history = trimmed_history([], phase, self.net.max_history)
+        _, priors = self.net.predict(history, combos, phase)
+        order = np.argsort(priors)[::-1][: self.num_recos]
+        return [combos[int(i)] for i in order]
 
     def _policy_index(self, combos, game):
         if len(combos) == 0:
@@ -294,6 +305,7 @@ class ADZExplorerStrategy(BaseStrategy, RecommenderMixin):
         scored = []
         for combo in root.next_combos:
             node = root.childmap.get(combo.bitwise)
-            scored.append((node.visits if node is not None else 0, str(combo)))
+            # return Combo objects (the unified recommender contract)
+            scored.append((node.visits if node is not None else 0, combo))
         scored.sort(key=lambda t: t[0], reverse=True)
         return [combo for _, combo in scored]

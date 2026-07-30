@@ -172,18 +172,17 @@ def test_brute_recommender_returns_offered_combo_objects():
         assert move.bitwise in offered
 
 
-def test_mcts_recommender_returns_offered_combo_strings():
-    # NOTE: MCTS's getRecommendedMoves returns str(combo), not Combo objects, unlike
-    # brute's -- an inconsistency in the recommender contract, characterized here.
+def test_mcts_recommender_returns_offered_combo_objects():
+    # unified recommender contract: getRecommendedMoves returns Combo objects
+    # (matching brute), not str(combo)
     strat = MCTSExplorerStrategy(iterations=3, num_recos=5)
     phase = PhaseInfo.from_string(snapshots.FIXED_PHASES["fresh_attack_2p"])
     _, combos = get_expansion_at(phase)
-    offered = {str(c) for c in combos}
+    offered = {c.bitwise for c in combos}
     recos = strat.getRecommendedMoves(phase, combos)
     assert 1 <= len(recos) <= strat.num_recos
     for move in recos:
-        assert isinstance(move, str)
-        assert move in offered
+        assert move.bitwise in offered
 
 
 # --------------------------------------------------------------------------- #
