@@ -32,10 +32,12 @@ def adz_net_names():
 # concrete architectures (imported here so their @register_adz runs on
 # ``import regi_py.rl.adz.nets``; add future ADZ nets alongside)
 from regi_py.rl.adz.nets.douzero import MultiHotActionNet  # noqa: E402,F401
+from regi_py.rl.adz.nets.pooled import PooledActionNet  # noqa: E402,F401
 
 __all__ = [
     "CandidateBaseNet",
     "MultiHotActionNet",
+    "PooledActionNet",
     "register_adz",
     "get_adz_net",
     "adz_net_names",
