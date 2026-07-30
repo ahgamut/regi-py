@@ -353,7 +353,7 @@ function setButtonActivity(button, active) {
     }
 }
 
-function makeEnemyPileWithInfo(ce, enemyPileSize, currentBlock) {
+function makeEnemyPileWithInfo(ce, enemyPileSize) {
     let wrapper = document.createElement("div");
     wrapper.className = "card-wrapper";
 
@@ -376,14 +376,6 @@ function makeEnemyPileWithInfo(ce, enemyPileSize, currentBlock) {
     hp.className = "is-size-6";
     hp.textContent = ce ? `${ce.hp} HP` : "defeated";
     pile.appendChild(hp);
-
-    // spades block accumulated against the current enemy's attack
-    if (ce) {
-        let blk = document.createElement("div");
-        blk.className = "is-size-7 enemy-block";
-        blk.textContent = `Block ${currentBlock || 0}`;
-        pile.appendChild(blk);
-    }
 
     let lbl = document.createElement("div");
     lbl.className = "is-size-7 label-below";
@@ -463,13 +455,19 @@ function makeOtherPlayerInfo(game) {
     return res;
 }
 
-function makeUsedCombos(combos) {
+function makeUsedCombos(combos, currentBlock) {
     let res = document.createElement("div");
     res.className = "mb-4";
     let hdr = document.createElement("h2");
     hdr.className = "subtitle is-5";
     hdr.textContent = "Combos Used";
     res.appendChild(hdr);
+
+    // spades block accumulated against the current enemy (from the combos played)
+    let blk = document.createElement("div");
+    blk.className = "is-size-6 current-block mb-2";
+    blk.textContent = `Block ${currentBlock || 0}`;
+    res.appendChild(blk);
 
     let list = document.createElement("div");
     list.className = "combos-list";
@@ -498,11 +496,11 @@ function updateBoard(game) {
 
     let enemy_view = document.getElementById('enemy-view');
     enemy_view.replaceChildren();
-    enemy_view.appendChild(makeEnemyPileWithInfo(game.current_enemy, game.enemy_pile_size, game.current_block));
+    enemy_view.appendChild(makeEnemyPileWithInfo(game.current_enemy, game.enemy_pile_size));
 
     let combos_view = document.getElementById('combos-view');
     combos_view.replaceChildren();
-    combos_view.appendChild(makeUsedCombos(game.used_combos || []));
+    combos_view.appendChild(makeUsedCombos(game.used_combos || [], game.current_block));
 }
 
 function getCardButton(card) {

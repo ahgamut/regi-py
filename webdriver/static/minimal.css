@@ -195,8 +195,8 @@ button.game-card-selectable {
     flex-direction: column;
 }
 
-/* spades-block accumulated against the current enemy (shown in the enemy card) */
-.enemy-block {
+/* spades-block accumulated against the current enemy (shown by the used combos) */
+.current-block {
     color: #2c5282;
     font-weight: 600;
 }
