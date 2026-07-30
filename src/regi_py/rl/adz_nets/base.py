@@ -177,11 +177,18 @@ class CandidateBaseNet(nn.Module):
         loss, so ``run_epoch`` and the trainer's per-head logging are shared."""
         value, cand_logits, keepy = y_hat
         policy = data["policy"]
-        # padded slots carry -inf logits -> log_softmax = -inf there, but the
-        # policy target is exactly 0 on pads; nan_to_num zeroes those before the
-        # multiply so 0 * -inf never becomes nan
-        log_probs = torch.log_softmax(cand_logits, dim=-1)
-        log_probs = torch.nan_to_num(log_probs, neginf=0.0)
+        mask = data["cand_mask"]
+        # forward emits -inf on padded slots. Feeding -inf straight into
+        # log_softmax is unsafe for BACKWARD: a fully-masked row (a terminal
+        # self-play record has zero candidates) makes the log_softmax jacobian
+        # inf, and inf * 0 (the zero upstream grad) = nan, which would poison the
+        # whole batch's gradient. Rebuild finite logits from the mask instead --
+        # real slots keep their logit, pads get dtype.min -- so log_softmax is
+        # finite everywhere; a fully-masked row is then uniform and, times its
+        # all-zero policy target, contributes 0 to the loss with 0 gradient.
+        neg = torch.finfo(cand_logits.dtype).min
+        safe_logits = torch.where(mask > 0, cand_logits, torch.full_like(cand_logits, neg))
+        log_probs = torch.log_softmax(safe_logits, dim=-1)
         ce = -(policy * log_probs).sum(dim=-1)
         # every decision (attack AND defense) carries a policy, so normalize by the
         # number of decisions in the batch (all rows) -- the AZ attack-count mask
