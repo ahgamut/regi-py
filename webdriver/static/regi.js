@@ -57,8 +57,8 @@ function _flushQueue() {
 let _msgTimer = null;
 
 function receive_ws(event) {
-    // twice because string inside string
-    let info = JSON.parse(JSON.parse(event.data));
+    // server single-encodes (send_text of a RegiEncoder-dumped string), so one parse
+    let info = JSON.parse(event.data);
 
     if (info.type === "invalid-session") {
         clearGameCookies();
@@ -209,6 +209,20 @@ function clearRecommendations() {
         container.style.display = 'none';
     }
     if (toggle) toggle.textContent = 'Show Recommendations';
+    highlightRecommendedCards(null);
+}
+
+// Subtly mark the hand cards that make up the top recommended combo, in addition
+// to the popup. Matches by card value against the already-rendered hand.
+function highlightRecommendedCards(reco) {
+    let target = document.getElementById('player-cards');
+    if (!target) return;
+    target.querySelectorAll('.reco-suggested').forEach(el => el.classList.remove('reco-suggested'));
+    if (!reco || reco.length === 0) return;
+    let values = new Set(reco[0].map(card => card.value));
+    for (let el of target.querySelectorAll('.game-card-selectable')) {
+        if (values.has(el.textContent)) el.classList.add('reco-suggested');
+    }
 }
 
 function submit_option() {
@@ -240,13 +254,7 @@ function submit_redirect_option() {
         // send the option picked
         let msg = { userid: g.userid, type: "player-move", choice: pickIndex };
         send_ws(msg);
-
-        // after sending your option, disable the buttons
-        let submitter = document.getElementById('main-button');
-        let yielder = document.getElementById('side-button');
-        setButtonActivity(submitter, false);
-        setButtonActivity(yielder, false);
-
+        disableActionButtons();
         g.redirection = false;
     }
 }
@@ -284,46 +292,39 @@ function submit_card_option() {
         // send the option picked
         let msg = { userid: g.userid, type: "player-move", choice: pickIndex };
         send_ws(msg);
-
-        // after sending your option, disable the buttons
-        let submitter = document.getElementById('main-button');
-        let yielder = document.getElementById('side-button');
-        setButtonActivity(submitter, false);
-        setButtonActivity(yielder, false);
-
+        disableActionButtons();
     }
 }
 
 function yield_option() {
     let g = Alpine.store("gamestate");
     let cur_player = g.data;
-    
+
     let picksOK = false;
     let comboLen = cur_player.combos.length;
     let pickIndex = -1;
     for (let i = 0; i < comboLen; i++) {
-        if (combos[i].length == 0) {
+        if (cur_player.combos[i].length == 0) {
             picksOK = true;
             pickIndex = i;
             break;
         }
     }
-    
+
     if (!picksOK) {
         logMessage("yield is not a valid move!", 'is-warning');
         addNotification("Invalid Yield! Pick Cards", 'is-warning');
     } else {
         // send the option picked
-        let msg = { userid: g.userid, choice: pickIndex };
+        let msg = { userid: g.userid, type: "player-move", choice: pickIndex };
         send_ws(msg);
-
-        // after sending your option, disable the buttons
-        let submitter = document.getElementById('main-button');
-        let yielder = document.getElementById('side-button');
-        setButtonActivity(submitter, false);
-        setButtonActivity(yielder, false);
-
+        disableActionButtons();
     }
+}
+
+function disableActionButtons() {
+    setButtonActivity(document.getElementById('main-button'), false);
+    setButtonActivity(document.getElementById('side-button'), false);
 }
 
 function setButtonActivity(button, active) {
@@ -481,7 +482,7 @@ function updateBoard(game) {
     combos_view.appendChild(makeUsedCombos(game.used_combos || []));
 }
 
-function getCardButton(card, block) {
+function getCardButton(card) {
     let b = document.createElement("div");
     b.className = "game-card game-card-selectable has-text-weight-bold is-size-6";
     b.textContent = card;
@@ -557,10 +558,10 @@ function selectAttack(data) {
     //
     g.myTurn = true;
     g.playerShould = "You have to ATTACK";
-    // console.log(data);
     updateBoard(data.game);
     updateCards(data.player);
     updateRecommendations(data.reco);
+    highlightRecommendedCards(data.reco);
 }
 function selectDefend(data) {
     let g = Alpine.store('gamestate');
@@ -573,10 +574,10 @@ function selectDefend(data) {
     //
     g.myTurn = true;
     g.playerShould = `You have to DEFEND ${data.damage} damage`;
-    // console.log(data);
     updateBoard(data.game);
     updateCards(data.player);
     updateRecommendations(data.reco);
+    highlightRecommendedCards(data.reco);
 }
 function selectRedirect(data) {
     let g = Alpine.store('gamestate');
@@ -719,10 +720,7 @@ function processLog(data) {
             if (data.game.active_player_id !== null) {
                 if (data.game.active_player_id != g.playerid) {
                     g.myTurn = false;
-                    let submitter = document.getElementById('main-button');
-                    let yielder = document.getElementById('side-button');
-                    setButtonActivity(submitter, false);
-                    setButtonActivity(yielder, false);
+                    disableActionButtons();
 
                     let activePlayerName = data.game.active_player
                         ? getDisplayName(data.game.active_player)
@@ -733,6 +731,7 @@ function processLog(data) {
                     updateCards(data.game.active_player);
                 }
             }
+            break;
         case 'DEBUG':
             // can I send something here?
             break;
@@ -759,10 +758,6 @@ function setupTurnMessageHover() {
     });
 }
 
-function restackNotifications() {
-    // no-op: notifications are absolutely positioned via inline styles set on creation
-}
-
 function dismissOldNotifications(delay) {
     let tray = document.getElementById('turn-message');
     let notifications = tray.querySelectorAll('.notification');
@@ -778,7 +773,6 @@ function scheduleDismiss(el, delay) {
     }, delay);
     let removeTimer = setTimeout(() => {
         el.remove();
-        restackNotifications();
     }, delay + 3600);
     el.dataset.fadeTimer = fadeTimer;
     el.dataset.removeTimer = removeTimer;
@@ -802,7 +796,6 @@ function addNotification(content, subtype) {
     delButton.classList.add('delete');
     delButton.addEventListener("click", () => {
         res.remove();
-        restackNotifications();
     });
 
     res.appendChild(delButton);

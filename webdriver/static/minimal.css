@@ -124,6 +124,17 @@
         max-height: none !important;
         padding: 0.5rem 1.875rem 0.5rem 0.5rem;
     }
+
+    /* keep the used-combos list and the recommendations popup from eating the
+       viewport on narrow screens */
+    .combos-list {
+        max-height: 11rem;
+    }
+
+    #reco-popup {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
 }
 
 .bot-tag {
@@ -169,6 +180,23 @@
     border-color: #3273dc;
     transform: translateY(-0.5rem);
     box-shadow: 0.1875rem 0.3125rem 0.25rem rgba(0,0,0,0.3);
+}
+
+/* cards that make up the top recommended combo (inline hint, in addition to the
+   recommendations popup) */
+.game-card-selectable.reco-suggested {
+    border-color: #f9a825;
+    box-shadow: 0 0 0 0.125rem #f9a825, 0.125rem 0.125rem 0 rgba(0,0,0,0.15);
+}
+
+.game-card-selectable.reco-suggested::after {
+    content: "\2605"; /* star */
+    position: absolute;
+    top: 0.125rem;
+    right: 0.25rem;
+    font-size: 0.7rem;
+    line-height: 1;
+    color: #f9a825;
 }
 
 .game-card-enemy {
