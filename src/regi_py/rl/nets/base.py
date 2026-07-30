@@ -89,11 +89,14 @@ class BaseNet(nn.Module):
             a_hat = a_hat0.detach().cpu().numpy()[0, 0, :, :]
         return v_hat, k_hat, a_hat
 
-    def calculate_loss(self, y, y_hat, phase_atk):
+    def calculate_loss(self, data, y_hat):
         """Shared value + keepyness + masked-policy-CE loss. Architecture-agnostic:
         it only reads the (v, k, a) heads and the attack-phase mask, so every
-        card-space net reuses it. Returns (total, (policy, value, keepy))."""
-        v, k, a = y
+        card-space net reuses it. Reads its own target keys from ``data`` (the
+        batch dict keyed by ``TRAIN_FIELDS``), so ``run_epoch`` stays paradigm-
+        agnostic. Returns (total, (policy, value, keepy))."""
+        v, k, a = data["value"], data["keepyness"], data["atk_probs"]
+        phase_atk = data["attacking"]
         v_hat, k_hat, a_hat = y_hat
         # clamp inside log: masked cells make a_hat exactly 0, and the target a is
         # also 0 there, so 0*log(0) must not become nan

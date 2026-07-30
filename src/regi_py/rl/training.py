@@ -85,18 +85,18 @@ def drain(q, buf):
 
 def run_epoch(model, batch, optimizer):
     # a batch is a tuple of tensors in the model's ``TRAIN_FIELDS`` order (that is
-    # how ``ShardBuffer`` packs each shard's ``TensorDataset``)
+    # how ``ShardBuffer`` packs each shard's ``TensorDataset``). Both paradigms
+    # (card-space AZ nets and candidate-scoring ADZ nets) reach the net + loss the
+    # same way: build ``data`` from the fields, forward, then let the net pull its
+    # own target keys from ``data`` in ``calculate_loss(data, y_hat)``.
     data = {k: v.to(model.device) for k, v in zip(type(model).TRAIN_FIELDS, batch)}
-    v_hat, k_hat, a_hat = model(data)
-    v, k, a = data["value"], data["keepyness"], data["atk_probs"]
-    loss, (loss1, loss2, loss3) = model.calculate_loss(
-        (v, k, a), (v_hat, k_hat, a_hat), data["attacking"]
-    )
+    y_hat = model(data)
+    loss, comps = model.calculate_loss(data, y_hat)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     # total plus (policy, value, keepy) components for per-head logging
-    return loss.item(), (loss1.item(), loss2.item(), loss3.item())
+    return loss.item(), tuple(c.item() for c in comps)
 
 
 # self-play move selection: for the first SELFPLAY_TEMP_MOVES moves, sample the
