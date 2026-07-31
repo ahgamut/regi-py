@@ -1,11 +1,13 @@
-"""Generic trainer plumbing for the AlphaZero pipeline.
+"""Generic, single-process trainer plumbing shared by both NN pipelines.
 
-Lifted out of ``trainers/az_trainer.py`` so that module keeps only the
-multiprocessing orchestration (``submain``/``trainer``/``explorer``/``main``).
-Everything here is reusable, single-process, and free of any ``mp`` state:
-self-play data generation (``run_single_game``), the optimization step
-(``run_epoch``), evaluation (``test_model``/``improved_gameplay``), and small
-helpers (``EndGameLog``, ``total_enemy_hp``, ``get_split_optimizer``, ``drain``).
+Everything here is reusable, mp-free: the self-play / brute / team / eval GAME
+RUNNERS (``run_single_game`` / ``run_brute_game`` / ``run_team_game`` /
+``test_model`` / ``improved_gameplay``), which are paradigm-AGNOSTIC -- each takes a
+``paradigm`` (see ``trainer_loop.Paradigm``) bundling the AZ-vs-ADZ node / strategy /
+recorder / ``infos_fn`` classes, so one body serves both; the optimization step
+(``run_epoch``); the AZ-specific data recorders + ``infos_from_game`` (the ADZ ones
+live in ``adz_training``); and small helpers (``EndGameLog``, ``total_enemy_hp``,
+``get_split_optimizer``, ``drain``, ``sample_teammate``, the recorder mixins).
 """
 import random
 import sys
@@ -19,13 +21,7 @@ from regi_py import GameState, DummyLog, seed
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.combomap import cell_of_bitwise
 from regi_py.strats import RandomStrategy, BruteSamplingStrategy, STRATEGY_LIST
-from regi_py.rl.az.explorer import (
-    NetDirectStrategy,
-    AZExplorerStrategy,
-    AlphaZeroNode,
-    AZNodeInfo,
-    simulate_node,
-)
+from regi_py.rl.az.explorer import AZExplorerStrategy, AlphaZeroNode, AZNodeInfo
 from regi_py.rl.utils import enemy_hp_left, hp_loss_penalty
 
 
@@ -135,7 +131,10 @@ def _sample_selfplay_child(node, move_num):
     return random.choices(node.children, weights=weights, k=1)[0]
 
 
-def run_single_game(tid, i, net, num_bots, num_iterations):
+def run_single_game(tid, i, net, num_bots, num_iterations, paradigm):
+    """Net self-play from a fresh ``initialize()`` (AZ or ADZ, per ``paradigm``):
+    visit-count temperature for the opening then greedy, value target discounted by
+    distance to the terminal position. Returns the net's training tensors."""
     a = time.time()
     log = DummyLog()
     strat = RandomStrategy()
@@ -146,14 +145,14 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     start_phase = game.export_phaseinfo()
     #
     history = []
-    node = AlphaZeroNode(start_phase, net=net, history=[], prior=1.0, trim=False)
+    node = paradigm.node_cls(start_phase, net=net, history=[], prior=1.0, trim=False)
     s0 = enemy_hp_left(node.root_phase)
     move_num = 0
     while node.root_phase.game_endvalue == 0:
         # root-only exploration noise: mix fresh Dirichlet into this move's
         # search root before searching (self-play only, not competitive play)
         node.add_dirichlet_noise()
-        simulate_node(node, num_iterations)
+        paradigm.simulate_fn(node, num_iterations)
         history.append(node.export())
         child = _sample_selfplay_child(node, move_num)
         child.parent = None
@@ -278,17 +277,18 @@ def infos_from_game(game, moves, value, net_cls):
     return infos
 
 
-def run_brute_game(tid, i, net_cls, num_bots, iterations):
+def run_brute_game(tid, i, net_cls, num_bots, iterations, paradigm):
     """Play one brute-sampling game from a random mid-game state; return training
-    tensors only if it was WON (else ``None``).
+    tensors only if it made large progress (else ``None``).
 
-    ``init_random`` seeds a random mid-game position (partial deck, fewer
-    enemies), so brute wins here yield short, diverse *late-game* trajectories --
-    the data AZ self-play (always from a fresh ``initialize()``) never produces.
+    ``init_random`` seeds a random mid-game position (partial deck, fewer enemies),
+    so brute wins here yield short, diverse *late-game* trajectories -- the data net
+    self-play (always from a fresh ``initialize()``) never produces. ``paradigm``
+    supplies the AZ/ADZ brute recorder + ``infos_fn``.
     """
     a = time.time()
     log = EndGameLog()
-    strat = RecordingBruteStrategy(iterations=iterations)
+    strat = paradigm.brute_recorder(iterations=iterations)
     game = GameState(log)
     for _ in range(num_bots):
         game.add_player(strat)
@@ -301,21 +301,14 @@ def run_brute_game(tid, i, net_cls, num_bots, iterations):
     s1 = enemy_hp_left(end_phase)
     dt = time.time() - a
     win = end_phase.game_endvalue == 1
-    large_progress = False
-    if s0 - s1 >= 130:
-        large_progress = True
-    # only games that progress a lot are submitted as training data
-    if not large_progress:
+    if s0 - s1 < 130:  # only games that progress a lot are submitted as training data
         return None
-    print(
-        f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr
-    )
+    print(f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     # build the training records AFTER the game, from the now-stable game.history.
-    # score losses by the hp penalty (matching run_single_game) so the brute and
-    # AZ explorers agree on the value target over the states they both visit --
-    # a high-progress loss is not labelled as good as a win.
+    # score losses by the hp penalty (matching run_single_game) so brute and net
+    # explorers agree on the value target -- a high-progress loss is not as good as a win.
     value = 1.0 if win else hp_loss_penalty(s1)
-    infos = infos_from_game(game, strat.moves, value=value, net_cls=net_cls)
+    infos = paradigm.infos_fn(game, strat.moves, value=value, net_cls=net_cls)
     if not infos:
         return None
     return net_cls.tensorify_training(infos)
@@ -338,14 +331,15 @@ class RecordingAZTeamStrategy(_TeamRecordMixin, AZExplorerStrategy):
         self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
 
 
-def run_team_game(tid, i, net, num_bots, iterations):
-    """One full cooperative game: 1-2 net-guided-MCTS seats + non-NN teammates from
-    ``regi_py.strats``. Returns training tensors from the NN's decisions only (one-hot
-    targets, value = outcome); every game submitted. See the team-games design notes."""
+def run_team_game(tid, i, net, num_bots, iterations, paradigm):
+    """One full cooperative game: 1-2 net-guided-MCTS seats (``paradigm`` team recorder)
+    + non-NN teammates from ``regi_py.strats``. Returns training tensors from the NN's
+    decisions only (one-hot targets, value = outcome); every game submitted. See
+    the team-games design notes."""
     a = time.time()
     log = EndGameLog()
     moves = []
-    nn_strat = RecordingAZTeamStrategy(net, iterations, moves)
+    nn_strat = paradigm.team_recorder(net, iterations, moves)
     num_nn = random.randint(1, min(2, num_bots - 1))  # >= 1 non-NN teammate
     seats = [nn_strat] * num_nn + [sample_teammate() for _ in range(num_bots - num_nn)]
     random.shuffle(seats)
@@ -364,13 +358,13 @@ def run_team_game(tid, i, net, num_bots, iterations):
         file=sys.stderr,
     )
     value = 1.0 if win else hp_loss_penalty(s1)  # flat outcome value (brute-style)
-    infos = infos_from_game(game, moves, value=value, net_cls=type(net))
+    infos = paradigm.infos_fn(game, moves, value=value, net_cls=type(net))
     if not infos:
         return None
     return type(net).tensorify_training(infos)
 
 
-def test_model(episode, model, num_simulations):
+def test_model(episode, model, num_simulations, paradigm):
     model.eval()
     log = EndGameLog()
     diffe = []
@@ -378,7 +372,7 @@ def test_model(episode, model, num_simulations):
         game = GameState(log)
         num_players = random.randint(2, 4)
         for i in range(num_players):
-            game.add_player(NetDirectStrategy(model))
+            game.add_player(paradigm.direct_strat(model))
         game.initialize()
         game.start_loop()
         diffe.append(log.diffe())
@@ -387,7 +381,7 @@ def test_model(episode, model, num_simulations):
     print("episode", episode, "saved model", file=sys.stderr)
 
 
-def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=0.6):
+def improved_gameplay(episode, new_model, old_model, num_simulations, paradigm, threshold=0.6):
     new_model.eval()
     old_model.eval()
     log1 = EndGameLog()
@@ -395,9 +389,9 @@ def improved_gameplay(episode, new_model, old_model, num_simulations, threshold=
 
     newer_better = 0
     # evaluate with net-guided MCTS (fixed 64 iters/move), not the search-free
-    # NetDirectStrategy, so the comparison reflects competitive play
-    old_strat = AZExplorerStrategy(old_model, iterations=64)
-    new_strat = AZExplorerStrategy(new_model, iterations=64)
+    # Direct strategy, so the comparison reflects competitive play
+    old_strat = paradigm.explorer_strat(old_model, iterations=64)
+    new_strat = paradigm.explorer_strat(new_model, iterations=64)
 
     for s in range(num_simulations):
         game1 = GameState(log1)

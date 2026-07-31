@@ -24,27 +24,46 @@ import torch.multiprocessing as mp
 import numpy as np
 
 from regi_py.rl.loaders import ShardBuffer
-from regi_py.rl.training import run_epoch, get_split_optimizer, drain
+from regi_py.rl.training import (
+    run_epoch,
+    get_split_optimizer,
+    drain,
+    run_single_game,
+    run_brute_game,
+    run_team_game,
+    test_model,
+    improved_gameplay,
+)
+
+
+@dataclass
+class Paradigm:
+    """The AZ-vs-ADZ pieces the (otherwise identical) game runners in ``rl.training``
+    switch on. The runners duck-type this, so no import back into ``rl.training`` is
+    needed; every field is a module-level class/fn, so it pickles across ``spawn``."""
+
+    node_cls: type          # self-play MCTS node (AlphaZeroNode / ADZNode)
+    simulate_fn: Callable   # simulate_node / adz_simulate_node
+    brute_recorder: type    # RecordingBruteStrategy / RecordingADZBruteStrategy
+    team_recorder: type     # RecordingAZTeamStrategy / RecordingADZTeamStrategy
+    infos_fn: Callable      # infos_from_game / adz_infos_from_game
+    direct_strat: type      # NetDirectStrategy / ADZDirectStrategy (eval: test_model)
+    explorer_strat: type    # AZExplorerStrategy / ADZExplorerStrategy (eval: A/B)
 
 
 @dataclass
 class Pipeline:
-    """The paradigm-specific bits of one trainer. ``get_net`` maps ``--net`` to the
-    net class; the ``run_*`` / eval callables are the AZ or ADZ versions from
-    ``rl.training`` / ``rl.adz_training``. Stored on ``params.pipeline`` and pulled
-    by ``explorer`` / ``evaluator``; all fields are module-level and picklable, so it
-    survives the ``spawn`` hand-off to child processes."""
+    """One trainer's paradigm-specific config. ``get_net`` maps ``--net`` to the net
+    class; ``paradigm`` bundles the AZ/ADZ classes the shared runners switch on. Stored
+    on ``params.pipeline`` and read by ``explorer`` / ``evaluator``; all fields are
+    module-level/picklable, so it survives the ``spawn`` hand-off to child processes."""
 
     prog: str                    # argparse program name
     label: str                   # self-play explorer role label ("az" / "adz")
     net_default: str             # --net default
     net_choices: Sequence[str]   # --net choices
     get_net: Callable            # name -> net_cls
-    run_single: Callable         # net self-play game
-    run_brute: Callable          # brute late-game sampling
-    run_team: Callable           # cooperative team game (--team-games)
-    test_model: Callable
-    improved_gameplay: Callable
+    paradigm: Paradigm           # AZ/ADZ node/strategy/recorder/infos pieces
 
 
 def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, params):
@@ -138,18 +157,19 @@ def evaluator(eval_queue, eval_done, params):
             if not have_baseline:
                 old_model.load_state_dict(new_model.state_dict())
                 have_baseline = True
-                pl.test_model(episode, new_model, params.num_simulations)
+                test_model(episode, new_model, params.num_simulations, pl.paradigm)
                 continue
             # otherwise only checkpoint when the candidate beats the last-saved one
-            if pl.improved_gameplay(
+            if improved_gameplay(
                 episode,
-                new_model=new_model,
-                old_model=old_model,
+                new_model,
+                old_model,
                 num_simulations=10,
+                paradigm=pl.paradigm,
                 threshold=0.5,
             ):
                 old_model.load_state_dict(new_model.state_dict())
-                pl.test_model(episode, new_model, params.num_simulations)
+                test_model(episode, new_model, params.num_simulations, pl.paradigm)
     finally:
         # release the trainer (which is holding the shared memory alive for us)
         eval_done.set()
@@ -174,31 +194,34 @@ def explorer(tid, shared_model, exp_queue, device, params):
         try:
             if other_play:
                 if params.team_games:
-                    examples = pl.run_team(
+                    examples = run_team_game(
                         tid,
                         count,
-                        net=shared_model,
-                        num_bots=num_bots,
-                        iterations=params.num_simulations,
+                        shared_model,
+                        num_bots,
+                        params.num_simulations,
+                        pl.paradigm,
                     )
                 else:
-                    examples = pl.run_brute(
+                    examples = run_brute_game(
                         tid,
                         count,
-                        net_cls=params.net_cls,
-                        num_bots=num_bots,
-                        iterations=params.num_simulations,
+                        params.net_cls,
+                        num_bots,
+                        params.num_simulations,
+                        pl.paradigm,
                     )
                 if examples is None:  # lost/degenerate game -> no data submitted
                     fails = 0
                     continue
             else:
-                examples = pl.run_single(
+                examples = run_single_game(
                     tid,
                     count,
-                    net=shared_model,
-                    num_bots=num_bots,
-                    num_iterations=params.num_simulations,
+                    shared_model,
+                    num_bots,
+                    params.num_simulations,
+                    pl.paradigm,
                 )
             exp_queue.put(examples)
             del examples
