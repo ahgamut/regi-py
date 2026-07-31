@@ -28,6 +28,7 @@ from regi_py.rl.training import run_epoch, get_split_optimizer, drain
 from regi_py.rl.adz_training import (
     adz_run_single_game,
     adz_run_brute_game,
+    adz_run_team_game,
     adz_test_model,
     adz_improved_gameplay,
 )
@@ -141,12 +142,14 @@ def evaluator(eval_queue, eval_done, params):
 
 
 def explorer(tid, shared_model, exp_queue, device, params):
-    # even-tid explorers brute-sample from random mid-game states (win-only data,
-    # covering late-game positions ADZ self-play never reaches); odd-tid explorers
-    # run candidate-scored ADZ self-play. tid starts at 1, so tid 0 (the trainer)
-    # is not an explorer and this cleanly splits "every other explorer".
-    brute = (tid % 2) == 0
-    role = "brute-explore" if brute else "adz-explore"
+    # odd-tid explorers run candidate-scored ADZ self-play; other_play explorers
+    # (even tid) supply the complementary data -- brute late-game samples by default,
+    # or full cooperative team games with --team-games (net beside other regi_py.strats).
+    other_play = (tid % 2) == 0
+    if other_play:
+        role = "team-explore" if params.team_games else "brute-explore"
+    else:
+        role = "adz-explore"
     print(f"P{tid} on {device} to {role}")
     torch.set_num_threads(params.num_threads)
     count = 0
@@ -154,15 +157,24 @@ def explorer(tid, shared_model, exp_queue, device, params):
     while True:
         num_bots = random.randint(2, 4)
         try:
-            if brute:
-                examples = adz_run_brute_game(
-                    tid,
-                    count,
-                    net_cls=params.net_cls,
-                    num_bots=num_bots,
-                    iterations=params.num_simulations,
-                )
-                if examples is None:  # lost game -> no training data submitted
+            if other_play:
+                if params.team_games:
+                    examples = adz_run_team_game(
+                        tid,
+                        count,
+                        net=shared_model,
+                        num_bots=num_bots,
+                        iterations=params.num_simulations,
+                    )
+                else:
+                    examples = adz_run_brute_game(
+                        tid,
+                        count,
+                        net_cls=params.net_cls,
+                        num_bots=num_bots,
+                        iterations=params.num_simulations,
+                    )
+                if examples is None:  # lost/degenerate game -> no data submitted
                     fails = 0
                     continue
             else:
@@ -285,6 +297,13 @@ def main():
     parser.add_argument("--weights-path", default="", help="weights")
     parser.add_argument(
         "--net", default="adzmulti", choices=adz_net_names(), help="ADZ net architecture"
+    )
+    parser.add_argument(
+        "--team-games",
+        action="store_true",
+        help="even-tid explorers play full cooperative games (net beside other "
+        "regi_py.strats, training on the NN's decisions only) instead of brute "
+        "games; use only after regular self-play has trained the net",
     )
     params = parser.parse_args()
     params.net_cls = get_adz_net(params.net)

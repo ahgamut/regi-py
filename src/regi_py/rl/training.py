@@ -18,7 +18,7 @@ import numpy as np
 from regi_py import GameState, DummyLog, seed
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.combomap import cell_of_bitwise
-from regi_py.strats import RandomStrategy, BruteSamplingStrategy
+from regi_py.strats import RandomStrategy, BruteSamplingStrategy, STRATEGY_LIST
 from regi_py.rl.az.explorer import (
     NetDirectStrategy,
     AZExplorerStrategy,
@@ -27,6 +27,19 @@ from regi_py.rl.az.explorer import (
     simulate_node,
 )
 from regi_py.rl.utils import enemy_hp_left, hp_loss_penalty
+
+
+# brute teammates search at the full default depth
+TEAM_BRUTE_ITERS = 128
+
+
+def sample_teammate():
+    """A random non-NN strategy instance from ``regi_py.strats`` (``STRATEGY_LIST``)
+    to fill a team game's non-NN seats. All zero-arg except ``BruteSamplingStrategy``."""
+    cls = random.choice(STRATEGY_LIST)
+    if cls is BruteSamplingStrategy:
+        return cls(iterations=TEAM_BRUTE_ITERS)
+    return cls()
 
 
 def total_enemy_hp(game):
@@ -294,6 +307,66 @@ def run_brute_game(tid, i, net_cls, num_bots, iterations):
     if not infos:
         return None
     return net_cls.tensorify_training(infos)
+
+
+class RecordingAZTeamStrategy(AZExplorerStrategy):
+    """``AZExplorerStrategy`` that also records each of ITS OWN decisions brute-style
+    (``(history_index, played_bitwise, [part_location, ...])``, plain values). On a
+    team game's NN seat(s), so ``moves`` holds exactly the NN-active decisions; rebuilt
+    post-game by ``infos_from_game``. See the team-games design notes."""
+
+    def __init__(self, net, iterations, moves):
+        super().__init__(net, iterations=iterations, trim=False)
+        self.moves = moves
+
+    def _record(self, combos, ind, game):
+        if ind is None or ind < 0 or not combos:
+            return
+        combo = combos[ind]
+        idx = len(game.history) - 1  # decision phase is history[-1] (see brute recorder)
+        self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        ind = super().getAttackIndex(combos, player, yield_allowed, game)
+        self._record(combos, ind, game)
+        return ind
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        ind = super().getDefenseIndex(combos, player, damage, game)
+        self._record(combos, ind, game)
+        return ind
+
+
+def run_team_game(tid, i, net, num_bots, iterations):
+    """One full cooperative game: 1-2 net-guided-MCTS seats + non-NN teammates from
+    ``regi_py.strats``. Returns training tensors from the NN's decisions only (one-hot
+    targets, value = outcome); every game submitted. See the team-games design notes."""
+    a = time.time()
+    log = EndGameLog()
+    moves = []
+    nn_strat = RecordingAZTeamStrategy(net, iterations, moves)
+    num_nn = random.randint(1, min(2, num_bots - 1))  # >= 1 non-NN teammate
+    seats = [nn_strat] * num_nn + [sample_teammate() for _ in range(num_bots - num_nn)]
+    random.shuffle(seats)
+    game = GameState(log)
+    for s in seats:
+        game.add_player(s)
+    game.initialize()
+    s0 = enemy_hp_left(game.export_phaseinfo())
+    game.start_loop()
+    end_phase = game.export_phaseinfo()
+    s1 = enemy_hp_left(end_phase)
+    dt = time.time() - a
+    win = end_phase.game_endvalue == 1
+    print(
+        f"{tid},{i},t{len(moves)}({num_nn}/{num_bots}),{s0},{s1},{dt:.4f}s,{win}",
+        file=sys.stderr,
+    )
+    value = 1.0 if win else hp_loss_penalty(s1)  # flat outcome value (brute-style)
+    infos = infos_from_game(game, moves, value=value, net_cls=type(net))
+    if not infos:
+        return None
+    return type(net).tensorify_training(infos)
 
 
 def test_model(episode, model, num_simulations):

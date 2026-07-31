@@ -32,6 +32,7 @@ from regi_py.rl.training import (
     SELFPLAY_TEMP_MOVES,
     VALUE_DISCOUNT,
     _sample_selfplay_child,
+    sample_teammate,
 )
 from regi_py.rl.utils import enemy_hp_left, hp_loss_penalty
 
@@ -178,6 +179,70 @@ def adz_run_brute_game(tid, i, net_cls, num_bots, iterations):
     if not infos:
         return None
     return net_cls.tensorify_training(infos)
+
+
+class RecordingADZTeamStrategy(ADZExplorerStrategy):
+    """``ADZExplorerStrategy`` that also records each of ITS OWN decisions the way an
+    ``ADZNodeInfo`` needs (``(history_index, [bitwise...], cand_feats, played_bitwise,
+    attacking)``, plain values). On a team game's NN seat(s); rebuilt post-game by
+    ``adz_infos_from_game``. See the team-games design notes."""
+
+    def __init__(self, net, iterations, moves):
+        super().__init__(net, iterations=iterations, trim=False)
+        self.moves = moves
+
+    def _record(self, combos, ind, game):
+        if ind is None or ind < 0 or not combos:
+            return
+        root_phase = game.export_phaseinfo()  # by-value copy: safe to featurize now
+        idx = len(game.history) - 1  # decision phase is history[-1] (plain int)
+        bitwises = [c.bitwise for c in combos]
+        feats = candidate_semantics(root_phase, combos)  # plain np, safe to hold
+        self.moves.append(
+            (idx, bitwises, feats, combos[ind].bitwise, float(root_phase.phase_attacking))
+        )
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        ind = super().getAttackIndex(combos, player, yield_allowed, game)
+        self._record(combos, ind, game)
+        return ind
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        ind = super().getDefenseIndex(combos, player, damage, game)
+        self._record(combos, ind, game)
+        return ind
+
+
+def adz_run_team_game(tid, i, net, num_bots, iterations):
+    """ADZ analogue of ``rl.training.run_team_game``: full cooperative game, 1-2
+    candidate-scored-MCTS seats + non-NN teammates, training data from the NN's
+    decisions only. See the team-games design notes."""
+    a = time.time()
+    log = EndGameLog()
+    moves = []
+    nn_strat = RecordingADZTeamStrategy(net, iterations, moves)
+    num_nn = random.randint(1, min(2, num_bots - 1))  # >= 1 non-NN teammate
+    seats = [nn_strat] * num_nn + [sample_teammate() for _ in range(num_bots - num_nn)]
+    random.shuffle(seats)
+    game = GameState(log)
+    for s in seats:
+        game.add_player(s)
+    game.initialize()
+    s0 = enemy_hp_left(game.export_phaseinfo())
+    game.start_loop()
+    end_phase = game.export_phaseinfo()
+    s1 = enemy_hp_left(end_phase)
+    dt = time.time() - a
+    win = end_phase.game_endvalue == 1
+    print(
+        f"{tid},{i},t{len(moves)}({num_nn}/{num_bots}),{s0},{s1},{dt:.4f}s,{win}",
+        file=sys.stderr,
+    )
+    value = 1.0 if win else hp_loss_penalty(s1)  # flat outcome value (brute-style)
+    infos = adz_infos_from_game(game, moves, value=value, net_cls=type(net))
+    if not infos:
+        return None
+    return type(net).tensorify_training(infos)
 
 
 def adz_test_model(episode, model, num_simulations):
