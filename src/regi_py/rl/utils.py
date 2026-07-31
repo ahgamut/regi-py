@@ -11,6 +11,13 @@ from regi_py.strats.phase_utils import *
 import numpy as np
 
 
+def perspectivize(phase):
+    """Reduce ``phase`` to what its ACTIVE player can observe: a copy with the hidden
+    cards reshuffled (own hand / used pile / enemies untouched). NN-safe root that
+    stops MCTS cheating with perfect info."""
+    return PhaseInfo.randomize_from(phase, phase.active_player)
+
+
 def normalize_probs(arr):
     """Normalize a nonnegative array to sum 1; empty/zero sums throw to the last cell."""
     t = np.sum(arr)

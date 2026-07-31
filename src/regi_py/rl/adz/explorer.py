@@ -226,6 +226,7 @@ class ADZDirectStrategy(BaseStrategy, RecommenderMixin):
         # objects, the unified recommender contract
         if len(combos) == 0:
             return []
+        phase = perspectivize(phase)  # imperfect-info root
         history = trimmed_history([], phase, self.net.max_history)
         _, priors = self.net.predict(history, combos, phase)
         order = np.argsort(priors)[::-1][: self.num_recos]
@@ -234,7 +235,8 @@ class ADZDirectStrategy(BaseStrategy, RecommenderMixin):
     def _policy_index(self, combos, game):
         if len(combos) == 0:
             return -1
-        root_phase = game.export_phaseinfo()
+        # perspectivize: this player's view before predicting
+        root_phase = perspectivize(game.export_phaseinfo())
         history = trimmed_history(game.history, root_phase, self.net.max_history)
         _, priors = self.net.predict(history, combos, root_phase)
         return int(np.argmax(priors))
@@ -266,8 +268,9 @@ class ADZExplorerStrategy(BaseStrategy, RecommenderMixin):
         return 0
 
     def _root_from_game(self, game):
+        # perspectivize: imperfect-info search root
         return ADZNode(
-            game.export_phaseinfo(),
+            perspectivize(game.export_phaseinfo()),
             history=list(game.history),
             net=self.net,
             prior=1.0,
@@ -293,6 +296,7 @@ class ADZExplorerStrategy(BaseStrategy, RecommenderMixin):
         return _random_redirect(game)
 
     def getRecommendedMoves(self, phase, combos):
+        phase = perspectivize(phase)  # imperfect-info root
         root = ADZNode(
             phase,
             history=[],

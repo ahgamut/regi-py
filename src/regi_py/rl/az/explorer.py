@@ -241,6 +241,7 @@ class NetDirectStrategy(BaseStrategy, RecommenderMixin):
         # Combo objects, the unified recommender contract.
         if len(combos) == 0:
             return []
+        phase = perspectivize(phase)  # imperfect-info root
         history = AlphaZeroNode._trimmed_history([], phase, self.net.max_history)
         _, k_hat, a_hat = self.net.predict(history)
         scores = np.zeros(len(combos), dtype=np.float32)
@@ -273,7 +274,8 @@ class NetDirectStrategy(BaseStrategy, RecommenderMixin):
     def getAttackIndex(self, combos, player, yield_allowed, game):
         if len(combos) == 0:
             return -1
-        root_phase = game.export_phaseinfo()
+        # perspectivize: this player's view before predicting
+        root_phase = perspectivize(game.export_phaseinfo())
         history = AlphaZeroNode._trimmed_history(
             game.history, root_phase, self.net.max_history
         )
@@ -288,7 +290,8 @@ class NetDirectStrategy(BaseStrategy, RecommenderMixin):
     def getDefenseIndex(self, combos, player, damage, game):
         if len(combos) == 0:
             return -1
-        root_phase = game.export_phaseinfo()
+        # perspectivize: this player's view before predicting
+        root_phase = perspectivize(game.export_phaseinfo())
         history = AlphaZeroNode._trimmed_history(
             game.history, root_phase, self.net.max_history
         )
@@ -320,8 +323,9 @@ class AZExplorerStrategy(BaseStrategy, RecommenderMixin):
         return 0
 
     def _root_from_game(self, game):
+        # perspectivize: imperfect-info search root
         return AlphaZeroNode(
-            game.export_phaseinfo(),
+            perspectivize(game.export_phaseinfo()),
             history=list(game.history),
             net=self.net,
             prior=1.0,
@@ -353,6 +357,7 @@ class AZExplorerStrategy(BaseStrategy, RecommenderMixin):
         return (game.active_player + offset) % game.num_players
 
     def getRecommendedMoves(self, phase, combos):
+        phase = perspectivize(phase)  # imperfect-info root
         root = AlphaZeroNode(
             phase,
             history=[],
