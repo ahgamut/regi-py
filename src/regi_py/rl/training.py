@@ -294,14 +294,14 @@ def run_brute_game(tid, i, net_cls, num_bots, iterations, paradigm):
         game.add_player(strat)
     game.init_random()
     s0 = enemy_hp_left(game.export_phaseinfo())
-    if s0 < 130:
+    if s0 < 170:
         return None
     game.start_loop()
     end_phase = game.export_phaseinfo()
     s1 = enemy_hp_left(end_phase)
     dt = time.time() - a
     win = end_phase.game_endvalue == 1
-    if s0 - s1 < 130:  # only games that progress a lot are submitted as training data
+    if s0 - s1 < 170:  # only games that progress a lot are submitted as training data
         return None
     print(f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     # build the training records AFTER the game, from the now-stable game.history.
