@@ -174,50 +174,62 @@ def run_single_game(tid, i, net, num_bots, num_iterations):
     return type(net).tensorify_training(history)
 
 
-class RecordingBruteStrategy(BruteSamplingStrategy):
-    """``BruteSamplingStrategy`` that records, per decision, ONLY the index of the
-    decision phase in ``game.history`` plus the played move -- all as plain values,
-    never a ``PhaseInfo`` reference.
-
-    ``game.history`` is a pybind view over a live ``std::vector<PhaseInfo>``: its
-    elements are references that DANGLE the moment the vector reallocates on the
-    next appended phase. The old design held those references (a window per move)
-    for the whole game and then segfaulted in ``to_string`` at tensorify time. Here
-    nothing but plain ints/bitwise are kept; the windows are rebuilt from the
-    stable post-game history in ``infos_from_game``. One instance is shared by all
-    players (Regicide is cooperative: every decision in a won game earns the win).
-    """
-
-    def __init__(self, iterations=64):
-        super().__init__(iterations=iterations)
-        self.moves = []  # (history_index, combo_bitwise, [part_location, ...])
+# Recording strategies stash, per decision, ONLY plain values (a history index +
+# the played move) -- never a PhaseInfo reference, which would dangle when the
+# game.history vector reallocates (segfault at tensorify). Windows are rebuilt from
+# the stable post-game history in infos_from_game. Two mixins factor the shared
+# attack/defense wrappers; each recorder supplies only the paradigm-specific record.
+class _BruteRecordMixin:
+    """For a ``BruteSamplingStrategy`` recorder: pick the brute move (same random
+    fallback as the parent) then append it. Subclass implements ``_append(root_phase,
+    combos, ind, game)`` -- the only per-paradigm bit (AZ vs ADZ record tuple)."""
 
     def _record_and_pick(self, combos, game):
         root_phase = game.export_phaseinfo()
-        # same fallback contract as the parent's getAttackIndex/getDefenseIndex:
-        # a brute failure still plays (and records) a concrete index
         try:
             ind = self.get_best_move(root_phase, combos)
         except Exception as e:
             print("failed to process moves", e, file=sys.stderr)
             ind = random.randint(0, len(combos) - 1)
-        combo = combos[ind]
-        # start_loop records the current phase at the top of the iteration, before
-        # the strategy is consulted, so this decision phase is history[-1]; keep
-        # only its index (a plain int, safe to hold across the rest of the game)
-        idx = len(game.history) - 1
-        self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
+        self._append(root_phase, combos, ind, game)
         return ind
 
     def getAttackIndex(self, combos, player, yield_allowed, game):
-        if len(combos) == 0:
-            return -1
-        return self._record_and_pick(combos, game)
+        return self._record_and_pick(combos, game) if combos else -1
 
     def getDefenseIndex(self, combos, player, damage, game):
-        if len(combos) == 0:
-            return -1
-        return self._record_and_pick(combos, game)
+        return self._record_and_pick(combos, game) if combos else -1
+
+
+class _TeamRecordMixin:
+    """For an Explorer-strategy recorder on a team game's NN seat(s): play via the
+    net (``super()``) then record the chosen decision. Because a strategy is consulted
+    only on its own turns, this records exactly the NN-active decisions. Subclass
+    implements ``_record(combos, ind, game)`` (skips a no-move ``ind``)."""
+
+    def getAttackIndex(self, combos, player, yield_allowed, game):
+        ind = super().getAttackIndex(combos, player, yield_allowed, game)
+        self._record(combos, ind, game)
+        return ind
+
+    def getDefenseIndex(self, combos, player, damage, game):
+        ind = super().getDefenseIndex(combos, player, damage, game)
+        self._record(combos, ind, game)
+        return ind
+
+
+class RecordingBruteStrategy(_BruteRecordMixin, BruteSamplingStrategy):
+    """Brute self-play recorder (AZ). One instance is shared by all players (Regicide
+    is cooperative: every decision in a won game earns the win)."""
+
+    def __init__(self, iterations=64):
+        super().__init__(iterations=iterations)
+        self.moves = []  # (history_index, combo_bitwise, [part_location, ...])
+
+    def _append(self, root_phase, combos, ind, game):
+        combo = combos[ind]
+        idx = len(game.history) - 1  # decision phase is history[-1] (start_loop pushed it)
+        self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
 
 
 def infos_from_game(game, moves, value, net_cls):
@@ -309,11 +321,10 @@ def run_brute_game(tid, i, net_cls, num_bots, iterations):
     return net_cls.tensorify_training(infos)
 
 
-class RecordingAZTeamStrategy(AZExplorerStrategy):
-    """``AZExplorerStrategy`` that also records each of ITS OWN decisions brute-style
-    (``(history_index, played_bitwise, [part_location, ...])``, plain values). On a
-    team game's NN seat(s), so ``moves`` holds exactly the NN-active decisions; rebuilt
-    post-game by ``infos_from_game``. See the team-games design notes."""
+class RecordingAZTeamStrategy(_TeamRecordMixin, AZExplorerStrategy):
+    """``AZExplorerStrategy`` that records each of its own decisions brute-style
+    (``(history_index, played_bitwise, [part_location, ...])``), rebuilt post-game by
+    ``infos_from_game``. See the team-games design notes."""
 
     def __init__(self, net, iterations, moves):
         super().__init__(net, iterations=iterations, trim=False)
@@ -323,18 +334,8 @@ class RecordingAZTeamStrategy(AZExplorerStrategy):
         if ind is None or ind < 0 or not combos:
             return
         combo = combos[ind]
-        idx = len(game.history) - 1  # decision phase is history[-1] (see brute recorder)
+        idx = len(game.history) - 1
         self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        ind = super().getAttackIndex(combos, player, yield_allowed, game)
-        self._record(combos, ind, game)
-        return ind
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        ind = super().getDefenseIndex(combos, player, damage, game)
-        self._record(combos, ind, game)
-        return ind
 
 
 def run_team_game(tid, i, net, num_bots, iterations):

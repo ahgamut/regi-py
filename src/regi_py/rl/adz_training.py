@@ -33,6 +33,8 @@ from regi_py.rl.training import (
     VALUE_DISCOUNT,
     _sample_selfplay_child,
     sample_teammate,
+    _BruteRecordMixin,
+    _TeamRecordMixin,
 )
 from regi_py.rl.utils import enemy_hp_left, hp_loss_penalty
 
@@ -77,48 +79,25 @@ def adz_run_single_game(tid, i, net, num_bots, num_iterations):
     return type(net).tensorify_training(history)
 
 
-class RecordingADZBruteStrategy(BruteSamplingStrategy):
-    """``BruteSamplingStrategy`` that records, per decision, the plain values an
-    ``ADZNodeInfo`` needs -- NEVER a ``PhaseInfo`` reference (the dangling-reference
-    rule; see ``rl.training.RecordingBruteStrategy``).
-
-    Unlike the AZ recorder (which stored only the played combo), the ADZ record must
-    capture each decision's full offered list + per-candidate semantics, because the
-    net scores the ragged offer, not a fixed grid. Both are computed here from the
-    by-value ``export_phaseinfo`` copy (a stable snapshot) and kept as plain
-    numpy/ints; the history window is rebuilt post-game in ``adz_infos_from_game``.
-    """
+class RecordingADZBruteStrategy(_BruteRecordMixin, BruteSamplingStrategy):
+    """Brute self-play recorder (ADZ). Unlike the AZ recorder it must capture each
+    decision's full offered list + per-candidate semantics (the net scores the ragged
+    offer, not a fixed grid), computed from the by-value ``export_phaseinfo`` copy and
+    kept as plain numpy/ints; window rebuilt post-game in ``adz_infos_from_game``."""
 
     def __init__(self, iterations=64):
         super().__init__(iterations=iterations)
         # (history_index, [bitwise...], cand_feats(K,F), played_bitwise, attacking)
         self.moves = []
 
-    def _record_and_pick(self, combos, game):
-        root_phase = game.export_phaseinfo()  # by-value copy: safe to featurize now
-        try:
-            ind = self.get_best_move(root_phase, combos)
-        except Exception as e:
-            print("failed to process moves", e, file=sys.stderr)
-            ind = random.randint(0, len(combos) - 1)
+    def _append(self, root_phase, combos, ind, game):
         combo = combos[ind]
-        idx = len(game.history) - 1  # this decision phase is history[-1] (plain int)
+        idx = len(game.history) - 1  # decision phase is history[-1] (plain int)
         bitwises = [c.bitwise for c in combos]
         feats = candidate_semantics(root_phase, combos)  # plain np, safe to hold
         self.moves.append(
             (idx, bitwises, feats, combo.bitwise, float(root_phase.phase_attacking))
         )
-        return ind
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        if len(combos) == 0:
-            return -1
-        return self._record_and_pick(combos, game)
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        if len(combos) == 0:
-            return -1
-        return self._record_and_pick(combos, game)
 
 
 def adz_infos_from_game(game, moves, value, net_cls):
@@ -181,11 +160,11 @@ def adz_run_brute_game(tid, i, net_cls, num_bots, iterations):
     return net_cls.tensorify_training(infos)
 
 
-class RecordingADZTeamStrategy(ADZExplorerStrategy):
-    """``ADZExplorerStrategy`` that also records each of ITS OWN decisions the way an
+class RecordingADZTeamStrategy(_TeamRecordMixin, ADZExplorerStrategy):
+    """``ADZExplorerStrategy`` that records each of its own decisions the way an
     ``ADZNodeInfo`` needs (``(history_index, [bitwise...], cand_feats, played_bitwise,
-    attacking)``, plain values). On a team game's NN seat(s); rebuilt post-game by
-    ``adz_infos_from_game``. See the team-games design notes."""
+    attacking)``), rebuilt post-game by ``adz_infos_from_game``. See
+    the team-games design notes."""
 
     def __init__(self, net, iterations, moves):
         super().__init__(net, iterations=iterations, trim=False)
@@ -195,22 +174,12 @@ class RecordingADZTeamStrategy(ADZExplorerStrategy):
         if ind is None or ind < 0 or not combos:
             return
         root_phase = game.export_phaseinfo()  # by-value copy: safe to featurize now
-        idx = len(game.history) - 1  # decision phase is history[-1] (plain int)
+        idx = len(game.history) - 1
         bitwises = [c.bitwise for c in combos]
-        feats = candidate_semantics(root_phase, combos)  # plain np, safe to hold
+        feats = candidate_semantics(root_phase, combos)
         self.moves.append(
             (idx, bitwises, feats, combos[ind].bitwise, float(root_phase.phase_attacking))
         )
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        ind = super().getAttackIndex(combos, player, yield_allowed, game)
-        self._record(combos, ind, game)
-        return ind
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        ind = super().getDefenseIndex(combos, player, damage, game)
-        self._record(combos, ind, game)
-        return ind
 
 
 def adz_run_team_game(tid, i, net, num_bots, iterations):
