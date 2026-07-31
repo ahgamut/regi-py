@@ -37,10 +37,11 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
 
     ep = 0
     buf = ShardBuffer(capacity=params.memory_size, train_fields=params.net_cls.TRAIN_FIELDS)
+    part_size = min(5000, params.memory_size // 2)
     while ep < params.num_episodes:
         drain(exp_queue, buf)
 
-        if len(buf) < params.batch_size:
+        if len(buf) < part_size:
             time.sleep(1)
             continue
 
