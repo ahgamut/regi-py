@@ -30,6 +30,7 @@ from common import (
     make_app,
     make_recommender,
     validate_reco,
+    parse_reco_spec,
     GameInterruptedError,
 )
 
@@ -87,6 +88,7 @@ class Context:
         no_download=False,
         history_folder=None,
         recommender=None,
+        bot_weights=None,
     ):
         self.manager = ConnectionManager(num_players, len(bots))
         self.playerlog = WebPlayerLog(
@@ -100,6 +102,7 @@ class Context:
         self.skip_bots = skip_bots
         self.no_download = no_download
         self.recommender = recommender
+        self.bot_weights = bot_weights
         self.userids = []
         self.usernames = {}
         # seat (game player id) -> userid, rebuilt each game since seating is
@@ -125,6 +128,15 @@ class Context:
         self.bots = bots
         self.manager.num_bots = len(bots)
 
+    def make_net_bot(self, spec):
+        """Build an NN-net-backed bot from a ``NAME-ITERS`` spec (the reco_bot
+        grammar): ``iters == 0`` -> Direct-net, ``iters > 0`` -> Explorer. The
+        net registries + torch are imported lazily inside the src factory."""
+        from regi_py.rl import make_net_strategy
+
+        name, iters = parse_reco_spec(spec)
+        return make_net_strategy(name, iters, self.bot_weights)
+
     def load_game(self):
         assert app.state.CTX.ALT_STARTED
         strategy_map = get_strategy_map(rl_mods=False)
@@ -133,7 +145,13 @@ class Context:
         # connection index to its human strat for input routing.
         if len(self.strats) != self.num_players + len(self.bots):
             for b in self.bots:
-                self.strats.append(strategy_map[b]())
+                if b in strategy_map:
+                    self.strats.append(strategy_map[b]())
+                else:
+                    # not a torch-free builtin -> an NN-net bot given as a
+                    # NAME-ITERS spec; build it via the src factory using the
+                    # weights from --bot-weights (torch imported lazily there).
+                    self.strats.append(self.make_net_bot(b))
 
         # shuffle the SEATING every game so turn order differs each start/restart.
         # We seat a shuffled copy and record which seat each human drew; the game
@@ -411,6 +429,7 @@ def make_CTX(app, d):
         d.no_download,
         d.history_folder,
         recommender=recommender,
+        bot_weights=d.bot_weights,
     )
     pw = "no password" if d.password is None else "password required"
     reco = "off" if d.reco is None else d.reco
@@ -444,7 +463,10 @@ def load_args():
         dest="bots",
         action="append",
         default=[],
-        help="bot options: " + ",".join(strategy_map),
+        help="bot options: "
+        + ",".join(strategy_map)
+        + ". A NAME-ITERS spec (e.g. basic-0, adzmulti-64) adds an NN-net bot "
+        "and requires --bot-weights (ITERS 0 => Direct-net, >0 => Explorer).",
     )
     parser.add_argument(
         "--skip-bots",
@@ -481,6 +503,12 @@ def load_args():
         default=None,
         help="path to a .pt checkpoint (required when --reco names an NN net)",
     )
+    parser.add_argument(
+        "--bot-weights",
+        dest="bot_weights",
+        default=None,
+        help="path to a .pt checkpoint for NN-net bots added via -b NAME-ITERS",
+    )
     d = parser.parse_args()
     total_players = d.num_players + len(d.bots)
 
@@ -492,6 +520,30 @@ def load_args():
         print("ERROR can't have more than 4 players!\n\n")
         parser.print_help()
         sys.exit(1)
+    # any -b that isn't a torch-free builtin is an NN-net bot given as a
+    # NAME-ITERS spec; validate the grammar and require --bot-weights up front
+    # (fail fast, before starting the server / importing torch).
+    net_bots = [b for b in d.bots if b not in strategy_map]
+    if net_bots:
+        if not d.bot_weights:
+            print(
+                "ERROR NN-net bots "
+                + ", ".join(repr(b) for b in net_bots)
+                + " require --bot-weights PATH\n\n"
+            )
+            parser.print_help()
+            sys.exit(1)
+        if not os.path.isfile(d.bot_weights):
+            print(f"ERROR --bot-weights file not found: {d.bot_weights!r}\n\n")
+            parser.print_help()
+            sys.exit(1)
+        for b in net_bots:
+            try:
+                parse_reco_spec(b)
+            except ValueError as err:
+                print(f"ERROR bot {b!r}: {err}\n\n")
+                parser.print_help()
+                sys.exit(1)
     # recommendations are opt-in: only validate/parse a spec when --reco is given
     d.reco_name, d.reco_iters = None, None
     if d.reco is not None:

@@ -363,28 +363,9 @@ def make_recommender(name, iters, weights_path=None):
 def _make_nn_recommender(name, iters, weights_path):
     if not weights_path:
         raise ValueError(f"NN recommender {name!r} requires --reco-weights PATH")
-    import torch  # lazy: only imported for NN recommenders
-    from regi_py.rl.az.nets import net_names, get_net
-    from regi_py.rl.adz.nets import adz_net_names, get_adz_net
+    # NN-net construction lives in src (``regi_py.rl.make_net_strategy``) -- it's
+    # an rl concern, not webapp-specific -- so bots and recommenders share it.
+    # torch + the net registries are imported lazily there.
+    from regi_py.rl import make_net_strategy
 
-    if name in net_names():
-        cls, paradigm = get_net(name), "az"
-    elif name in adz_net_names():
-        cls, paradigm = get_adz_net(name), "adz"
-    else:
-        choices = ", ".join(list(BUILTIN_RECOS) + net_names() + adz_net_names())
-        raise ValueError(f"unknown --reco net {name!r}; choices: {choices}")
-
-    net = cls()
-    net.load_state_dict(
-        torch.load(weights_path, map_location="cpu", weights_only=True)
-    )
-    net.eval()
-
-    if paradigm == "adz":
-        from regi_py.rl.adz.explorer import ADZDirectStrategy, ADZExplorerStrategy
-
-        return ADZDirectStrategy(net) if iters == 0 else ADZExplorerStrategy(net, iterations=iters)
-    from regi_py.rl.az.explorer import NetDirectStrategy, AZExplorerStrategy
-
-    return NetDirectStrategy(net) if iters == 0 else AZExplorerStrategy(net, iterations=iters)
+    return make_net_strategy(name, iters, weights_path)
