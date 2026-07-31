@@ -180,7 +180,10 @@ def explorer(tid, shared_model, exp_queue, device, params):
     # supply the complementary data -- brute late-game samples by default, or full
     # cooperative team games with --team-games (net beside other regi_py.strats).
     pl = params.pipeline
-    other_play = (tid % 2) == 0
+    if params.team_games:
+        other_play = (tid % 2) == 0
+    else:
+        other_play = (tid % 4) == 0
     if other_play:
         role = "team-explore" if params.team_games else "brute-explore"
     else:
