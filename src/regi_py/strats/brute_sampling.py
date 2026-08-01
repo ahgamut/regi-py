@@ -68,8 +68,6 @@ class BruteSamplingStrategy(BaseStrategy, RecommenderMixin):
         except Exception as e:
             print("failed to process moves", e)
             ind = random.randint(0, len(combos) - 1)
-        if combos[ind].bitwise == 0 and attack_yieldfail(ind, game, combos):
-            print("this yield is randomly a fail", ind, combos[ind])
         return ind
 
     def getDefenseIndex(self, combos, player, damage, game):
@@ -82,8 +80,6 @@ class BruteSamplingStrategy(BaseStrategy, RecommenderMixin):
         except Exception as e:
             print("failed to process moves", e)
             ind = random.randint(0, len(combos) - 1)
-        if defend_throwing(ind, game, combos):
-            print("this defend is a throw", ind, combos[ind])
         return ind
 
     def getRecommendedMoves(self, phase, combos):
