@@ -13,6 +13,7 @@ from .logging import JSONArrayWriter, write_json_array
 
 #
 from .strats import STRATEGY_LIST as strat1
+from .strat_spec import build_strategy, spec_uses_nn
 
 __all__ = [
     # enums / constants
@@ -49,6 +50,8 @@ __all__ = [
     "write_json_array",
     # helpers
     "get_strategy_map",
+    "build_strategy",
+    "spec_uses_nn",
 ]
 
 
