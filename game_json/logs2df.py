@@ -219,10 +219,22 @@ class JsonSource(LogSource):
     parser_desc = "rowify-jsons"
 
     def zip_members(self, z):
-        return [name for name in z.namelist() if "game" in name]
+        # ``*.phases.json`` sidecars (run_benchmark --save-phases) are lists of phase
+        # STRINGS, not event logs -- match game event logs only.
+        return [
+            name
+            for name in z.namelist()
+            if "game" in name
+            and name.endswith(".json")
+            and not name.endswith(".phases.json")
+        ]
 
     def folder_files(self, folder):
-        return glob.glob(os.path.join(folder, "game*.json"))
+        return [
+            f
+            for f in glob.glob(os.path.join(folder, "game*.json"))
+            if not f.endswith(".phases.json")
+        ]
 
     def load(self, fileobj):
         return json.load(fileobj)

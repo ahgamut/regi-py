@@ -75,10 +75,12 @@ def build_team(team, nn_cache):
     return strats
 
 
-def run_one_game(phase_string, team, seed, nn_cache):
+def run_one_game(phase_string, team, seed, nn_cache, save_phases):
     """Run a single game from ``phase_string`` with ``team`` under ``seed``.
 
-    Returns the JSON string of the game's event log.
+    Returns ``(events_json, phases_json, phase_count, enemy_hp_left)`` where
+    ``phases_json`` is the JSON list of the game's per-phase strings when
+    ``save_phases`` else ``None``.
     """
     log = ListLog()
     game = GameState(log)
@@ -92,11 +94,17 @@ def run_one_game(phase_string, team, seed, nn_cache):
     phase_count = game.phase_count
     enemy_hp_left = sum(max(e.hp, 0) for e in game.enemy_pile)
     # Serialize here, while the live C++ objects referenced by the events are in scope.
-    payload = json.dumps(log.events, cls=RegiEncoder)
-    return payload, phase_count, enemy_hp_left
+    events_json = json.dumps(log.events, cls=RegiEncoder)
+    phases_json = None
+    if save_phases:
+        # game.history is stable now that the game has ended (no more appends), so
+        # its PhaseInfo references are safe to stringify (the dangling-ref rule only
+        # bites when a reference is held ACROSS an append).
+        phases_json = json.dumps([p.to_string() for p in game.history])
+    return events_json, phases_json, phase_count, enemy_hp_left
 
 
-def worker(wid, task_queue, result_queue, uses_nn):
+def worker(wid, task_queue, result_queue, uses_nn, save_phases):
     if uses_nn:
         import torch  # lazy: only when an NN strategy is in play
 
@@ -109,10 +117,13 @@ def worker(wid, task_queue, result_queue, uses_nn):
         name, phase_string, team, seed = item
         try:
             a = time.time()
-            payload, phase_count, enemy_hp_left = run_one_game(
-                phase_string, team, seed, nn_cache
+            events_json, phases_json, phase_count, enemy_hp_left = run_one_game(
+                phase_string, team, seed, nn_cache, save_phases
             )
-            result_queue.put((name, payload))
+            outputs = [(name, events_json)]
+            if phases_json is not None:
+                outputs.append((name[: -len(".json")] + ".phases.json", phases_json))
+            result_queue.put(outputs)
             print(
                 f"{name} ok {phase_count}p hp_left={enemy_hp_left} {time.time() - a:.3f}s",
                 file=sys.stderr,
@@ -125,7 +136,7 @@ def delegator(task_queue, phases, teams, seeds, num_workers):
     for i, phase_string in enumerate(phases):
         for j, team in enumerate(teams):
             for k, seed in enumerate(seeds):
-                name = f"game{i:04d}-team{j:03d}-rep{k:03d}.json"
+                name = f"game{i:04d}-team{j:03d}-sim{k:03d}.json"
                 task_queue.put((name, phase_string, team, seed))
     for _ in range(num_workers):
         task_queue.put(DONE)
@@ -139,8 +150,8 @@ def saver(output, manifest, result_queue):
             item = result_queue.get()
             if item is DONE:
                 break
-            name, payload = item
-            zf.writestr(name, payload)
+            for entry_name, payload in item:  # one game -> 1 (or 2, with phases) files
+                zf.writestr(entry_name, payload)
             n += 1
     print(f"saved {n} games to {output}", file=sys.stderr)
 
@@ -217,6 +228,11 @@ def main():
         type=int,
         help="base seed for reproducible repetitions (rep r uses base+r)",
     )
+    parser.add_argument(
+        "--save-phases",
+        action="store_true",
+        help="also save each game's phase strings to a sibling '.phases.json' zip entry",
+    )
     d = parser.parse_args()
 
     num_players, phases, teams = load_inputs(d.phases, d.teams)
@@ -231,7 +247,8 @@ def main():
         "reps": d.reps,
         "seeds": seeds,
         "uses_nn": uses_nn,
-        "naming": "game{phase:04d}-team{team:03d}-rep{rep:03d}.json",
+        "save_phases": d.save_phases,
+        "naming": "game{phase:04d}-team{team:03d}-sim{rep:03d}.json",
     }
 
     mp.set_start_method("fork", force=True)
@@ -242,7 +259,9 @@ def main():
     save_proc.start()
 
     workers = [
-        mp.Process(target=worker, args=(w, task_queue, result_queue, uses_nn))
+        mp.Process(
+            target=worker, args=(w, task_queue, result_queue, uses_nn, d.save_phases)
+        )
         for w in range(d.num_workers)
     ]
     for w in workers:
