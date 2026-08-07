@@ -3,6 +3,18 @@ from regi_py.logging import DummyLog
 import random
 
 
+def perspectivize(phase, perspective=None):
+    """Reduce ``phase`` to what ``perspective`` (default: the phase's ACTIVE
+    player) can observe: a COPY with the hidden cards reshuffled among the piles
+    that player can't see (own hand / used pile / enemies untouched, every pile
+    SIZE preserved). The single determinization lever for every search strategy --
+    replace the body with ``return phase`` to run them under perfect info.
+    """
+    if perspective is None:
+        perspective = phase.active_player
+    return PhaseInfo.randomize_from(phase, perspective)
+
+
 def enemy_hp_left(game):
     return sum(max(x.hp, 0) for x in game.enemy_pile)
 

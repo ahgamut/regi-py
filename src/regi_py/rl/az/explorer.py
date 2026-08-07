@@ -266,7 +266,7 @@ class NetDirectStrategy(BaseStrategy, RecommenderMixin):
         for i in range(game.num_players):
             if i == game.active_player:
                 continue
-            history[-1] = PhaseInfo.randomize_from(root_phase, i)
+            history[-1] = perspectivize(root_phase, i)
             v_hat, _, _ = self.net.predict(history, i)
             vals[i] = v_hat
         return int(np.argmax(vals))

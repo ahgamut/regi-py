@@ -147,9 +147,7 @@ class MCTSNode:
         if end_value != 0:
             return float(end_value == 1)
 
-        imagined_root_phase = PhaseInfo.randomize_from(
-            self.root_phase, active_perspective
-        )
+        imagined_root_phase = perspectivize(self.root_phase, active_perspective)
         end_game, _ = quick_game_sim(
             imagined_root_phase, strat_klass=SubsetRandomStrategy
         )
