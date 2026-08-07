@@ -45,6 +45,7 @@ class MoveTokenNet(BaseNet):
             nn.Linear(DIM, DIM),
             nn.ReLU(),
         )
+        self.card_norm = nn.LayerNorm(DIM)
 
         # static move structure (which cards each move uses, which grid cell it is)
         cell_flat, card_idx, card_mask = features.move_structure()
@@ -83,7 +84,7 @@ class MoveTokenNet(BaseNet):
         return {"tokens": torch.from_numpy(tok).unsqueeze(0)}
 
     def forward(self, data):
-        cardfeat = self.card_mlp(data["tokens"])   # (N, 56, DIM)
+        cardfeat = self.card_norm(self.card_mlp(data["tokens"]))   # (N, 56, DIM)
         n = cardfeat.shape[0]
 
         # build move tokens: masked mean of each move's member card features
