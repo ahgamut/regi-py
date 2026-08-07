@@ -14,7 +14,7 @@ import numpy as np
 from regi_py.strats import BruteSamplingStrategy
 from regi_py.rl.features import candidate_semantics
 from regi_py.rl.adz.explorer import ADZNodeInfo, ADZExplorerStrategy, trimmed_history
-from regi_py.rl.training import _BruteRecordMixin, _TeamRecordMixin
+from regi_py.rl.training import _BruteRecordMixin, _TeamRecordMixin, VALUE_DISCOUNT
 
 
 class RecordingADZBruteStrategy(_BruteRecordMixin, BruteSamplingStrategy):
@@ -44,6 +44,7 @@ def adz_infos_from_game(game, moves, value, net_cls):
     policy is a one-hot at the played subset over that decision's offered list. The
     window length is ``net_cls.max_history`` (matches its inference window)."""
     hist = list(game.history)
+    last = len(hist) - 1  # discount each record by its distance to the terminal phase
     maxhist = net_cls.max_history
     infos = []
     for idx, bitwises, feats, played_bw, attacking in moves:
@@ -60,7 +61,7 @@ def adz_infos_from_game(game, moves, value, net_cls):
                 candidates=bitwises,
                 cand_feats=feats,
                 policy=policy,
-                value=value,
+                value=value * (VALUE_DISCOUNT ** (last - idx)),
                 attacking=attacking,
             )
         )

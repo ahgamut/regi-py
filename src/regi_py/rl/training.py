@@ -246,6 +246,7 @@ def infos_from_game(game, moves, value, net_cls):
     length is ``net_cls.max_history`` (matches its inference window).
     """
     hist = list(game.history)
+    last = len(hist) - 1  # discount each record by its distance to the terminal phase
     maxhist = net_cls.max_history
     infos = []
     for idx, bitwise, part_locs in moves:
@@ -269,7 +270,7 @@ def infos_from_game(game, moves, value, net_cls):
         infos.append(
             AZNodeInfo(
                 history=window,
-                value=value,
+                value=value * (VALUE_DISCOUNT ** (last - idx)),
                 atk_probs=atk_probs,
                 keepyness=keepyness,
             )
@@ -307,6 +308,7 @@ def run_brute_game(tid, i, net_cls, num_bots, iterations, paradigm):
     # build the training records AFTER the game, from the now-stable game.history.
     # score losses by the hp penalty (matching run_single_game) so brute and net
     # explorers agree on the value target -- a high-progress loss is not as good as a win.
+    # infos_fn discounts each record by distance to end (see infos_from_game).
     value = 1.0 if win else hp_loss_penalty(s1)
     infos = paradigm.infos_fn(game, strat.moves, value=value, net_cls=net_cls)
     if not infos:
@@ -357,7 +359,7 @@ def run_team_game(tid, i, net, num_bots, iterations, paradigm):
         f"{tid},{i},t{len(moves)}({num_nn}/{num_bots}),{s0},{s1},{dt:.4f}s,{win}",
         file=sys.stderr,
     )
-    value = 1.0 if win else hp_loss_penalty(s1)  # flat outcome value (brute-style)
+    value = 1.0 if win else hp_loss_penalty(s1)  # infos_fn discounts by distance to end
     infos = paradigm.infos_fn(game, moves, value=value, net_cls=type(net))
     if not infos:
         return None
