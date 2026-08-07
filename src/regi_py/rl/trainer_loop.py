@@ -81,7 +81,9 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
     buf = ShardBuffer(capacity=params.memory_size, train_fields=params.net_cls.TRAIN_FIELDS)
     part_size = min(5000, params.memory_size // 2)
     while ep < params.num_episodes:
+        t0 = time.perf_counter()
         drain(exp_queue, buf)
+        t_drain = time.perf_counter() - t0
 
         if len(buf) < part_size:
             time.sleep(1)
@@ -89,9 +91,16 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
 
         losses = []
         comps = []
+        t_sample = 0.0
+        t_epoch = 0.0
         for e in range(params.epochs):
+            t0 = time.perf_counter()
             batch = buf.sample_batch(params.batch_size)
+            t1 = time.perf_counter()
             loss, parts = run_epoch(train_model, batch, optimizer)
+            t2 = time.perf_counter()
+            t_sample += t1 - t0
+            t_epoch += t2 - t1
             losses.append(loss)
             comps.append(parts)
 
@@ -100,7 +109,8 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
             "episode",
             ep,
             f"loss={np.mean(losses):.4f} policy={policy:.4f} "
-            f"value={value:.4f} keepy={keepy:.4f}",
+            f"value={value:.4f} keepy={keepy:.4f} "
+            f"t_drain={t_drain:.3f}s t_sample={t_sample:.3f}s t_epoch={t_epoch:.3f}s",
             file=sys.stderr,
         )
         ep += 1
