@@ -90,9 +90,9 @@ class CombineNet(nn.Module):
         self.wca1 = WidthCrossAttention(channels=channels, heads=4)
         self.wca2 = WidthCrossAttention(channels=channels, heads=4)
         self.net = Conv2dBlock(
-            channels=(channels, 64, 64, 64, 64, 64, 64, 64, 64, 64),
-            shapes=(1, 3, 3, 1, 3, 3, 1, 3, 3),
-            paddings=(0, 1, 1, 0, 1, 1, 0, 1, 1),
+            channels=(channels, 64, 64, 64),
+            shapes=(1, 3, 3),
+            paddings=(0, 1, 1),
         )
 
     def forward(self, usp, loc, cap):
