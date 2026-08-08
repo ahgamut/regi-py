@@ -455,19 +455,13 @@ function makeOtherPlayerInfo(game) {
     return res;
 }
 
-function makeUsedCombos(combos, currentBlock) {
+function makeUsedCombos(combos) {
     let res = document.createElement("div");
     res.className = "mb-4";
     let hdr = document.createElement("h2");
     hdr.className = "subtitle is-5";
     hdr.textContent = "Combos Used";
     res.appendChild(hdr);
-
-    // spades block accumulated against the current enemy (from the combos played)
-    let blk = document.createElement("div");
-    blk.className = "is-size-6 current-block mb-2";
-    blk.textContent = `Block ${currentBlock || 0}`;
-    res.appendChild(blk);
 
     let list = document.createElement("div");
     list.className = "combos-list";
@@ -482,6 +476,37 @@ function makeUsedCombos(combos, currentBlock) {
         list.appendChild(b);
     }
     res.appendChild(list);
+    return res;
+}
+
+// combat status shown above the player's cards: how much the current enemy
+// hits for right now (base attack reduced by the accumulated block) and the
+// current amount of block built up against it.
+function makeCombatStatus(game) {
+    let res = document.createElement("div");
+    res.className = "combat-status mb-2";
+
+    let ce = game.current_enemy;
+    let block = game.current_block || 0;
+    // the enemy's effective incoming damage = base attack minus block (floored at 0)
+    let damage = ce ? Math.max(0, ce.strength - block) : 0;
+
+    let dmg = document.createElement("div");
+    dmg.className = "is-size-6 current-damage";
+    // effective damage, with the (base attack - accumulated block) breakdown
+    let dmgText = damage > 0
+        ? `Enemy hitting for ${damage} (${ce.strength} - ${block})`
+        : `Enemy is full-blocked (${block} >= ${ce.strength})`;
+    dmg.textContent = ce
+        ? dmgText
+        : "No enemy";
+    res.appendChild(dmg);
+
+    let blk = document.createElement("div");
+    blk.className = "is-size-6 current-block";
+    blk.textContent = `Block ${block}`;
+    res.appendChild(blk);
+
     return res;
 }
 
@@ -500,7 +525,13 @@ function updateBoard(game) {
 
     let combos_view = document.getElementById('combos-view');
     combos_view.replaceChildren();
-    combos_view.appendChild(makeUsedCombos(game.used_combos || [], game.current_block));
+    combos_view.appendChild(makeUsedCombos(game.used_combos || []));
+
+    let combat_status = document.getElementById('combat-status');
+    if (combat_status) {
+        combat_status.replaceChildren();
+        combat_status.appendChild(makeCombatStatus(game));
+    }
 }
 
 function getCardButton(card) {
@@ -512,6 +543,9 @@ function getCardButton(card) {
     b.addEventListener("click", () => {
         let on = b.classList.toggle("is-focused");
         b.setAttribute("aria-pressed", on ? "true" : "false");
+        // nudge the reactive button label so a selection change flips the
+        // hover "Yield" hint back to "Submit" (and vice versa) immediately.
+        Alpine.store('gamestate').cardTick++;
     });
     return b;
 }
@@ -854,6 +888,18 @@ function endGameStatusUpdate() {
     setButtonActivity(yielder, true);
 }
 
+// true when it is the player's turn and no hand card is currently selected —
+// submitting an empty selection on an attack (where yield is allowed) yields.
+function submitWouldYield() {
+    let g = Alpine.store('gamestate');
+    g.cardTick; // reactive dep: re-evaluate the label when a card is (de)selected
+    if (!g.myTurn || g.redirection) return false;
+    if (!g.data || !g.data.yield_allowed) return false;
+    let cards = document.getElementById('player-cards');
+    if (!cards) return false;
+    return cards.querySelectorAll('.is-focused').length === 0;
+}
+
 function mainButtonText() {
     let g = Alpine.store('gamestate');
     let result = "";
@@ -865,7 +911,9 @@ function mainButtonText() {
             result = "Ready!"
             break;
         case "RUNNING":
-            result = "Submit";
+            // hovering the Submit button with nothing selected hints that
+            // submitting now yields (the empty combo is the yield move).
+            result = (g.submitHover && submitWouldYield()) ? "Yield" : "Submit";
             break;
         case "ENDED":
         case "ERROR":

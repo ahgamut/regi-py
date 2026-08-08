@@ -21,6 +21,8 @@ document.addEventListener('alpine:init', () => {
         history: [],
         knownUsernames: { {{ playerid }}: "{{ username }}" },
         sideButtonActive: false,
+        submitHover: false,
+        cardTick: 0,
         noDownload: {{ 'true' if no_download else 'false' }},
     })
     init_ws()
@@ -58,6 +60,7 @@ document.addEventListener('alpine:init', () => {
                 <div class="column is-full-mobile is-6-tablet" x-show="$store.gamestate.statusz != 'LOADING'">
                     <div x-show="!($store.gamestate.redirection)">
                         <h1 class="subtitle" x-text="'Your cards'" ></h1>
+                        <div id="combat-status"></div>
                         <div id="player-cards"></div>
                     </div>
                     <div x-show="$store.gamestate.redirection">
@@ -76,7 +79,7 @@ document.addEventListener('alpine:init', () => {
                     <div id="turn-message"></div>
                 </div>
                 <div id="submit-zone">
-                    <div id="main-button" class="control button is-large is-primary" x-on:click="mainButtonRedirect()" x-text="mainButtonText()"></div>
+                    <div id="main-button" class="control button is-large is-primary" x-on:click="mainButtonRedirect()" x-on:mouseenter="$store.gamestate.submitHover = true" x-on:mouseleave="$store.gamestate.submitHover = false" x-text="mainButtonText()"></div>
                     <div id="side-button" class="control button is-large is-secondary" x-show="sideButtonText() != '<hide>' && $store.gamestate.sideButtonActive" x-on:click="sideButtonRedirect()" x-text="sideButtonText()"></div>
                 </div>
             </div>

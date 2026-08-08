@@ -195,9 +195,15 @@ button.game-card-selectable {
     flex-direction: column;
 }
 
-/* spades-block accumulated against the current enemy (shown by the used combos) */
+/* combat status shown above the player's cards: enemy's effective damage and
+   the spades-block accumulated against the current enemy */
 .current-block {
     color: #2c5282;
+    font-weight: 600;
+}
+
+.current-damage {
+    color: #c53030;
     font-weight: 600;
 }
 
