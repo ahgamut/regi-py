@@ -10,6 +10,11 @@ The column schema (``COLNAMES``/``PLAYERINFO``) is *derived* from the single
 serialization source-of-truth in :mod:`regi_py.serialize` rather than hardcoded,
 so adding a field to a game/player/enemy/combo dict shows up here automatically.
 
+Output can go to a CSV (``-o``) and/or a SQLite database (``--sqlite``); both
+share the one row schema, so each file is parsed once and its rows fanned out to
+every requested sink.  ``sqlite3`` is in the stdlib, so the DB path needs no extra
+dependency.
+
 ``j2df.py`` and ``bin2df.py`` remain as thin CLI shims that call :func:`main`
 with the matching source, so existing command lines keep working.  ``msgpack`` is
 imported lazily inside the msgpack source, so the JSON path needs no msgpack.
@@ -21,6 +26,7 @@ import glob
 import hashlib
 import json
 import os
+import sqlite3
 import zipfile
 
 from regi_py.serialize import (
@@ -412,13 +418,72 @@ def discover_files(input_object, source):
     return None, source.folder_files(input_object)
 
 
-def write_csv(files, source, output_csv, z=None):
-    with open(output_csv, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(FILEMETA + COLNAMES + PLAYERINFO)
+# --------------------------------------------------------------------------- #
+# output sinks: a CSV file and/or a SQLite table, both fed the same rows
+# --------------------------------------------------------------------------- #
+class CsvSink:
+    """Write rows to a CSV, header first (the historical R-facing output)."""
+
+    def __init__(self, path, header):
+        self._f = open(path, "w", newline="")
+        self._writer = csv.writer(self._f)
+        self._writer.writerow(header)
+
+    def write_rows(self, rows):
+        self._writer.writerows(rows)
+
+    def close(self):
+        self._f.close()
+
+
+class SqliteSink:
+    """Write rows to a ``game_logs`` table in a SQLite database.
+
+    The columns are exactly the CSV header (dotted names quoted), so the DB
+    carries the same schema as the CSV -- one row per event, all values stored
+    with TEXT affinity (SQLite keeps ints/NULLs as-is regardless).  An existing
+    table is dropped first so re-running overwrites rather than appends.
+    """
+
+    TABLE = "game_logs"
+
+    def __init__(self, path, header):
+        self._conn = sqlite3.connect(path)
+        cols_ddl = ", ".join(f'"{c}" TEXT' for c in header)
+        self._conn.execute(f'DROP TABLE IF EXISTS "{self.TABLE}"')
+        self._conn.execute(f'CREATE TABLE "{self.TABLE}" ({cols_ddl})')
+        placeholders = ", ".join("?" * len(header))
+        self._insert = f'INSERT INTO "{self.TABLE}" VALUES ({placeholders})'
+
+    def write_rows(self, rows):
+        self._conn.executemany(self._insert, rows)
+
+    def close(self):
+        self._conn.commit()
+        self._conn.close()
+
+
+def write_outputs(files, source, output_csv=None, output_db=None, z=None):
+    """Parse each file once and fan its rows out to every requested sink."""
+    header = FILEMETA + COLNAMES + PLAYERINFO
+    sinks = []
+    if output_csv:
+        sinks.append(CsvSink(output_csv, header))
+    if output_db:
+        sinks.append(SqliteSink(output_db, header))
+    try:
         for file in files:
             rows = proc_file(file, source, z)
-            writer.writerows(rows)
+            for sink in sinks:
+                sink.write_rows(rows)
+    finally:
+        for sink in sinks:
+            sink.close()
+
+
+def write_csv(files, source, output_csv, z=None):
+    """Back-compat wrapper: CSV-only output (delegates to :func:`write_outputs`)."""
+    write_outputs(files, source, output_csv=output_csv, z=z)
 
 
 SOURCES = {"json": JsonSource, "msgpack": MsgpackSource}
@@ -444,14 +509,24 @@ def main(source=None):
         required=True,
         help="a folder, single log file, or ZIP archive of logs",
     )
-    parser.add_argument("-o", "--output-csv", required=True, help="output csv")
+    parser.add_argument("-o", "--output-csv", default=None, help="output csv")
+    parser.add_argument(
+        "-d",
+        "--sqlite",
+        dest="output_db",
+        default=None,
+        help="output SQLite database (rows go into a 'game_logs' table)",
+    )
     d = parser.parse_args()
+
+    if not d.output_csv and not d.output_db:
+        parser.error("need an output: -o/--output-csv and/or -d/--sqlite")
 
     if source is None:
         source = SOURCES[d.source]()
 
     z, files = discover_files(d.input_object, source)
-    write_csv(files, source, d.output_csv, z)
+    write_outputs(files, source, output_csv=d.output_csv, output_db=d.output_db, z=z)
 
 
 if __name__ == "__main__":

@@ -113,6 +113,48 @@ def test_json_path_end_to_end(tmp_path, seeded):
     assert len(digests) == 1 and digests.pop()
 
 
+def test_sqlite_output_matches_csv(tmp_path, seeded):
+    import sqlite3
+
+    fname = tmp_path / "game0-teamR-sim01.json"
+    log = JSONLog(str(fname))
+    game = GameState(log)
+    for _ in range(2):
+        game.add_player(RandomStrategy())
+    game.initialize()
+    game.start_loop()
+    log.close()
+
+    header = logs2df.FILEMETA + logs2df.COLNAMES + logs2df.PLAYERINFO
+    csv_path = tmp_path / "out.csv"
+    db_path = tmp_path / "out.db"
+    z, files = logs2df.discover_files(str(fname), logs2df.JsonSource())
+    logs2df.write_outputs(
+        files,
+        logs2df.JsonSource(),
+        output_csv=str(csv_path),
+        output_db=str(db_path),
+        z=z,
+    )
+
+    # the DB carries the same schema and the same rows as the CSV
+    conn = sqlite3.connect(str(db_path))
+    db_cols = [r[1] for r in conn.execute("PRAGMA table_info(game_logs)")]
+    assert db_cols == header
+    db_rows = conn.execute(f'SELECT * FROM game_logs').fetchall()
+    conn.close()
+
+    csv_rows = logs2df.proc_file(str(fname), logs2df.JsonSource())
+    assert len(db_rows) == len(csv_rows) > 0
+    # CSV stringifies everything; compare the DB rows the same way so ints/None
+    # (stored as-is by SQLite) line up with the CSV's text cells
+    def as_csv_text(v):
+        return "" if v is None else str(v)
+
+    for db_row, csv_row in zip(db_rows, csv_rows):
+        assert [as_csv_text(v) for v in db_row] == [as_csv_text(v) for v in csv_row]
+
+
 def test_game_digest_x0_fix_uses_piles():
     players = [{"cards": ["Ac", "Kd"]}, {"cards": ["2h"]}]
     with_piles = {
