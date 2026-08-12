@@ -89,6 +89,8 @@ class Context:
         history_folder=None,
         recommender=None,
         bot_weights=None,
+        preset_phases=None,
+        preset_num_players=None,
     ):
         self.manager = ConnectionManager(num_players, len(bots))
         self.playerlog = WebPlayerLog(
@@ -103,6 +105,11 @@ class Context:
         self.no_download = no_download
         self.recommender = recommender
         self.bot_weights = bot_weights
+        # a preset list of starting deals (make_phases phase strings) replayed in
+        # order when the table has preset_num_players seats, then exhausted
+        self.preset_phases = list(preset_phases) if preset_phases else []
+        self.preset_num_players = preset_num_players
+        self.preset_index = 0
         self.userids = []
         self.usernames = {}
         # seat (game player id) -> userid, rebuilt each game since seating is
@@ -171,7 +178,7 @@ class Context:
         if self.num_players == 1 and len(self.bots) > 0:
             print("solo player with bots, skipping ready check")
             self.strats[0].ready = True
-        self.game.initialize()
+        self._deal_game(len(seating))
         if not (self.num_players == 1 and len(self.bots) > 0):
             t = 0
             while t != self.num_players:
@@ -179,6 +186,27 @@ class Context:
                 t = sum(p.ready for p in self.strats[: self.num_players])
                 print(t, "players ready")
         self.game.start_loop()
+
+    def _deal_game(self, num_seats):
+        """Deal the current game. When a preset deal list is loaded and its
+        player count matches the ``num_seats`` at the table, replay the next
+        preset deal (``init_string`` from a make_phases phase string); the deals
+        are consumed in order. Otherwise -- no presets, all consumed, or a
+        player-count mismatch -- fall back to a fresh random deal
+        (``initialize``), exactly as before."""
+        if (
+            self.preset_index < len(self.preset_phases)
+            and self.preset_num_players == num_seats
+        ):
+            phase = self.preset_phases[self.preset_index]
+            self.preset_index += 1
+            print(
+                f"dealing preset game {self.preset_index}/{len(self.preset_phases)} "
+                f"({num_seats}p)"
+            )
+            self.game.init_string(phase)
+        else:
+            self.game.initialize()
 
     def end_game(self):
         assert self.game is not None
@@ -430,6 +458,8 @@ def make_CTX(app, d):
         d.history_folder,
         recommender=recommender,
         bot_weights=d.bot_weights,
+        preset_phases=d.preset_phases,
+        preset_num_players=d.preset_num_players,
     )
     pw = "no password" if d.password is None else "password required"
     reco = "off" if d.reco is None else d.reco
@@ -509,6 +539,14 @@ def load_args():
         default=None,
         help="path to a .pt checkpoint for NN-net bots added via -b NAME-ITERS",
     )
+    parser.add_argument(
+        "--preset-games",
+        dest="preset_games",
+        default=None,
+        help="path to a make_phases JSON ({'num_players': N, 'phases': [str, ...]}). "
+        "Those starting deals are replayed in order whenever the table has N players; "
+        "once exhausted (or if the player count differs) games are dealt at random as usual.",
+    )
     d = parser.parse_args()
     total_players = d.num_players + len(d.bots)
 
@@ -553,6 +591,32 @@ def load_args():
             print(f"ERROR {err}\n\n")
             parser.print_help()
             sys.exit(1)
+    # preset games are opt-in: load + validate the make_phases JSON up front so a
+    # missing/malformed file fails before the server starts.
+    d.preset_num_players, d.preset_phases = None, None
+    if d.preset_games is not None:
+        if not os.path.isfile(d.preset_games):
+            print(f"ERROR --preset-games file not found: {d.preset_games!r}\n\n")
+            parser.print_help()
+            sys.exit(1)
+        try:
+            with open(d.preset_games) as f:
+                preset = json.load(f)
+            d.preset_num_players = int(preset["num_players"])
+            d.preset_phases = [str(p) for p in preset["phases"]]
+        except (ValueError, KeyError, TypeError) as err:
+            print(
+                f"ERROR --preset-games {d.preset_games!r} is not a valid "
+                f"make_phases JSON: {err}\n\n"
+            )
+            parser.print_help()
+            sys.exit(1)
+        if d.preset_num_players != total_players:
+            # not fatal (bots may still be picked in the web UI), just a heads-up
+            print(
+                f"NOTE --preset-games is {d.preset_num_players}p but the table is "
+                f"currently {total_players}p; presets only apply when the seat count matches."
+            )
     return d
 
 
