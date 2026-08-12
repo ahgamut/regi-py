@@ -21,6 +21,7 @@ the team file actually uses an NN strategy.
 """
 
 import argparse
+import gc
 import json
 import multiprocessing as mp
 import os
@@ -110,6 +111,7 @@ def worker(wid, task_queue, result_queue, uses_nn, save_phases):
 
         torch.set_num_threads(1)
     nn_cache = {}
+    logged_gc = False
     while True:
         item = task_queue.get()
         if item is DONE:
@@ -130,6 +132,11 @@ def worker(wid, task_queue, result_queue, uses_nn, save_phases):
             )
         except Exception as e:  # one bad game must not stall the whole run
             print(f"{name} FAILED: {e!r}", file=sys.stderr)
+        # reclaim the finished game's search tree (cyclic refs pin native PhaseInfo)
+        collected = gc.collect()
+        if not logged_gc:
+            print(f"worker {wid}: gc.collect() reclaimed {collected} objects", file=sys.stderr)
+            logged_gc = True
 
 
 def delegator(task_queue, phases, teams, seeds, num_workers):
