@@ -86,15 +86,13 @@ def get_split_optimizer(model):
 def drain(q, buf):
     while not q.empty():
         obj = q.get()
-        evicted = buf.add(obj)
-        del obj  # drop child's dict ref
-        if evicted is not None:
-            del evicted  # retire evicted shard
+        buf.add(obj)  # COPIES the rows into the buffer's private ring tensors
+        del obj  # frees the child's shared-memory (/dev/shm) segments right now
 
 
 def run_epoch(model, batch, optimizer):
     # a batch is a tuple of tensors in the model's ``TRAIN_FIELDS`` order (that is
-    # how ``ShardBuffer`` packs each shard's ``TensorDataset``). Both paradigms
+    # how ``ShardBuffer.sample_batch`` stacks its ring tensors). Both paradigms
     # (card-space AZ nets and candidate-scoring ADZ nets) reach the net + loss the
     # same way: build ``data`` from the fields, forward, then let the net pull its
     # own target keys from ``data`` in ``calculate_loss(data, y_hat)``.
