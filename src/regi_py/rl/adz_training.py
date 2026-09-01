@@ -2,8 +2,8 @@
 
 The GAME RUNNERS / eval (self-play, brute, team, ``test_model``,
 ``improved_gameplay``) are now the paradigm-agnostic ones in ``rl.training``, driven
-by a ``trainer_loop.Paradigm`` (the ADZ instance is built in
-``trainers/adz_trainer.py``). What stays ADZ-specific lives here: the two brute/team
+by a ``trainer_loop.Paradigm`` (the ADZ instance is built in the unified
+``trainers/trainer.py``). What stays ADZ-specific lives here: the two brute/team
 recorders (candidate-scoring: they must capture each decision's offered list +
 per-candidate semantics, not just a played combo) and ``adz_infos_from_game`` (the
 one-shot ``ADZNodeInfo`` builder). The recorders reuse the shared

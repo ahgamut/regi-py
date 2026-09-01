@@ -3,10 +3,10 @@
 Both pipelines have identical process roles (``trainer`` / ``explorer`` /
 ``evaluator``) + ``submain`` + CLI, differing only in the net registry and the
 paradigm-specific self-play / eval functions. Those differences are bundled in a
-:class:`Pipeline` spec that the thin ``trainers/az_trainer.py`` /
-``trainers/adz_trainer.py`` shims build and hand to :func:`run_trainer`. The
-mp-free plumbing (``run_epoch`` / ``get_split_optimizer`` / ``drain`` /
-``ShardBuffer``) is reused from ``rl.training`` unchanged.
+:class:`Pipeline` spec; the single ``trainers/trainer.py`` CLI builds both pipelines
+(AZ + ADZ) and hands them to :func:`run_trainer`, which picks the paradigm from
+``--net`` (the two net registries are disjoint). The mp-free plumbing (``run_epoch`` /
+``get_split_optimizer`` / ``drain`` / ``ShardBuffer``) is reused from ``rl.training``.
 """
 import argparse
 import gc
@@ -325,8 +325,16 @@ def submain(params):
         p.terminate()
 
 
-def build_parser(pipeline):
-    parser = argparse.ArgumentParser(pipeline.prog)
+def build_parser(pipelines):
+    # ``--net`` choices are the UNION across pipelines; because the AZ and ADZ net
+    # registries are disjoint, the chosen name unambiguously selects the paradigm
+    # (resolved in run_trainer). Default + prog come from the first pipeline.
+    net_choices = []
+    for pl in pipelines:
+        for name in pl.net_choices:
+            if name not in net_choices:
+                net_choices.append(name)
+    parser = argparse.ArgumentParser(pipelines[0].prog)
     parser.add_argument(
         "--num-episodes", default=1, type=int, help="number of episodes"
     )
@@ -359,9 +367,9 @@ def build_parser(pipeline):
     parser.add_argument("--weights-path", default="", help="weights")
     parser.add_argument(
         "--net",
-        default=pipeline.net_default,
-        choices=pipeline.net_choices,
-        help="net architecture",
+        default=pipelines[0].net_default,
+        choices=net_choices,
+        help="net architecture; also selects the paradigm (AZ vs ADZ, by registry)",
     )
     parser.add_argument(
         "--value-fn",
@@ -380,12 +388,16 @@ def build_parser(pipeline):
     return parser
 
 
-def run_trainer(pipeline):
-    """Parse args for ``pipeline``, size the process pool, and launch ``submain``.
-    The two trainer shims each build a :class:`Pipeline` and call this."""
-    params = build_parser(pipeline).parse_args()
-    params.pipeline = pipeline
-    params.net_cls = pipeline.get_net(params.net)
+def run_trainer(pipelines):
+    """Parse args, pick the paradigm from ``--net``, size the process pool, and launch
+    ``submain``. Takes one :class:`Pipeline` or a list of them (the unified
+    ``trainers/trainer.py`` passes [AZ, ADZ]); the pipeline whose net registry owns
+    ``--net`` is selected, so no separate ``--paradigm`` flag is needed."""
+    if isinstance(pipelines, Pipeline):
+        pipelines = [pipelines]
+    params = build_parser(pipelines).parse_args()
+    params.pipeline = next(pl for pl in pipelines if params.net in pl.net_choices)
+    params.net_cls = params.pipeline.get_net(params.net)
     # resolve the name to a module-level fn (picklable by qualname -> spawn-safe)
     params.value_fn = get_value_fn(params.value_fn)
     ncpu = os.cpu_count() or 2
