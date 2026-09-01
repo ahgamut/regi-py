@@ -290,23 +290,29 @@ class MsgpackSource(LogSource):
         return True
 
     @staticmethod
-    def multi(game, cmb):
-        from regi_py.core import Entry, Suit
+    def _combo_damage(game, sel_cards):
+        """Immunity-adjusted attack damage of ``sel_cards``, straight from the engine.
 
+        Builds the real ``Combo`` from the selected cards' location bitmask (via the
+        ``combomap`` bijection) and asks the engine for the damage -- this accounts for
+        CLUBS_DOUBLE / SPADES / JOKER_NERF exactly as gameplay does, replacing the old
+        by-hand multiplier that sniffed the clubs glyph out of each card's display string.
+        Falls back to the plain strength sum when there is no enemy or the card set has
+        no attack cell (both cases the old multiplier treated as ``x1``).
+        """
+        if not sel_cards:
+            return 0
+        base = sum(x.strength for x in sel_cards)
         if len(game.enemy_pile) == 0:
-            return 1
-        enemy = game.enemy_pile[0]
-        cmb_has_clubs = any("\u2993" in card["value"] for card in cmb)
-        if not cmb_has_clubs:
-            return 1
-        joker_nerf = False
-        for combo in game.used_combos:
-            for card in combo:
-                if card.entry == Entry.JOKER:
-                    joker_nerf = True
-        if joker_nerf or enemy.suit != Suit.CLUBS:
-            return 2
-        return 1
+            return base
+        from regi_py.core import ComboTable, cards_bitwise
+        from regi_py.combomap import cell_of_bitwise
+
+        cell = cell_of_bitwise(cards_bitwise(sel_cards))
+        if cell is None:
+            return base
+        combo = ComboTable.make_combo(*cell)
+        return game.get_combo_damage(game.enemy_pile[0], combo)
 
     def phase_str_to_game_dct(self, info):
         from regi_py.core import PhaseInfo, GameState, RandomStrategy
@@ -335,13 +341,11 @@ class MsgpackSource(LogSource):
         if len(info["combos"]) > 0:
             selected_ind = info["sel_index"]
             selected_combo = info["combos"][selected_ind]
-            cmb = []
-            for x in acp.cards:
-                if str(x) in selected_combo:
-                    cmb.append(dump_card(x))
+            sel_cards = [x for x in acp.cards if str(x) in selected_combo]
+            cmb = [dump_card(x) for x in sel_cards]
             r["combo"] = cmb
-            dmg = sum(x["strength"] for x in cmb) * self.multi(game, cmb)
             if event == "ATTACK":
+                dmg = self._combo_damage(game, sel_cards)
                 data["used_combos"].append(cmb)
         if event == "ATTACK":
             r["damage"] = dmg
