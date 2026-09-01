@@ -190,6 +190,73 @@ def combine(ctx: ValueContext, terms) -> np.ndarray:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# registered value functions: fixed convex combos (weights sum to 1, so each stays
+# in [-1, 1]). All module-level defs so they pickle by qualname across `spawn`.
+# --------------------------------------------------------------------------- #
+@register("paced")
+def paced(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.2, pacing)])
+
+
+@register("atk")
+def atk(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.2, exact_kill_frac)])
+
+
+@register("atk-blk")
+def atk_blk(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.1, exact_kill_frac), (0.1, full_block_frac)])
+
+
+@register("paced-atk")
+def paced_atk(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.15, exact_kill_frac), (0.05, pacing)])
+
+
+@register("atk-draw")
+def atk_draw(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.15, exact_kill_frac), (0.05, empty_draw_penalty)])
+
+
+@register("paced-blk")
+def paced_blk(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.1, pacing), (0.1, full_block_frac)])
+
+
+def _atk_suit(ctx: ValueContext, suit: int) -> np.ndarray:
+    """0.8 hp + 0.10 exact-kill + 0.05 attack-suit + 0.05 keep-suit, for one suit."""
+    return combine(
+        ctx,
+        [
+            (0.8, hp),
+            (0.10, exact_kill_frac),
+            (0.05, lambda c: attack_suit_frac(c, suit)),
+            (0.05, lambda c: keep_suit_frac(c, suit)),
+        ],
+    )
+
+
+@register("atk-C")
+def atk_clubs(ctx: ValueContext) -> np.ndarray:
+    return _atk_suit(ctx, _SUITS["clubs"])
+
+
+@register("atk-D")
+def atk_diamonds(ctx: ValueContext) -> np.ndarray:
+    return _atk_suit(ctx, _SUITS["diamonds"])
+
+
+@register("atk-H")
+def atk_hearts(ctx: ValueContext) -> np.ndarray:
+    return _atk_suit(ctx, _SUITS["hearts"])
+
+
+@register("atk-S")
+def atk_spades(ctx: ValueContext) -> np.ndarray:
+    return _atk_suit(ctx, _SUITS["spades"])
+
+
 def phase_snapshot(phases):
     """By-value ``PhaseInfo`` copies (independent of the engine's history vector)."""
     from regi_py.core import PhaseInfo

@@ -268,3 +268,37 @@ def test_combine_convex_stays_in_range(seeded):
     w = 1.0 / len(comps)
     out = vf.combine(ctx, [(w, f) for f in comps])
     assert (out >= -1.0).all() and (out <= 1.0).all()
+
+
+# --------------------------------------------------------------------------- #
+# registered convex-combo value functions
+# --------------------------------------------------------------------------- #
+_NEW_VALUE_FNS = [
+    "paced", "atk", "atk-blk", "paced-atk", "atk-draw", "paced-blk",
+    "atk-C", "atk-D", "atk-H", "atk-S",
+]
+
+
+def test_all_value_fns_registered():
+    names = vf.value_fn_names()
+    for n in ["hp"] + _NEW_VALUE_FNS:
+        assert n in names
+
+
+@pytest.mark.parametrize("name", _NEW_VALUE_FNS)
+def test_value_fn_with_real_actions(seeded, name):
+    # exercise the action-reading terms with a real (snapshot, actions) driven game
+    ctx = _ctx(seeded)
+    out = vf.get_value_fn(name)(ctx)
+    assert out.shape == (len(ctx.positions),)
+    assert out.dtype == np.float32
+    assert (out >= -1.0).all() and (out <= 1.0).all()
+
+
+def test_value_fn_matches_manual_combo(seeded):
+    ctx = _ctx(seeded)
+    got = vf.get_value_fn("paced-atk")(ctx)
+    want = vf.combine(
+        ctx, [(0.8, vf.hp), (0.15, vf.exact_kill_frac), (0.05, vf.pacing)]
+    )
+    assert np.array_equal(got, want)
