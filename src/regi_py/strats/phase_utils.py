@@ -109,65 +109,6 @@ def get_nonbad_defends(game, combos):
     return res
 
 
-class PhaseRecorderStrategy(BaseStrategy):
-    __strat_name__ = "phase-recorder"
-
-    def __init__(self, root_phase):
-        super(PhaseRecorderStrategy, self).__init__()
-        self.root_phase = root_phase
-        self.reroll()
-
-    def reroll(self):
-        self.shortcut = None
-        self.root_combos = None
-        self.next_phases = None
-        #
-        self.prev_phase = None
-        self.prev_a = None
-        self.is_recording = True
-
-    def setup(self, player, game):
-        return 0
-
-    def getRedirectIndex(self, player, game):
-        offset = random.randint(1, game.num_players - 1)
-        return (game.active_player + offset) % game.num_players
-
-    def mark_combo(self, phase):
-        self.next_phases[self.prev_a] = phase
-
-    def update_prev(self, a):
-        self.prev_a = a
-
-    def process_phase(self, phase, combos):
-        if str(phase) == str(self.root_phase):
-            if self.is_recording:
-                self.root_combos = combos
-                self.next_phases = [None] * len(combos)
-            self.prev_phase = phase
-        elif str(self.prev_phase) == str(self.root_phase):
-            self.mark_combo(phase)
-            self.prev_phase = phase
-        if self.shortcut is not None:
-            subind = self.shortcut
-            self.shortcut = None
-            bts = self.root_combos[subind].bitwise
-            ind = index_of_bitwise(combos, bts)
-            self.update_prev(subind)
-        else:
-            ind = random.choice(range(len(combos)))
-            self.update_prev(ind)
-        return ind
-
-    def getAttackIndex(self, combos, player, yield_allowed, game):
-        ind = self.process_phase(game.export_phaseinfo(), combos)
-        return ind
-
-    def getDefenseIndex(self, combos, player, damage, game):
-        ind = self.process_phase(game.export_phaseinfo(), combos)
-        return ind
-
-
 def index_of_bitwise(combos, bitwise, default=-1):
     """Position in ``combos`` of the combo whose ``bitwise`` identity matches.
 
