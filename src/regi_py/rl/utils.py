@@ -28,7 +28,7 @@ def hp_loss_penalty(enemy_hp):
 
     Single source of truth for the loss-side reward shaping shared by the MCTS
     leaf value (``az_explorer.AlphaZeroNode.simulate``) and the whole-game
-    training target (``rl.training.run_single_game``). Lives here (torch-free)
+    training target (via ``rl.value_fns``). Lives here (torch-free)
     so ``az_explorer`` can use it without pulling in ``training``/torch.
     """
     if enemy_hp > 320:
@@ -36,3 +36,12 @@ def hp_loss_penalty(enemy_hp):
     if enemy_hp > 280:
         return -0.9
     return (160 - enemy_hp) / 160
+
+
+# discount a game's outcome back toward earlier moves: the value target for a
+# position d decisions before the end is reward * VALUE_DISCOUNT**d. Early play has
+# little control over the eventual win/loss, so a raw-outcome target broadcast to
+# every position is needlessly high-variance and overconfident on distant states.
+# Lives here (torch-free) so the value-function registry (``rl.value_fns``) can use
+# it without importing ``training``/torch.
+VALUE_DISCOUNT = 0.98

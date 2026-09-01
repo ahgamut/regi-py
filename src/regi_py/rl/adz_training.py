@@ -14,7 +14,8 @@ import numpy as np
 from regi_py.strats import BruteSamplingStrategy
 from regi_py.rl.features import candidate_semantics
 from regi_py.rl.adz.explorer import ADZNodeInfo, ADZExplorerStrategy, trimmed_history
-from regi_py.rl.training import _BruteRecordMixin, _TeamRecordMixin, VALUE_DISCOUNT
+from regi_py.rl.training import _BruteRecordMixin, _TeamRecordMixin
+from regi_py.rl.value_fns import assign_values, phase_snapshot
 
 
 class RecordingADZBruteStrategy(_BruteRecordMixin, BruteSamplingStrategy):
@@ -38,15 +39,15 @@ class RecordingADZBruteStrategy(_BruteRecordMixin, BruteSamplingStrategy):
         )
 
 
-def adz_infos_from_game(game, moves, value, net_cls):
+def adz_infos_from_game(game, moves, win, s0, s1, net_cls, value_fn):
     """Build the ``ADZNodeInfo`` training list AFTER a brute/team game finishes, from
     the now-stable ``game.history``. One-shot analogue of ``ADZNode.export()``: the
-    policy is a one-hot at the played subset over that decision's offered list. The
-    window length is ``net_cls.max_history`` (matches its inference window)."""
+    policy is a one-hot at the played subset over that decision's offered list.
+    ``value_fn`` sets each value; ``moves``' history indices are the snapshot positions."""
     hist = list(game.history)
-    last = len(hist) - 1  # discount each record by its distance to the terminal phase
     maxhist = net_cls.max_history
     infos = []
+    positions = []
     for idx, bitwises, feats, played_bw, attacking in moves:
         root_phase = hist[idx]
         window = trimmed_history(hist[:idx], root_phase, maxhist)
@@ -61,10 +62,12 @@ def adz_infos_from_game(game, moves, value, net_cls):
                 candidates=bitwises,
                 cand_feats=feats,
                 policy=policy,
-                value=value * (VALUE_DISCOUNT ** (last - idx)),
+                value=0.0,
                 attacking=attacking,
             )
         )
+        positions.append(idx)
+    assign_values(infos, phase_snapshot(hist), positions, win, s0, s1, value_fn)
     return infos
 
 

@@ -22,7 +22,8 @@ from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.combomap import cell_of_bitwise
 from regi_py.strats import RandomStrategy, BruteSamplingStrategy, STRATEGY_LIST
 from regi_py.rl.az.explorer import AZExplorerStrategy, AlphaZeroNode, AZNodeInfo
-from regi_py.rl.utils import enemy_hp_left, hp_loss_penalty
+from regi_py.rl.utils import enemy_hp_left
+from regi_py.rl.value_fns import assign_values, phase_snapshot
 
 
 # brute teammates search at the full default depth
@@ -113,12 +114,6 @@ def run_epoch(model, batch, optimizer):
 # collapsed every game onto ~one trajectory.
 SELFPLAY_TEMP_MOVES = 12
 
-# discount the game outcome back toward earlier moves: the value target for a
-# position d moves before the end is reward * VALUE_DISCOUNT**d. Early play has
-# little control over the eventual win/loss, so a raw-outcome target broadcast to
-# every position is needlessly high-variance and overconfident on distant states.
-VALUE_DISCOUNT = 0.98
-
 
 def _sample_selfplay_child(node, move_num):
     if move_num >= SELFPLAY_TEMP_MOVES:
@@ -129,10 +124,10 @@ def _sample_selfplay_child(node, move_num):
     return random.choices(node.children, weights=weights, k=1)[0]
 
 
-def run_single_game(tid, i, net, num_bots, num_iterations, paradigm):
+def run_single_game(tid, i, net, num_bots, num_iterations, paradigm, value_fn):
     """Net self-play from a fresh ``initialize()`` (AZ or ADZ, per ``paradigm``):
-    visit-count temperature for the opening then greedy, value target discounted by
-    distance to the terminal position. Returns the net's training tensors."""
+    visit-count temperature for the opening then greedy. ``value_fn`` sets the value
+    target per position. Returns the net's training tensors."""
     a = time.time()
     log = DummyLog()
     strat = RandomStrategy()
@@ -161,12 +156,10 @@ def run_single_game(tid, i, net, num_bots, num_iterations, paradigm):
     s1 = enemy_hp_left(node.root_phase)
     #
     dt = time.time() - a
-    reward = 1.0 if win else hp_loss_penalty(s1)
-    # the last move keeps the full reward; each earlier move is discounted by its
-    # distance to the terminal position (see VALUE_DISCOUNT)
-    last = len(history) - 1
-    for j, info in enumerate(history):
-        info.value = reward * (VALUE_DISCOUNT ** (last - j))
+    # dense trajectory: record k's decision phase is history[k].history[-1] (already a
+    # by-value copy), positions 0..last map straight onto the snapshot
+    snapshot = [info.history[-1] for info in history]
+    assign_values(history, snapshot, list(range(len(history))), win, s0, s1, value_fn)
     print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     return type(net).tensorify_training(history)
 
@@ -229,28 +222,23 @@ class RecordingBruteStrategy(_BruteRecordMixin, BruteSamplingStrategy):
         self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
 
 
-def infos_from_game(game, moves, value, net_cls):
-    """Build the ``AZNodeInfo`` training list AFTER a brute game finishes.
+def infos_from_game(game, moves, win, s0, s1, net_cls, value_fn):
+    """Build the ``AZNodeInfo`` training list AFTER a brute/team game finishes.
 
-    Rebuilds each decision's history window from the now-stable ``game.history``.
-    Safe because the game is over (the underlying vector no longer reallocates) and
-    tensorify runs before ``run_brute_game`` returns, while ``game`` -- which keeps
-    those references alive -- is still in scope.
-
-    One-shot analogue of ``AlphaZeroNode.export()`` (N0 = 1): ``keepyness`` is 1 for
-    kept hand cards / 0 for the cards spent in the played combo; ``atk_probs`` is a
-    one-hot at the played combo's ComboTable cell on attack phases (defense phases
-    keep it all-zero -- the action loss is masked by ``attacking``). The window
-    length is ``net_cls.max_history`` (matches its inference window).
+    Rebuilds each decision's window from the now-stable ``game.history`` (safe: the game
+    is over so the vector no longer reallocates, and tensorify runs while ``game`` is
+    still in scope). One-shot analogue of ``AlphaZeroNode.export()`` (N0 = 1):
+    ``keepyness`` is 1 for kept hand cards / 0 for cards spent in the played combo;
+    ``atk_probs`` is a one-hot at the played combo's ComboTable cell on attack phases
+    (defense keeps it zero -- masked by ``attacking``). ``value_fn`` sets each value from
+    the game snapshot; ``moves``' history indices are the snapshot positions.
     """
     hist = list(game.history)
-    last = len(hist) - 1  # discount each record by its distance to the terminal phase
     maxhist = net_cls.max_history
     infos = []
+    positions = []
     for idx, bitwise, part_locs in moves:
         root_phase = hist[idx]
-        # dense window ending at this decision, matching NetDirectStrategy's
-        # inference window (the last ``maxhist`` phases of game.history)
         window = AlphaZeroNode._trimmed_history(hist[:idx], root_phase, maxhist)
         #
         keepyness = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
@@ -266,17 +254,14 @@ def infos_from_game(game, moves, value, net_cls):
                 atk_probs[lp] = 1.0
         #
         infos.append(
-            AZNodeInfo(
-                history=window,
-                value=value * (VALUE_DISCOUNT ** (last - idx)),
-                atk_probs=atk_probs,
-                keepyness=keepyness,
-            )
+            AZNodeInfo(history=window, value=0.0, atk_probs=atk_probs, keepyness=keepyness)
         )
+        positions.append(idx)
+    assign_values(infos, phase_snapshot(hist), positions, win, s0, s1, value_fn)
     return infos
 
 
-def run_brute_game(tid, i, net_cls, num_bots, iterations, paradigm):
+def run_brute_game(tid, i, net_cls, num_bots, iterations, paradigm, value_fn):
     """Play one brute-sampling game from a random mid-game state; return training
     tensors only if it made large progress (else ``None``).
 
@@ -303,12 +288,10 @@ def run_brute_game(tid, i, net_cls, num_bots, iterations, paradigm):
     if s0 - s1 < 170:  # only games that progress a lot are submitted as training data
         return None
     print(f"{tid},{i},b{len(strat.moves)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
-    # build the training records AFTER the game, from the now-stable game.history.
-    # score losses by the hp penalty (matching run_single_game) so brute and net
-    # explorers agree on the value target -- a high-progress loss is not as good as a win.
-    # infos_fn discounts each record by distance to end (see infos_from_game).
-    value = 1.0 if win else hp_loss_penalty(s1)
-    infos = paradigm.infos_fn(game, strat.moves, value=value, net_cls=net_cls)
+    # records built AFTER the game from the now-stable history; value_fn scores them
+    infos = paradigm.infos_fn(
+        game, strat.moves, win=win, s0=s0, s1=s1, net_cls=net_cls, value_fn=value_fn
+    )
     if not infos:
         return None
     return net_cls.tensorify_training(infos)
@@ -331,7 +314,7 @@ class RecordingAZTeamStrategy(_TeamRecordMixin, AZExplorerStrategy):
         self.moves.append((idx, combo.bitwise, [c.location for c in combo.parts]))
 
 
-def run_team_game(tid, i, net, num_bots, iterations, paradigm):
+def run_team_game(tid, i, net, num_bots, iterations, paradigm, value_fn):
     """One full cooperative game: 1-2 net-guided-MCTS seats (``paradigm`` team recorder)
     + non-NN teammates from ``regi_py.strats``. Returns training tensors from the NN's
     decisions only (one-hot targets, value = outcome); every game submitted. See
@@ -357,8 +340,9 @@ def run_team_game(tid, i, net, num_bots, iterations, paradigm):
         f"{tid},{i},t{len(moves)}({num_nn}/{num_bots}),{s0},{s1},{dt:.4f}s,{win}",
         file=sys.stderr,
     )
-    value = 1.0 if win else hp_loss_penalty(s1)  # infos_fn discounts by distance to end
-    infos = paradigm.infos_fn(game, moves, value=value, net_cls=type(net))
+    infos = paradigm.infos_fn(
+        game, moves, win=win, s0=s0, s1=s1, net_cls=type(net), value_fn=value_fn
+    )
     if not infos:
         return None
     return type(net).tensorify_training(infos)

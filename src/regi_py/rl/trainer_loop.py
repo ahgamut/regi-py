@@ -35,6 +35,7 @@ from regi_py.rl.training import (
     test_model,
     improved_gameplay,
 )
+from regi_py.rl.value_fns import get_value_fn, value_fn_names
 
 
 @dataclass
@@ -221,6 +222,7 @@ def explorer(tid, shared_model, exp_queue, device, params):
                         num_bots,
                         params.num_simulations,
                         pl.paradigm,
+                        params.value_fn,
                     )
                 else:
                     examples = run_brute_game(
@@ -230,6 +232,7 @@ def explorer(tid, shared_model, exp_queue, device, params):
                         num_bots,
                         params.num_simulations,
                         pl.paradigm,
+                        params.value_fn,
                     )
                 if examples is None:  # lost/degenerate game -> no data submitted
                     fails = 0
@@ -242,6 +245,7 @@ def explorer(tid, shared_model, exp_queue, device, params):
                     num_bots,
                     params.num_simulations,
                     pl.paradigm,
+                    params.value_fn,
                 )
             exp_queue.put(examples)
             del examples
@@ -360,6 +364,13 @@ def build_parser(pipeline):
         help="net architecture",
     )
     parser.add_argument(
+        "--value-fn",
+        dest="value_fn",
+        default="hp",
+        choices=value_fn_names(),
+        help="value-target function (see rl.value_fns)",
+    )
+    parser.add_argument(
         "--team-games",
         action="store_true",
         help="even-tid explorers play full cooperative games (net beside other "
@@ -375,6 +386,8 @@ def run_trainer(pipeline):
     params = build_parser(pipeline).parse_args()
     params.pipeline = pipeline
     params.net_cls = pipeline.get_net(params.net)
+    # resolve the name to a module-level fn (picklable by qualname -> spawn-safe)
+    params.value_fn = get_value_fn(params.value_fn)
     ncpu = os.cpu_count() or 2
     if params.num_processes <= 0:
         # fill the CPU with explorers: 1 trainer + (n-1) explorers + 1 evaluator,
