@@ -138,6 +138,7 @@ def run_single_game(tid, i, net, num_bots, num_iterations, paradigm, value_fn):
     start_phase = game.export_phaseinfo()
     #
     history = []
+    actions = []  # played combo (card locations) per decision, for the value_fn
     node = paradigm.node_cls(start_phase, net=net, history=[], prior=1.0, trim=False)
     s0 = enemy_hp_left(node.root_phase)
     move_num = 0
@@ -148,10 +149,13 @@ def run_single_game(tid, i, net, num_bots, num_iterations, paradigm, value_fn):
         paradigm.simulate_fn(node, num_iterations)
         history.append(node.export())
         child = _sample_selfplay_child(node, move_num)
+        # the combo played at this decision = the one that produced the chosen child
+        actions.append([c.location for c in child.prev_combo.parts])
         child.parent = None
         node = child
         move_num += 1
     history.append(node.export())
+    actions.append([])  # terminal export: no decision was made from it
     win = node.root_phase.game_endvalue == 1
     s1 = enemy_hp_left(node.root_phase)
     #
@@ -159,7 +163,9 @@ def run_single_game(tid, i, net, num_bots, num_iterations, paradigm, value_fn):
     # dense trajectory: record k's decision phase is history[k].history[-1] (already a
     # by-value copy), positions 0..last map straight onto the snapshot
     snapshot = [info.history[-1] for info in history]
-    assign_values(history, snapshot, list(range(len(history))), win, s0, s1, value_fn)
+    assign_values(
+        history, snapshot, list(range(len(history))), actions, win, s0, s1, value_fn
+    )
     print(f"{tid},{i},p{len(history)},{s0},{s1},{dt:.4f}s,{win}", file=sys.stderr)
     return type(net).tensorify_training(history)
 
@@ -237,6 +243,7 @@ def infos_from_game(game, moves, win, s0, s1, net_cls, value_fn):
     maxhist = net_cls.max_history
     infos = []
     positions = []
+    actions = []
     for idx, bitwise, part_locs in moves:
         root_phase = hist[idx]
         window = AlphaZeroNode._trimmed_history(hist[:idx], root_phase, maxhist)
@@ -257,7 +264,8 @@ def infos_from_game(game, moves, win, s0, s1, net_cls, value_fn):
             AZNodeInfo(history=window, value=0.0, atk_probs=atk_probs, keepyness=keepyness)
         )
         positions.append(idx)
-    assign_values(infos, phase_snapshot(hist), positions, win, s0, s1, value_fn)
+        actions.append(part_locs)
+    assign_values(infos, phase_snapshot(hist), positions, actions, win, s0, s1, value_fn)
     return infos
 
 

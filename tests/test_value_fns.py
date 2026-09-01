@@ -27,9 +27,12 @@ if "regi_py.rl" not in sys.modules:
         _stub.__path__ = [str(_RL_DIR)]
         sys.modules["regi_py.rl"] = _stub
 
+import math  # noqa: E402
+
 import regi_py.core as core  # noqa: E402
-from regi_py.core import GameState, RandomStrategy, PhaseInfo  # noqa: E402
+from regi_py.core import GameState, RandomStrategy, PhaseInfo, Card  # noqa: E402
 from regi_py.logging import DummyLog  # noqa: E402
+from regi_py.strats.phase_utils import PhaseExpander  # noqa: E402
 
 import regi_py.rl.value_fns as vf  # noqa: E402
 from regi_py.rl.utils import hp_loss_penalty, VALUE_DISCOUNT  # noqa: E402
@@ -44,6 +47,32 @@ def _game_history(seeded, n_players=3):
     game.initialize()
     game.start_loop()
     return vf.phase_snapshot(game.history), game
+
+
+def _drive_game(seeded, n_players=3, cap=600):
+    """Drive a full game one decision at a time via PhaseExpander (torch-free), always
+    playing the first non-yield combo offered. Returns a ValueContext-shaped
+    (snapshot, positions, actions, win) -- actions = played card locations per phase."""
+    core.seed(seeded)
+    game = GameState(DummyLog())
+    for _ in range(n_players):
+        game.add_player(RandomStrategy())
+    game.initialize()
+    phase = game.export_phaseinfo()
+    snapshot, actions = [], []
+    while phase.game_endvalue == 0 and len(snapshot) < cap:
+        exp = PhaseExpander(phase)
+        offered = exp.offered()
+        chosen = next((c for c in offered if c.bitwise != 0), offered[0])
+        snapshot.append(PhaseInfo.from_string(phase.to_string()))
+        actions.append([c.location for c in chosen.parts])
+        phase = PhaseInfo.from_string(exp.step(chosen.bitwise).to_string())
+    return snapshot, list(range(len(snapshot))), actions, phase.game_endvalue == 1
+
+
+def _ctx(seeded):
+    snap, pos, acts, win = _drive_game(seeded)
+    return vf.ValueContext(snap, pos, actions=acts, win=win, s0=480.0, s1=0.0)
 
 
 def _expected_hp(n_snapshot, positions, win, s1):
@@ -127,8 +156,115 @@ def test_phase_snapshot_is_faithful_and_independent(seeded):
 def test_assign_values_sets_info_value(seeded):
     snapshot, _ = _game_history(seeded)
     positions = list(range(len(snapshot)))
+    actions = [[] for _ in positions]  # hp ignores actions; any aligned list is fine
     infos = [types.SimpleNamespace(value=None) for _ in positions]
-    vf.assign_values(infos, snapshot, positions, win=True, s0=480.0, s1=0.0, value_fn=vf.hp)
+    vf.assign_values(
+        infos, snapshot, positions, actions, win=True, s0=480.0, s1=0.0, value_fn=vf.hp
+    )
     exp = _expected_hp(len(snapshot), positions, win=True, s1=0.0)
     for info, e in zip(infos, exp):
         assert info.value == float(e)  # stored as a plain float
+
+
+# --------------------------------------------------------------------------- #
+# component functions
+# --------------------------------------------------------------------------- #
+def test_drive_game_produces_actions(seeded):
+    snap, pos, acts, win = _drive_game(seeded)
+    assert len(snap) == len(pos) == len(acts) and len(snap) > 0
+    # every action card location maps to a suit via loc//14, matching the engine's Card
+    for act in acts:
+        for loc in act:
+            assert loc // 14 == int(Card.from_location(loc).suit)
+
+
+@pytest.mark.parametrize("suit", [0, 1, 2, 3])
+def test_suit_component_ranges(seeded, suit):
+    ctx = _ctx(seeded)
+    assert 0.0 <= vf.attack_suit_frac(ctx, suit) <= 1.0
+    assert 0.0 <= vf.keep_suit_frac(ctx, suit) <= 1.0
+
+
+def test_attack_suit_frac_matches_independent_count(seeded):
+    ctx = _ctx(seeded)
+    atk = [ctx.snapshot[p] for p in ctx.positions if ctx.snapshot[p].phase_attacking]
+    acts = [a for p, a in zip(ctx.positions, ctx.actions) if ctx.snapshot[p].phase_attacking]
+    denom = len(atk)
+    for suit in range(4):
+        want = (
+            sum(any(loc // 14 == suit for loc in a) for a in acts) / denom
+            if denom
+            else 0.0
+        )
+        assert vf.attack_suit_frac(ctx, suit) == pytest.approx(want)
+
+
+def test_scalar_component_ranges(seeded):
+    ctx = _ctx(seeded)
+    assert 0.0 <= vf.exact_kill_frac(ctx) <= 1.0
+    assert 0.0 <= vf.full_block_frac(ctx) <= 1.0
+    assert -1.0 <= vf.empty_draw_penalty(ctx) <= 0.0
+    assert -1.0 <= vf.pacing(ctx) <= 1.0
+
+
+def test_empty_context_components_are_zero():
+    # no decisions recorded -> action/state ratios collapse to 0 (no div-by-zero)
+    ctx = vf.ValueContext([], [], actions=[], win=False, s0=480.0, s1=480.0)
+    assert vf.attack_suit_frac(ctx, 0) == 0.0
+    assert vf.keep_suit_frac(ctx, 0) == 0.0
+    assert vf.exact_kill_frac(ctx) == 0.0
+    assert vf.full_block_frac(ctx) == 0.0
+    assert vf.empty_draw_penalty(ctx) == 0.0
+
+
+@pytest.mark.parametrize(
+    "n,win,expect",
+    [
+        (70, True, math.tanh(10 / 15)),   # fast win -> reward
+        (70, False, 0.0),                 # fast loss -> neutral
+        (79, True, math.tanh(1 / 15)),    # just under the fast threshold
+        (80, True, 0.0),                  # boundary: not < 80
+        (90, True, 0.0),                  # mid band -> neutral
+        (100, False, 0.0),                # boundary: not > 100
+        (120, True, -math.tanh(20 / 15)), # long game penalized even on a win
+        (120, False, -math.tanh(20 / 15)),
+    ],
+)
+def test_pacing_formula(n, win, expect):
+    # pacing reads only len(snapshot) + win, so a length-n dummy snapshot suffices
+    ctx = vf.ValueContext([0] * n, list(range(n)), win=win, s0=480.0, s1=0.0)
+    assert vf.pacing(ctx) == pytest.approx(expect)
+
+
+# --------------------------------------------------------------------------- #
+# combine (convex combination -> value function)
+# --------------------------------------------------------------------------- #
+def test_combine_single_term_broadcasts(seeded):
+    ctx = _ctx(seeded)
+    out = vf.combine(ctx, [(1.0, vf.pacing)])
+    assert out.shape == (len(ctx.positions),)
+    assert np.allclose(out, np.float32(vf.pacing(ctx)))
+
+
+def test_combine_mixes_scalar_and_per_position(seeded):
+    ctx = _ctx(seeded)
+    out = vf.combine(ctx, [(0.5, vf.hp), (0.5, vf.empty_draw_penalty)])
+    assert out.shape == (len(ctx.positions),)
+    assert out.dtype == np.float32
+    assert (out >= -1.0).all() and (out <= 1.0).all()
+
+
+def test_combine_convex_stays_in_range(seeded):
+    ctx = _ctx(seeded)
+    comps = [
+        vf.exact_kill_frac,
+        vf.full_block_frac,
+        vf.empty_draw_penalty,
+        vf.pacing,
+        lambda c: vf.attack_suit_frac(c, 0),
+        lambda c: vf.keep_suit_frac(c, 3),
+        vf.hp,
+    ]
+    w = 1.0 / len(comps)
+    out = vf.combine(ctx, [(w, f) for f in comps])
+    assert (out >= -1.0).all() and (out <= 1.0).all()

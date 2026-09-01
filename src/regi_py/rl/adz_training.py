@@ -11,6 +11,7 @@ one-shot ``ADZNodeInfo`` builder). The recorders reuse the shared
 """
 import numpy as np
 
+from regi_py.core import MAX_CARDS_IN_GAME
 from regi_py.strats import BruteSamplingStrategy
 from regi_py.rl.features import candidate_semantics
 from regi_py.rl.adz.explorer import ADZNodeInfo, ADZExplorerStrategy, trimmed_history
@@ -48,6 +49,7 @@ def adz_infos_from_game(game, moves, win, s0, s1, net_cls, value_fn):
     maxhist = net_cls.max_history
     infos = []
     positions = []
+    actions = []
     for idx, bitwises, feats, played_bw, attacking in moves:
         root_phase = hist[idx]
         window = trimmed_history(hist[:idx], root_phase, maxhist)
@@ -67,7 +69,9 @@ def adz_infos_from_game(game, moves, win, s0, s1, net_cls, value_fn):
             )
         )
         positions.append(idx)
-    assign_values(infos, phase_snapshot(hist), positions, win, s0, s1, value_fn)
+        # the played combo's card locations = set bits of its location bitmask
+        actions.append([b for b in range(MAX_CARDS_IN_GAME) if (played_bw >> b) & 1])
+    assign_values(infos, phase_snapshot(hist), positions, actions, win, s0, s1, value_fn)
     return infos
 
 
