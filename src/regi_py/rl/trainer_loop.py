@@ -68,7 +68,7 @@ class Pipeline:
     paradigm: Paradigm           # AZ/ADZ node/strategy/recorder/infos pieces
 
 
-def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, params):
+def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, params, infer=None):
     print(f"P{tid} on {train_device} to train")
     torch.set_num_threads(params.num_threads)
     with torch.device(train_device):
@@ -119,6 +119,9 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
 
         # publish the freshest weights so explorers self-play with the latest net
         shared_model.load_state_dict(train_model.state_dict())
+        if infer is not None:
+            with infer.version.get_lock():
+                infer.version.value += 1
 
         # hand a candidate snapshot to the eval process; best-effort, so a busy
         # evaluator never stalls training (stale candidates are simply skipped)
@@ -187,7 +190,7 @@ def evaluator(eval_queue, eval_done, params):
         eval_done.set()
 
 
-def explorer(tid, shared_model, exp_queue, device, params):
+def explorer(tid, shared_model, exp_queue, device, params, infer=None):
     # odd-tid explorers run net-guided self-play; other_play explorers (even tid)
     # supply the complementary data -- brute late-game samples by default, or full
     # cooperative team games with --team-games (net beside other regi_py.strats).
@@ -202,6 +205,14 @@ def explorer(tid, shared_model, exp_queue, device, params):
         role = f"{pl.label}-explore"
     print(f"P{tid} on {device} to {role}")
     torch.set_num_threads(params.num_threads)
+    # server path: self-play routes through a client-attached net; brute stays net-free
+    if infer is not None:
+        selfplay_net = params.net_cls()
+        selfplay_net.device = device
+        selfplay_net.eval()
+        selfplay_net._infer_client = infer.client_for(tid)
+    else:
+        selfplay_net = shared_model
     count = 0
     fails = 0
     logged_gc = False
@@ -241,7 +252,7 @@ def explorer(tid, shared_model, exp_queue, device, params):
                 examples = run_single_game(
                     tid,
                     count,
-                    shared_model,
+                    selfplay_net,
                     num_bots,
                     params.num_simulations,
                     pl.paradigm,
@@ -295,9 +306,21 @@ def submain(params):
     eval_done = mp.Event()  # evaluator -> trainer: "queue drained, safe to exit"
     processes = []
 
+    infer = None
+    p_infer = None
+    if getattr(params, "use_infer_server", False):
+        from regi_py.rl.play_server import build_arena, infer_server
+
+        infer_device = "cuda" if params.infer_device == "auto" else params.infer_device
+        infer = build_arena(params, n_slots=params.num_processes)
+        p_infer = mp.Process(
+            target=infer_server, args=(shared_model, infer, infer_device, params)
+        )
+        p_infer.start()
+
     p_trainer = mp.Process(
         target=trainer,
-        args=(0, shared_model, exp_queue, eval_queue, eval_done, train_device, params),
+        args=(0, shared_model, exp_queue, eval_queue, eval_done, train_device, params, infer),
     )
     p_trainer.start()
 
@@ -307,7 +330,7 @@ def submain(params):
     for i in range(1, params.num_processes):
         p = mp.Process(
             target=explorer,
-            args=(i, shared_model, exp_queue, test_device, params),
+            args=(i, shared_model, exp_queue, test_device, params, infer),
         )
         p.start()
         processes.append(p)
@@ -323,6 +346,8 @@ def submain(params):
     p_eval.join()
     for p in processes:
         p.terminate()
+    if p_infer is not None:
+        p_infer.terminate()
 
 
 def build_parser(pipelines):
@@ -385,17 +410,30 @@ def build_parser(pipelines):
         "regi_py.strats, training on the NN's decisions only) instead of brute "
         "games; use only after regular self-play has trained the net",
     )
+    parser.add_argument(
+        "--infer-device", default="auto", help="device for the GPU inference server "
+        "(trainer_server.py only); 'auto' -> cuda"
+    )
+    parser.add_argument(
+        "--infer-batch", default=64, type=int, help="max leaves per server forward "
+        "(trainer_server.py only)"
+    )
     return parser
 
 
-def run_trainer(pipelines):
+def run_trainer(pipelines, infer_server=False):
     """Parse args, pick the paradigm from ``--net``, size the process pool, and launch
     ``submain``. Takes one :class:`Pipeline` or a list of them (the unified
     ``trainers/trainer.py`` passes [AZ, ADZ]); the pipeline whose net registry owns
-    ``--net`` is selected, so no separate ``--paradigm`` flag is needed."""
+    ``--net`` is selected, so no separate ``--paradigm`` flag is needed.
+    ``infer_server`` (set by ``trainers/trainer_server.py``) routes self-play predicts
+    to a GPU inference server; it runs self-play + brute only, so team games are off."""
     if isinstance(pipelines, Pipeline):
         pipelines = [pipelines]
     params = build_parser(pipelines).parse_args()
+    params.use_infer_server = infer_server
+    if infer_server:
+        params.team_games = False
     params.pipeline = next(pl for pl in pipelines if params.net in pl.net_choices)
     params.net_cls = params.pipeline.get_net(params.net)
     # resolve the name to a module-level fn (picklable by qualname -> spawn-safe)
