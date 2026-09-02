@@ -41,6 +41,8 @@ class CandidateBaseNet(nn.Module):
     CAND_FEATURE_DIM = features.CAND_FEATURE_DIM
     TRAIN_FIELDS = ()            # input columns THEN target columns, in shard order
 
+    _infer_client = None         # play_server.InferClient, or None for local CPU predict
+
     def __init__(self):
         super().__init__()
         self.device = "cpu"
@@ -158,6 +160,8 @@ class CandidateBaseNet(nn.Module):
         """Inference contract: ``(value, priors)`` where ``priors`` is a
         ``len(offered_combos)`` numpy array of a softmax over the REAL (unpadded)
         candidates, aligned to ``offered_combos``. Empty offer -> empty priors."""
+        if self._infer_client is not None:
+            return self.predict_remote(history, offered_combos, phase, perspective)
         with torch.inference_mode():
             data = type(self).tensorify_predict(
                 history, offered_combos, phase, perspective, self.max_history
@@ -170,6 +174,36 @@ class CandidateBaseNet(nn.Module):
             logits = cand_logits[0, :K]
             priors = torch.softmax(logits, dim=-1).detach().cpu().numpy()
         return v_hat, priors.astype(np.float32)
+
+    def predict_remote(self, history, offered_combos, phase, perspective=None):
+        data = type(self).tensorify_predict(
+            history, offered_combos, phase, perspective, self.max_history
+        )
+        out = self._infer_client.exchange(data)
+        v_hat = float(out["v"][0])
+        K = len(offered_combos)
+        if K == 0:
+            return v_hat, np.zeros(0, dtype=np.float32)
+        return v_hat, np.array(out["priors"][:K], dtype=np.float32)
+
+    def predict_batch(self, batch):
+        with torch.inference_mode():
+            data = {k: v.to(self.device) for k, v in batch.items()}
+            value, cand_logits, _ = self.forward(data)
+            mask = data["cand_mask"]
+            neg = torch.finfo(cand_logits.dtype).min
+            safe = torch.where(mask > 0, cand_logits, torch.full_like(cand_logits, neg))
+            priors = torch.softmax(safe, dim=-1)
+            return {
+                "v": value.detach().to("cpu"),
+                "priors": priors.detach().to("cpu"),
+            }
+
+    @classmethod
+    def sample_predict_input(cls, node):
+        return cls.tensorify_predict(
+            node.history, node.next_combos, node.root_phase, None, cls.max_history
+        )
 
     def calculate_loss(self, data, y_hat):
         """Masked policy CE over the candidate axis + value MSE + keepy MSE.

@@ -11,6 +11,7 @@ defaults here, driven by the ``_assemble`` hook and ``features.py``.
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS
 from regi_py.rl import features
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -20,6 +21,8 @@ class BaseNet(nn.Module):
     __mname__ = "base"          # checkpoint tag + strat-name suffix; must be unique
     max_history = 8             # history window length
     TRAIN_FIELDS = ()           # input columns THEN target columns, in shard order
+
+    _infer_client = None        # play_server.InferClient, or None for local CPU predict
 
     def __init__(self):
         super().__init__()
@@ -78,6 +81,8 @@ class BaseNet(nn.Module):
         return result
 
     def predict(self, history, perspective=None):
+        if self._infer_client is not None:
+            return self.predict_remote(history, perspective)
         # inference_mode: self-play/eval never backprop through predict, so skip
         # all autograd bookkeeping (a real CPU win, since every call otherwise
         # builds a graph that's immediately discarded)
@@ -88,6 +93,28 @@ class BaseNet(nn.Module):
             k_hat = k_hat0.detach().cpu().numpy()[0, :]
             a_hat = a_hat0.detach().cpu().numpy()[0, 0, :, :]
         return v_hat, k_hat, a_hat
+
+    def predict_remote(self, history, perspective=None):
+        data = type(self).tensorify_phases(history, perspective, self.max_history)
+        out = self._infer_client.exchange(data)
+        v_hat = float(out["v"][0])
+        k_hat = np.array(out["k"], dtype=np.float32)
+        a_hat = np.array(out["a"][0], dtype=np.float32)
+        return v_hat, k_hat, a_hat
+
+    def predict_batch(self, batch):
+        with torch.inference_mode():
+            data = {k: v.to(self.device) for k, v in batch.items()}
+            v_hat, k_hat, a_hat = self.forward(data)
+            return {
+                "v": v_hat.detach().to("cpu"),
+                "k": k_hat.detach().to("cpu"),
+                "a": a_hat.detach().to("cpu"),
+            }
+
+    @classmethod
+    def sample_predict_input(cls, node):
+        return cls.tensorify_phases(node.history, None, cls.max_history)
 
     def calculate_loss(self, data, y_hat):
         """Shared value + keepyness + masked-policy-CE loss. Architecture-agnostic:
