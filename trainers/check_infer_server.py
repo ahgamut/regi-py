@@ -34,11 +34,11 @@ def _tensorify(net_cls, args):
 
 def _unpack_row(out, k):
     if "priors" in out:                      # ADZ
-        return float(out["v"][0]), np.array(out["priors"][:k], dtype=np.float32)
+        return float(out["v"][0]), out["priors"][:k].numpy().astype(np.float32)
     return (
         float(out["v"][0]),
-        np.array(out["k"], dtype=np.float32),
-        np.array(out["a"][0], dtype=np.float32),
+        out["k"].numpy().astype(np.float32),
+        out["a"][0].numpy().astype(np.float32),
     )
 
 

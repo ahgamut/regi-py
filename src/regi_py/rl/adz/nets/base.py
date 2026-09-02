@@ -184,7 +184,7 @@ class CandidateBaseNet(nn.Module):
         K = len(offered_combos)
         if K == 0:
             return v_hat, np.zeros(0, dtype=np.float32)
-        return v_hat, np.array(out["priors"][:K], dtype=np.float32)
+        return v_hat, out["priors"][:K].numpy().astype(np.float32)
 
     def predict_batch(self, batch):
         with torch.inference_mode():

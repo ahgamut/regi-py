@@ -98,8 +98,8 @@ class BaseNet(nn.Module):
         data = type(self).tensorify_phases(history, perspective, self.max_history)
         out = self._infer_client.exchange(data)
         v_hat = float(out["v"][0])
-        k_hat = np.array(out["k"], dtype=np.float32)
-        a_hat = np.array(out["a"][0], dtype=np.float32)
+        k_hat = out["k"].numpy().astype(np.float32)
+        a_hat = out["a"][0].numpy().astype(np.float32)
         return v_hat, k_hat, a_hat
 
     def predict_batch(self, batch):
