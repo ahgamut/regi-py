@@ -75,6 +75,10 @@ def build_arena(params, n_slots):
     return InferArena(in_fields, out_fields, mp.Queue(), events, mp.Value("i", 0), n_slots)
 
 
+def stop_server(arena):
+    arena.req_q.put(None)
+
+
 def infer_server(shared_model, arena, device, params):
     torch.set_num_threads(params.num_threads)
     net = params.net_cls()
@@ -91,6 +95,8 @@ def infer_server(shared_model, arena, device, params):
                 ids.append(arena.req_q.get_nowait())
             except queue.Empty:
                 break
+        if None in ids:                      # stop_server sentinel
+            break
         v = arena.version.value
         if v != seen:
             net.load_state_dict(shared_model.state_dict())

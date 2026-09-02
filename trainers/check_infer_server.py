@@ -15,7 +15,7 @@ import types
 import numpy as np
 import torch
 
-from regi_py.rl.play_server import build_arena, infer_server
+from regi_py.rl.play_server import build_arena, infer_server, stop_server
 from regi_py.rl.training import run_single_game
 from regi_py.rl.value_fns import get_value_fn
 from trainers.trainer import AZ, ADZ
@@ -67,9 +67,7 @@ def main():
     ref_net.eval()
 
     arena = build_arena(params, n_slots=1)
-    server = threading.Thread(
-        target=infer_server, args=(ref_net, arena, "cpu", params), daemon=True
-    )
+    server = threading.Thread(target=infer_server, args=(ref_net, arena, "cpu", params))
     server.start()
 
     client_net = net_cls()
@@ -109,6 +107,9 @@ def main():
             row = {f: t[i] for f, t in out.items()}
             got = _unpack_row(row, k)
             worst_batch = max(worst_batch, float(np.max(np.abs(_flat(ref_out) - _flat(got)))))
+
+    stop_server(arena)
+    server.join(timeout=5)
 
     print(f"net={a.net} checks={checks} stash={len(stash)}")
     print(f"live (arena+thread server) max|diff| = {worst_live:.3e}")
