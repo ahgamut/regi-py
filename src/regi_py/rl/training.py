@@ -100,6 +100,17 @@ def run_epoch(model, batch, optimizer):
     data = {k: v.to(model.device) for k, v in zip(type(model).TRAIN_FIELDS, batch)}
     y_hat = model(data)
     loss, comps = model.calculate_loss(data, y_hat)
+    if not torch.isfinite(loss):
+        # a non-finite loss (transformer activation overflow -> inf/nan in the softmax)
+        # would step nan into AdamW's moments and poison every later update; skip the
+        # step so one spike can't kill the run
+        print(
+            f"WARN non-finite loss {loss.item()} comps="
+            f"{tuple(c.item() for c in comps)}; skipping optimizer step",
+            file=sys.stderr,
+        )
+        optimizer.zero_grad(set_to_none=True)
+        return loss.item(), tuple(c.item() for c in comps)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
