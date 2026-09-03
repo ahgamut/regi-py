@@ -91,6 +91,11 @@ def drain(q, buf):
         del obj  # frees the child's shared-memory (/dev/shm) segments right now
 
 
+# max global grad-norm before an optimizer step; caps the damage from a single
+# spiky batch. Named constant (tune per net if needed), like the value-fn scales.
+_GRAD_CLIP_NORM = 10.0
+
+
 def run_epoch(model, batch, optimizer):
     # a batch is a tuple of tensors in the model's ``TRAIN_FIELDS`` order (that is
     # how ``ShardBuffer.sample_batch`` stacks its ring tensors). Both paradigms
@@ -113,6 +118,16 @@ def run_epoch(model, batch, optimizer):
         return loss.item(), tuple(c.item() for c in comps)
     optimizer.zero_grad()
     loss.backward()
+    gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), _GRAD_CLIP_NORM)
+    if not torch.isfinite(gnorm):
+        # a finite loss can still backprop to nan/inf grads; clipping cannot rescue
+        # those, so skip the step rather than poison AdamW's moments
+        print(
+            f"WARN non-finite grad norm {gnorm.item()}; skipping optimizer step",
+            file=sys.stderr,
+        )
+        optimizer.zero_grad(set_to_none=True)
+        return loss.item(), tuple(c.item() for c in comps)
     optimizer.step()
     # total plus (policy, value, keepy) components for per-head logging
     return loss.item(), tuple(c.item() for c in comps)
