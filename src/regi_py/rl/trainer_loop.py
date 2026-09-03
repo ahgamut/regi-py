@@ -117,11 +117,12 @@ def trainer(tid, shared_model, exp_queue, eval_queue, eval_done, train_device, p
         )
         ep += 1
 
-        # publish the freshest weights so explorers self-play with the latest net
-        shared_model.load_state_dict(train_model.state_dict())
-        if infer is not None:
-            with infer.version.get_lock():
-                infer.version.value += 1
+        # republish weights (and bump the infer-server version) on the eval cadence
+        if ep % params.test_every == 0:
+            shared_model.load_state_dict(train_model.state_dict())
+            if infer is not None:
+                with infer.version.get_lock():
+                    infer.version.value += 1
 
         # hand a candidate snapshot to the eval process; best-effort, so a busy
         # evaluator never stalls training (stale candidates are simply skipped)
@@ -377,7 +378,8 @@ def build_parser(pipelines):
         "--num-threads", default=1, type=int, help="threads per process"
     )
     parser.add_argument(
-        "--test-every", default=1, type=int, help="offer a candidate to eval every k episodes"
+        "--test-every", default=1, type=int, help="offer a candidate to eval AND republish "
+        "weights to explorers / bump the infer-server version every k episodes"
     )
     parser.add_argument(
         "--max-explore-fails",
