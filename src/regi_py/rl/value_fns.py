@@ -75,18 +75,20 @@ def hp(ctx: ValueContext) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
-# component functions: each maps a finished game to ONE scalar in a fixed range.
-# Value functions are fixed convex combinations of these (see `combine`); a convex
-# combo of [-1, 1] terms stays in [-1, 1] for the Tanh value head. Suit index of a
-# card location is ``location // 14`` (CLUBS=0, DIAMONDS=1, HEARTS=2, SPADES=3).
-# `NUM_ENEMIES` (12) and the pile denominators below are the spec's fixed scales.
+# component functions: each maps a finished game to a per-record RUNNING-PREFIX
+# array (one value per ctx.positions entry) in a fixed range. The prefix at record
+# k reflects only what happened up to that decision's snapshot position, so an
+# intermediate state is credited with the bonuses accrued SO FAR, not the whole
+# game's total. Value functions are fixed convex combinations of these (see
+# `combine`); a convex combo of [-1, 1] terms stays in [-1, 1] for the Tanh value
+# head. Suit index of a card location is ``location // 14`` (CLUBS=0, DIAMONDS=1,
+# HEARTS=2, SPADES=3). `NUM_ENEMIES` (12) and the scales below are the fixed spec.
 # --------------------------------------------------------------------------- #
 NUM_ENEMIES = 12
 _SUITS = {"clubs": 0, "diamonds": 1, "hearts": 2, "spades": 3}
 _EMPTY_DRAW_SCALE = 20.0
-_PACE_SCALE = 15.0
-_PACE_FAST = 80
-_PACE_SLOW = 100
+_PACE_RATE = 4.0     # on-pace baseline: expected enemy HP cleared per phase
+_PACE_SCALE = 40.0   # tanh scale for the HP-cleared-vs-pace deviation
 
 
 def _combo_from_locations(locs):
@@ -103,28 +105,38 @@ def _combo_from_locations(locs):
     return ComboTable.make_combo(*cell) if cell is not None else None
 
 
-def attack_suit_frac(ctx: ValueContext, suit: int) -> float:
-    """[0,1] fraction of recorded ATTACK decisions whose played combo held ``suit``
-    (0 if there were no attack decisions)."""
-    total = hit = 0
+def _running(events, positions, denom, lo, hi):
+    """Running prefix of per-phase ``events`` (len == len(snapshot)) read at each
+    record's snapshot position: ``clip(cumsum(events)[positions] / denom, lo, hi)``.
+    ``events[j]`` is the count contributed by phase ``j`` (0 where none). A record at
+    position 0 has zero elapsed phases, so its bonus is 0 (also guards the denominator
+    against 0/0 once it becomes phase-count-dependent)."""
+    idx = np.asarray(positions, dtype=np.intp)
+    if idx.size == 0:
+        return np.zeros(0, dtype=np.float32)
+    csum = np.cumsum(np.asarray(events, dtype=np.float32))
+    vals = np.clip(csum[idx] / denom, lo, hi)
+    return np.where(idx == 0, np.float32(0.0), vals).astype(np.float32)
+
+
+def attack_suit_frac(ctx: ValueContext, suit: int) -> np.ndarray:
+    """Running min(1, count/12) of recorded ATTACK decisions whose played combo held
+    ``suit``, credited at each record."""
+    events = np.zeros(len(ctx.snapshot), dtype=np.float32)
     for pos, act in zip(ctx.positions, ctx.actions):
-        if not ctx.snapshot[pos].phase_attacking:
-            continue
-        total += 1
-        if any(loc // 14 == suit for loc in act):
-            hit += 1
-    return hit / total if total else 0.0
+        if ctx.snapshot[pos].phase_attacking and any(loc // 14 == suit for loc in act):
+            events[pos] += 1.0
+    return _running(events, ctx.positions, NUM_ENEMIES, 0.0, 1.0)
 
 
-def keep_suit_frac(ctx: ValueContext, suit: int) -> float:
-    """[0,1] fraction of recorded DEFENSE decisions where the defender kept >=1 card of
-    ``suit`` (retained it rather than discarding all of it); 0 if no defense decisions."""
-    total = hit = 0
+def keep_suit_frac(ctx: ValueContext, suit: int) -> np.ndarray:
+    """Running min(1, count/12) of recorded DEFENSE decisions where the defender kept
+    >=1 card of ``suit`` (retained it rather than discarding all of it)."""
+    events = np.zeros(len(ctx.snapshot), dtype=np.float32)
     for pos, act in zip(ctx.positions, ctx.actions):
         ph = ctx.snapshot[pos]
         if ph.phase_attacking:
             continue
-        total += 1
         discarded = set(act)
         kept = (
             card.location
@@ -132,49 +144,60 @@ def keep_suit_frac(ctx: ValueContext, suit: int) -> float:
             if card.location not in discarded
         )
         if any(loc // 14 == suit for loc in kept):
-            hit += 1
-    return hit / total if total else 0.0
+            events[pos] += 1.0
+    return _running(events, ctx.positions, NUM_ENEMIES, 0.0, 1.0)
 
 
-def exact_kill_frac(ctx: ValueContext) -> float:
-    """[0,1] fraction (over the 12 enemies) of attacks that dealt damage exactly equal
-    to the enemy's remaining HP."""
-    kills = 0
+def exact_kill_frac(ctx: ValueContext) -> np.ndarray:
+    """Running min(1, count/12) of attacks that dealt damage exactly equal to the
+    enemy's remaining HP."""
+    events = np.zeros(len(ctx.snapshot), dtype=np.float32)
     for pos, act in zip(ctx.positions, ctx.actions):
         ph = ctx.snapshot[pos]
         if not ph.phase_attacking or not act or len(ph.enemy_pile) == 0:
             continue
         combo = _combo_from_locations(act)
         if combo is not None and ph.combo_damage(combo) == ph.enemy_pile[0].hp:
-            kills += 1
-    return min(1.0, kills / NUM_ENEMIES)
+            events[pos] += 1.0
+    return _running(events, ctx.positions, NUM_ENEMIES, 0.0, 1.0)
 
 
-def full_block_frac(ctx: ValueContext) -> float:
-    """[0,1] min(1, phases fully blocking the enemy / 12): the accumulated block covers
-    the current enemy's attack (enemy hits for 0)."""
-    cnt = 0
-    for ph in ctx.snapshot:
-        if len(ph.enemy_pile) and ph.current_block() >= ph.enemy_pile[0].strength:
-            cnt += 1
-    return min(1.0, cnt / NUM_ENEMIES)
+def full_block_frac(ctx: ValueContext) -> np.ndarray:
+    """Running min(1, count/12) of phases whose accumulated block covers the current
+    enemy's attack (enemy hits for 0)."""
+    events = np.array(
+        [
+            1.0
+            if len(ph.enemy_pile) and ph.current_block() >= ph.enemy_pile[0].strength
+            else 0.0
+            for ph in ctx.snapshot
+        ],
+        dtype=np.float32,
+    )
+    return _running(events, ctx.positions, NUM_ENEMIES, 0.0, 1.0)
 
 
-def empty_draw_penalty(ctx: ValueContext) -> float:
-    """[-1,0] max(-1, -(phases with an empty draw pile / 20))."""
-    cnt = sum(1 for ph in ctx.snapshot if len(ph.draw_pile) == 0)
-    return max(-1.0, -(cnt / _EMPTY_DRAW_SCALE))
+def empty_draw_penalty(ctx: ValueContext) -> np.ndarray:
+    """Running max(-1, -(count/20)) over phases with an empty draw pile."""
+    events = np.array(
+        [1.0 if len(ph.draw_pile) == 0 else 0.0 for ph in ctx.snapshot],
+        dtype=np.float32,
+    )
+    return -_running(events, ctx.positions, _EMPTY_DRAW_SCALE, 0.0, 1.0)
 
 
-def pacing(ctx: ValueContext) -> float:
-    """[-1,1] length shaping: long games (>100 phases) penalized win or lose; fast WINS
-    (<80 phases) rewarded; the 80..100 band and short losses are neutral."""
-    n = len(ctx.snapshot)
-    if n > _PACE_SLOW:
-        return -math.tanh((n - _PACE_SLOW) / _PACE_SCALE)
-    if n < _PACE_FAST and ctx.win:
-        return math.tanh((_PACE_FAST - n) / _PACE_SCALE)
-    return 0.0
+def pacing(ctx: ValueContext) -> np.ndarray:
+    """Running pace shaping in (-1, 1): ``tanh((cleared - RATE*p) / SCALE)`` at each
+    record's snapshot position ``p``, where ``cleared = s0 - enemy_hp_left`` is total
+    enemy HP removed so far. Ahead of the RATE-HP/phase pace -> positive, behind ->
+    negative (no win gating). ``p == 0`` (zero elapsed phases) -> 0."""
+    out = np.zeros(len(ctx.positions), dtype=np.float32)
+    for k, p in enumerate(ctx.positions):
+        if p == 0:
+            continue
+        cleared = ctx.s0 - sum(max(e.hp, 0) for e in ctx.snapshot[p].enemy_pile)
+        out[k] = math.tanh((cleared - _PACE_RATE * p) / _PACE_SCALE)
+    return out
 
 
 def combine(ctx: ValueContext, terms) -> np.ndarray:

@@ -181,69 +181,99 @@ def test_drive_game_produces_actions(seeded):
 @pytest.mark.parametrize("suit", [0, 1, 2, 3])
 def test_suit_component_ranges(seeded, suit):
     ctx = _ctx(seeded)
-    assert 0.0 <= vf.attack_suit_frac(ctx, suit) <= 1.0
-    assert 0.0 <= vf.keep_suit_frac(ctx, suit) <= 1.0
+    for out in (vf.attack_suit_frac(ctx, suit), vf.keep_suit_frac(ctx, suit)):
+        assert out.shape == (len(ctx.positions),) and out.dtype == np.float32
+        assert (out >= 0.0).all() and (out <= 1.0).all()
 
 
-def test_attack_suit_frac_matches_independent_count(seeded):
+def test_attack_suit_frac_running_prefix(seeded):
+    # running min(1, count/12) of suit-holding attacks, with position 0 zeroed
     ctx = _ctx(seeded)
-    atk = [ctx.snapshot[p] for p in ctx.positions if ctx.snapshot[p].phase_attacking]
-    acts = [a for p, a in zip(ctx.positions, ctx.actions) if ctx.snapshot[p].phase_attacking]
-    denom = len(atk)
+    pos = np.asarray(ctx.positions)
     for suit in range(4):
-        want = (
-            sum(any(loc // 14 == suit for loc in a) for a in acts) / denom
-            if denom
-            else 0.0
+        got = vf.attack_suit_frac(ctx, suit)
+        ev = np.array(
+            [
+                1.0
+                if (ctx.snapshot[p].phase_attacking and any(l // 14 == suit for l in a))
+                else 0.0
+                for p, a in zip(ctx.positions, ctx.actions)
+            ],
+            dtype=np.float32,
         )
-        assert vf.attack_suit_frac(ctx, suit) == pytest.approx(want)
+        want = np.clip(np.cumsum(ev) / 12.0, 0.0, 1.0).astype(np.float32)
+        want = np.where(pos == 0, np.float32(0.0), want)
+        assert np.allclose(got, want)
+        assert np.all(np.diff(got) >= -1e-7)  # non-decreasing prefix
 
 
-def test_scalar_component_ranges(seeded):
+def test_component_ranges_and_prefix(seeded):
     ctx = _ctx(seeded)
-    assert 0.0 <= vf.exact_kill_frac(ctx) <= 1.0
-    assert 0.0 <= vf.full_block_frac(ctx) <= 1.0
-    assert -1.0 <= vf.empty_draw_penalty(ctx) <= 0.0
-    assert -1.0 <= vf.pacing(ctx) <= 1.0
+    n = len(ctx.positions)
+    ek, fb = vf.exact_kill_frac(ctx), vf.full_block_frac(ctx)
+    ed, pc = vf.empty_draw_penalty(ctx), vf.pacing(ctx)
+    for out in (ek, fb, ed, pc):
+        assert out.shape == (n,) and out.dtype == np.float32
+    assert (ek >= 0.0).all() and (ek <= 1.0).all()
+    assert (fb >= 0.0).all() and (fb <= 1.0).all()
+    assert (ed >= -1.0).all() and (ed <= 0.0).all()
+    assert (pc >= -1.0).all() and (pc <= 1.0).all()
+    # count prefixes accumulate monotonically; the empty-draw penalty only deepens
+    assert np.all(np.diff(ek) >= -1e-7) and np.all(np.diff(fb) >= -1e-7)
+    assert np.all(np.diff(ed) <= 1e-7)
+    # a record at position 0 (zero elapsed phases) carries no bonus
+    assert ek[0] == 0.0 and fb[0] == 0.0 and ed[0] == 0.0 and pc[0] == 0.0
 
 
-def test_empty_context_components_are_zero():
-    # no decisions recorded -> action/state ratios collapse to 0 (no div-by-zero)
+def test_empty_context_components_are_empty():
+    # no phases -> every component is a length-0 array (no bonus, no div-by-zero)
     ctx = vf.ValueContext([], [], actions=[], win=False, s0=480.0, s1=480.0)
-    assert vf.attack_suit_frac(ctx, 0) == 0.0
-    assert vf.keep_suit_frac(ctx, 0) == 0.0
-    assert vf.exact_kill_frac(ctx) == 0.0
-    assert vf.full_block_frac(ctx) == 0.0
-    assert vf.empty_draw_penalty(ctx) == 0.0
+    for out in (
+        vf.attack_suit_frac(ctx, 0),
+        vf.keep_suit_frac(ctx, 0),
+        vf.exact_kill_frac(ctx),
+        vf.full_block_frac(ctx),
+        vf.empty_draw_penalty(ctx),
+        vf.pacing(ctx),
+    ):
+        assert out.shape == (0,)
 
 
-@pytest.mark.parametrize(
-    "n,win,expect",
-    [
-        (70, True, math.tanh(10 / 15)),   # fast win -> reward
-        (70, False, 0.0),                 # fast loss -> neutral
-        (79, True, math.tanh(1 / 15)),    # just under the fast threshold
-        (80, True, 0.0),                  # boundary: not < 80
-        (90, True, 0.0),                  # mid band -> neutral
-        (100, False, 0.0),                # boundary: not > 100
-        (120, True, -math.tanh(20 / 15)), # long game penalized even on a win
-        (120, False, -math.tanh(20 / 15)),
-    ],
-)
-def test_pacing_formula(n, win, expect):
-    # pacing reads only len(snapshot) + win, so a length-n dummy snapshot suffices
-    ctx = vf.ValueContext([0] * n, list(range(n)), win=win, s0=480.0, s1=0.0)
-    assert vf.pacing(ctx) == pytest.approx(expect)
+def test_pacing_running_formula(seeded):
+    # tanh((cleared - 4*p)/40) at each position, with p == 0 zeroed
+    ctx = _ctx(seeded)
+    got = vf.pacing(ctx)
+    for k, p in enumerate(ctx.positions):
+        if p == 0:
+            assert got[k] == np.float32(0.0)
+            continue
+        cleared = ctx.s0 - sum(max(e.hp, 0) for e in ctx.snapshot[p].enemy_pile)
+        assert got[k] == pytest.approx(math.tanh((cleared - 4.0 * p) / 40.0), abs=1e-6)
+
+
+def test_pacing_sign_and_zero_phase():
+    enemy = lambda hp: types.SimpleNamespace(hp=hp)
+    ahead = [types.SimpleNamespace(enemy_pile=[enemy(60)])] * 6  # s0=100 -> cleared 40 at p=5
+    ctx = vf.ValueContext(ahead, [5], actions=[[]], win=False, s0=100.0, s1=60.0)
+    assert vf.pacing(ctx)[0] == pytest.approx(math.tanh((40 - 20) / 40))  # ahead of 4*5 pace
+    assert vf.pacing(ctx)[0] > 0
+    behind = [types.SimpleNamespace(enemy_pile=[enemy(90)])] * 6  # cleared 10 at p=5
+    ctx2 = vf.ValueContext(behind, [5], actions=[[]], win=False, s0=100.0, s1=90.0)
+    assert vf.pacing(ctx2)[0] == pytest.approx(math.tanh((10 - 20) / 40))
+    assert vf.pacing(ctx2)[0] < 0
+    # zero elapsed phases -> no bonus (avoid crediting the very first state)
+    ctx0 = vf.ValueContext(ahead, [0], actions=[[]], win=False, s0=100.0, s1=60.0)
+    assert vf.pacing(ctx0)[0] == np.float32(0.0)
 
 
 # --------------------------------------------------------------------------- #
 # combine (convex combination -> value function)
 # --------------------------------------------------------------------------- #
-def test_combine_single_term_broadcasts(seeded):
+def test_combine_single_term(seeded):
     ctx = _ctx(seeded)
     out = vf.combine(ctx, [(1.0, vf.pacing)])
     assert out.shape == (len(ctx.positions),)
-    assert np.allclose(out, np.float32(vf.pacing(ctx)))
+    assert np.allclose(out, vf.pacing(ctx))
 
 
 def test_combine_mixes_scalar_and_per_position(seeded):
