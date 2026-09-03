@@ -216,13 +216,9 @@ def explorer(tid, shared_model, exp_queue, device, params, infer=None):
         selfplay_net = shared_model
     count = 0
     fails = 0
-    logged_gc = False
     while True:
         # reclaim the previous game's search tree (cyclic refs pin native PhaseInfo)
-        collected = gc.collect()
-        if not logged_gc:
-            print(f"P{tid}: gc.collect() reclaimed {collected} objects", file=sys.stderr)
-            logged_gc = True
+        gc.collect()
         num_bots = random.randint(2, 4)
         try:
             if other_play:
