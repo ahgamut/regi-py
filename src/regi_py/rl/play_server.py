@@ -6,6 +6,8 @@ exchanges fixed-shape tensors through a preallocated shared-memory arena. Only s
 ids cross the queue -- never tensors -- so /dev/shm stays flat and bounded.
 """
 import queue
+import sys
+import time
 
 import torch
 import torch.multiprocessing as mp
@@ -88,8 +90,14 @@ def infer_server(shared_model, arena, device, params):
     net.eval()
     seen = -1
     cap = params.infer_batch
+    log_every = getattr(params, "infer_log_every", 200)
+    n_fwd = n_reload = sum_batch = 0
+    t_idle = t_reload = t_fwd = 0.0
+    hist = [0] * (cap + 1)
     while True:
+        t0 = time.perf_counter()
         ids = [arena.req_q.get()]
+        t_idle += time.perf_counter() - t0
         while len(ids) < cap:
             try:
                 ids.append(arena.req_q.get_nowait())
@@ -99,13 +107,30 @@ def infer_server(shared_model, arena, device, params):
             break
         v = arena.version.value
         if v != seen:
+            t0 = time.perf_counter()
             net.load_state_dict(shared_model.state_dict())
             net.to(device)
+            t_reload += time.perf_counter() - t0
+            n_reload += 1
             seen = v
+        t0 = time.perf_counter()
         idx = torch.as_tensor(ids, dtype=torch.long)
         batch = {f: t[idx] for f, t in arena.in_fields.items()}
         out = net.predict_batch(batch)
         for f, o in out.items():
             arena.out_fields[f][idx] = o
+        t_fwd += time.perf_counter() - t0
         for i in ids:
             arena.events[i].set()
+        n = len(ids)
+        n_fwd += 1
+        sum_batch += n
+        hist[n] += 1
+        if log_every and n_fwd % log_every == 0:
+            nz = " ".join(f"{b}:{hist[b]}" for b in range(1, cap + 1) if hist[b])
+            print(
+                f"infer_server fwd={n_fwd} avg_batch={sum_batch / n_fwd:.2f} "
+                f"reloads={n_reload} t_idle={t_idle:.1f}s t_reload={t_reload:.1f}s "
+                f"t_fwd={t_fwd:.1f}s batch_hist[{nz}]",
+                file=sys.stderr,
+            )
