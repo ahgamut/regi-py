@@ -29,6 +29,9 @@ from regi_py.rl.value_fns import assign_values, phase_snapshot
 # brute teammates search at the full default depth
 TEAM_BRUTE_ITERS = 128
 
+# the NN seat in a team game always searches at this depth, ignoring --num-simulations
+TEAM_NET_ITERS = 128
+
 
 def sample_teammate():
     """A random non-NN strategy instance from ``regi_py.strats`` (``STRATEGY_LIST``)
@@ -356,7 +359,7 @@ def run_team_game(tid, i, net, num_bots, iterations, paradigm, value_fn):
     a = time.time()
     log = EndGameLog()
     moves = []
-    nn_strat = paradigm.team_recorder(net, iterations, moves)
+    nn_strat = paradigm.team_recorder(net, TEAM_NET_ITERS, moves)
     num_nn = random.randint(1, min(2, num_bots - 1))  # >= 1 non-NN teammate
     seats = [nn_strat] * num_nn + [sample_teammate() for _ in range(num_bots - num_nn)]
     random.shuffle(seats)
