@@ -90,7 +90,7 @@ def infer_server(shared_model, arena, device, params):
     net.eval()
     seen = -1
     cap = params.infer_batch
-    log_every = getattr(params, "infer_log_every", 200)
+    log_every = getattr(params, "infer_log_every", 0)
     n_fwd = n_reload = sum_batch = 0
     t_idle = t_reload = t_fwd = 0.0
     hist = [0] * (cap + 1)

@@ -417,8 +417,8 @@ def build_parser(pipelines):
         "(trainer_server.py only)"
     )
     parser.add_argument(
-        "--infer-log-every", default=200, type=int, help="infer server logs batch/timing "
-        "stats every k forwards (trainer_server.py only; 0 disables)"
+        "--infer-log-every", default=0, type=int, help="infer server logs batch/timing "
+        "stats every k forwards (trainer_server.py only; 0 disables, the default)"
     )
     return parser
 
