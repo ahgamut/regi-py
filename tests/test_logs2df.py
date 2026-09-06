@@ -76,7 +76,7 @@ _HIST_PLAYERINFO = [
 def test_schema_matches_historical_columns():
     assert logs2df.COLNAMES == _HIST_COLNAMES
     assert logs2df.PLAYERINFO == _HIST_PLAYERINFO
-    assert logs2df.FILEMETA == ["file", "game", "team", "sim"]
+    assert logs2df.FILEMETA == ["run_id", "file", "game", "team", "sim"]
 
 
 def test_playerinfo_field_order_is_a_permutation_of_schema():
@@ -95,12 +95,15 @@ def test_json_path_end_to_end(tmp_path, seeded):
     game.start_loop()
     log.close()
 
-    rows = logs2df.proc_file(str(fname), logs2df.JsonSource())
+    rows = logs2df.proc_file(str(fname), logs2df.JsonSource(), "testrun")
     header = logs2df.FILEMETA + logs2df.COLNAMES + logs2df.PLAYERINFO
 
     assert rows, "expected at least one CSV row from a full game"
     for row in rows:
         assert len(row) == len(header)
+
+    # every row carries the run_id (meta column 0)
+    assert {row[0] for row in rows} == {"testrun"}
 
     event_col = len(logs2df.FILEMETA) + logs2df.COLNAMES.index("event")
     events = {row[event_col] for row in rows}
@@ -108,8 +111,9 @@ def test_json_path_end_to_end(tmp_path, seeded):
     assert "ATTACK" in events
     assert not (events & set(logs2df.IGNORE_EVENTS))
 
-    # the digest (meta column 1) is a stable non-empty hex string per game
-    digests = {row[1] for row in rows}
+    # the digest (the 'game' meta column) is a stable non-empty hex string per game
+    game_col = logs2df.FILEMETA.index("game")
+    digests = {row[game_col] for row in rows}
     assert len(digests) == 1 and digests.pop()
 
 
@@ -132,6 +136,7 @@ def test_sqlite_output_matches_csv(tmp_path, seeded):
     logs2df.write_outputs(
         files,
         logs2df.JsonSource(),
+        "testrun",
         output_csv=str(csv_path),
         output_db=str(db_path),
         z=z,
@@ -144,7 +149,7 @@ def test_sqlite_output_matches_csv(tmp_path, seeded):
     db_rows = conn.execute(f'SELECT * FROM game_logs').fetchall()
     conn.close()
 
-    csv_rows = logs2df.proc_file(str(fname), logs2df.JsonSource())
+    csv_rows = logs2df.proc_file(str(fname), logs2df.JsonSource(), "testrun")
     assert len(db_rows) == len(csv_rows) > 0
     # CSV stringifies everything; compare the DB rows the same way so ints/None
     # (stored as-is by SQLite) line up with the CSV's text cells

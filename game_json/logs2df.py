@@ -22,6 +22,7 @@ imported lazily inside the msgpack source, so the JSON path needs no msgpack.
 
 import argparse
 import csv
+import datetime
 import glob
 import hashlib
 import json
@@ -73,7 +74,9 @@ PLAYERINFO = [
     for field in PLAYERINFO_FIELD_ORDER
 ]
 
-FILEMETA = ["file", "game", "team", "sim"]
+# ``run_id`` tags every row with the --run-id (a constant per invocation, e.g. an r1
+# vs r2 benchmark run); it leads the file-level metadata columns.
+FILEMETA = ["run_id", "file", "game", "team", "sim"]
 
 
 # --------------------------------------------------------------------------- #
@@ -139,8 +142,8 @@ def proc_colname(obj, name):
     return o0
 
 
-def proc_event(event, file, game, team, sim):
-    row = [file, game, team, sim]
+def proc_event(event, run_id, file, game, team, sim):
+    row = [run_id, file, game, team, sim]
     for colname in COLNAMES + PLAYERINFO:
         row.append(proc_colname(event, colname))
     return row
@@ -387,7 +390,7 @@ class MsgpackSource(LogSource):
 # --------------------------------------------------------------------------- #
 # shared driver
 # --------------------------------------------------------------------------- #
-def proc_file(fname, source, z=None):
+def proc_file(fname, source, run_id, z=None):
     print(f"processing {fname}")
     bname, sim = get_metas(fname)
     binary = getattr(source, "open_binary", lambda: False)()
@@ -409,7 +412,7 @@ def proc_file(fname, source, z=None):
         for e in g["events"]:
             if e.get("event", "STATE") in IGNORE_EVENTS:
                 continue
-            rows.append(proc_event(e, bname, game, team, sim))
+            rows.append(proc_event(e, run_id, bname, game, team, sim))
     return rows
 
 
@@ -467,7 +470,7 @@ class SqliteSink:
         self._conn.close()
 
 
-def write_outputs(files, source, output_csv=None, output_db=None, z=None):
+def write_outputs(files, source, run_id, output_csv=None, output_db=None, z=None):
     """Parse each file once and fan its rows out to every requested sink."""
     header = FILEMETA + COLNAMES + PLAYERINFO
     sinks = []
@@ -477,7 +480,7 @@ def write_outputs(files, source, output_csv=None, output_db=None, z=None):
         sinks.append(SqliteSink(output_db, header))
     try:
         for file in files:
-            rows = proc_file(file, source, z)
+            rows = proc_file(file, source, run_id, z)
             for sink in sinks:
                 sink.write_rows(rows)
     finally:
@@ -485,9 +488,9 @@ def write_outputs(files, source, output_csv=None, output_db=None, z=None):
             sink.close()
 
 
-def write_csv(files, source, output_csv, z=None):
+def write_csv(files, source, output_csv, run_id="", z=None):
     """Back-compat wrapper: CSV-only output (delegates to :func:`write_outputs`)."""
-    write_outputs(files, source, output_csv=output_csv, z=z)
+    write_outputs(files, source, run_id, output_csv=output_csv, z=z)
 
 
 SOURCES = {"json": JsonSource, "msgpack": MsgpackSource}
@@ -521,6 +524,12 @@ def main(source=None):
         default=None,
         help="output SQLite database (rows go into a 'game_logs' table)",
     )
+    parser.add_argument(
+        "--run-id",
+        default=datetime.date.today().isoformat(),
+        help="value for the 'run_id' column tagging every row "
+        "(e.g. r1/r2; default: today's date yyyy-mm-dd)",
+    )
     d = parser.parse_args()
 
     if not d.output_csv and not d.output_db:
@@ -530,7 +539,9 @@ def main(source=None):
         source = SOURCES[d.source]()
 
     z, files = discover_files(d.input_object, source)
-    write_outputs(files, source, output_csv=d.output_csv, output_db=d.output_db, z=z)
+    write_outputs(
+        files, source, d.run_id, output_csv=d.output_csv, output_db=d.output_db, z=z
+    )
 
 
 if __name__ == "__main__":
