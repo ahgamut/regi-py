@@ -89,7 +89,9 @@ def hp(ctx: ValueContext) -> np.ndarray:
 NUM_ENEMIES = 12
 _SUITS = {"clubs": 0, "diamonds": 1, "hearts": 2, "spades": 3}
 _EMPTY_DRAW_SCALE = 20.0
-_PACE_RATE = 4.0     # on-pace baseline: expected enemy HP cleared per phase
+# on-pace baseline (expected enemy HP cleared per phase), by player count -- more players
+# clear a bit slower per phase. Falls back to 4.0 for an off-spec count.
+_PACE_RATE = {2: 4.0, 3: 3.5, 4: 3.0}
 _PACE_SCALE = 40.0   # tanh scale for the HP-cleared-vs-pace deviation
 _DRAW_PIVOT = 15.0   # draw-pile size scoring 0 (above -> +, below -> -)
 _DRAW_SCALE = 10.0   # tanh scale for the draw-pile deviation from the pivot
@@ -197,14 +199,17 @@ def empty_draw_penalty(ctx: ValueContext) -> np.ndarray:
 def pacing(ctx: ValueContext) -> np.ndarray:
     """Running pace shaping in (-1, 1): ``tanh((cleared - RATE*p) / SCALE)`` at each
     record's snapshot position ``p``, where ``cleared = s0 - enemy_hp_left`` is total
-    enemy HP removed so far. Ahead of the RATE-HP/phase pace -> positive, behind ->
-    negative (no win gating). ``p == 0`` (zero elapsed phases) -> 0."""
+    enemy HP removed so far and ``RATE`` is the per-player-count on-pace baseline
+    (`_PACE_RATE`). Ahead of the RATE-HP/phase pace -> positive, behind -> negative (no
+    win gating). ``p == 0`` (zero elapsed phases) -> 0."""
     out = np.zeros(len(ctx.positions), dtype=np.float32)
     for k, p in enumerate(ctx.positions):
         if p == 0:
             continue
-        cleared = ctx.s0 - sum(max(e.hp, 0) for e in ctx.snapshot[p].enemy_pile)
-        out[k] = math.tanh((cleared - _PACE_RATE * p) / _PACE_SCALE)
+        ph = ctx.snapshot[p]
+        cleared = ctx.s0 - sum(max(e.hp, 0) for e in ph.enemy_pile)
+        rate = _PACE_RATE.get(ph.num_players, 4.0)
+        out[k] = math.tanh((cleared - rate * p) / _PACE_SCALE)
     return out
 
 

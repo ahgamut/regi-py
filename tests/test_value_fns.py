@@ -242,30 +242,47 @@ def test_empty_context_components_are_empty():
 
 
 def test_pacing_running_formula(seeded):
-    # tanh((cleared - 4*p)/40) at each position, with p == 0 zeroed
+    # tanh((cleared - RATE*p)/40) at each position (RATE per player count), p == 0 zeroed
     ctx = _ctx(seeded)
     got = vf.pacing(ctx)
     for k, p in enumerate(ctx.positions):
         if p == 0:
             assert got[k] == np.float32(0.0)
             continue
-        cleared = ctx.s0 - sum(max(e.hp, 0) for e in ctx.snapshot[p].enemy_pile)
-        assert got[k] == pytest.approx(math.tanh((cleared - 4.0 * p) / 40.0), abs=1e-6)
+        ph = ctx.snapshot[p]
+        cleared = ctx.s0 - sum(max(e.hp, 0) for e in ph.enemy_pile)
+        rate = vf._PACE_RATE.get(ph.num_players, 4.0)
+        assert got[k] == pytest.approx(math.tanh((cleared - rate * p) / 40.0), abs=1e-6)
 
 
 def test_pacing_sign_and_zero_phase():
     enemy = lambda hp: types.SimpleNamespace(hp=hp)
-    ahead = [types.SimpleNamespace(enemy_pile=[enemy(60)])] * 6  # s0=100 -> cleared 40 at p=5
+    # num_players=2 -> RATE 4.0, so the on-pace deduction at p=5 is 4*5=20
+    ahead = [types.SimpleNamespace(enemy_pile=[enemy(60)], num_players=2)] * 6  # cleared 40 at p=5
     ctx = vf.ValueContext(ahead, [5], actions=[[]], win=False, s0=100.0, s1=60.0)
     assert vf.pacing(ctx)[0] == pytest.approx(math.tanh((40 - 20) / 40))  # ahead of 4*5 pace
     assert vf.pacing(ctx)[0] > 0
-    behind = [types.SimpleNamespace(enemy_pile=[enemy(90)])] * 6  # cleared 10 at p=5
+    behind = [types.SimpleNamespace(enemy_pile=[enemy(90)], num_players=2)] * 6  # cleared 10 at p=5
     ctx2 = vf.ValueContext(behind, [5], actions=[[]], win=False, s0=100.0, s1=90.0)
     assert vf.pacing(ctx2)[0] == pytest.approx(math.tanh((10 - 20) / 40))
     assert vf.pacing(ctx2)[0] < 0
     # zero elapsed phases -> no bonus (avoid crediting the very first state)
     ctx0 = vf.ValueContext(ahead, [0], actions=[[]], win=False, s0=100.0, s1=60.0)
     assert vf.pacing(ctx0)[0] == np.float32(0.0)
+
+
+def test_pacing_rate_varies_by_player_count():
+    # same cleared HP + position, different player count -> different on-pace baseline
+    enemy = lambda hp: types.SimpleNamespace(hp=hp)
+    for n, rate in [(2, 4.0), (3, 3.5), (4, 3.0)]:
+        snap = [types.SimpleNamespace(enemy_pile=[enemy(90)], num_players=n)] * 6  # cleared 10 at p=5
+        ctx = vf.ValueContext(snap, [5], actions=[[]], win=False, s0=100.0, s1=90.0)
+        assert vf.pacing(ctx)[0] == pytest.approx(math.tanh((10 - rate * 5) / 40.0), abs=1e-6)
+    # more players -> smaller on-pace baseline -> smaller deduction -> less behind here
+    def val(n):
+        snap = [types.SimpleNamespace(enemy_pile=[enemy(90)], num_players=n)] * 6
+        return vf.pacing(vf.ValueContext(snap, [5], actions=[[]], win=False, s0=100.0, s1=90.0))[0]
+    assert val(4) > val(3) > val(2)
 
 
 # --------------------------------------------------------------------------- #
