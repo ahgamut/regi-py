@@ -235,6 +235,8 @@ def test_empty_context_components_are_empty():
         vf.full_block_frac(ctx),
         vf.empty_draw_penalty(ctx),
         vf.pacing(ctx),
+        vf.draw_pile_health(ctx),
+        vf.other_hand_health(ctx),
     ):
         assert out.shape == (0,)
 
@@ -264,6 +266,66 @@ def test_pacing_sign_and_zero_phase():
     # zero elapsed phases -> no bonus (avoid crediting the very first state)
     ctx0 = vf.ValueContext(ahead, [0], actions=[[]], win=False, s0=100.0, s1=60.0)
     assert vf.pacing(ctx0)[0] == np.float32(0.0)
+
+
+# --------------------------------------------------------------------------- #
+# point-in-time components: draw_pile_health / other_hand_health
+# --------------------------------------------------------------------------- #
+def test_draw_pile_health_range_on_real_game(seeded):
+    ctx = _ctx(seeded)
+    out = vf.draw_pile_health(ctx)
+    assert out.shape == (len(ctx.positions),) and out.dtype == np.float32
+    assert (out >= -1.0).all() and (out <= 1.0).all()
+
+
+def test_draw_pile_health_formula_and_sign():
+    ph = lambda n: types.SimpleNamespace(draw_pile=[0] * n)
+    # tanh((size - 15) / 10): pivot 15 -> 0, above -> +, below -> -
+    snap = [ph(15), ph(25), ph(5), ph(0)]
+    ctx = vf.ValueContext(snap, [0, 1, 2, 3], actions=[[]] * 4, win=False, s0=1.0, s1=1.0)
+    got = vf.draw_pile_health(ctx)
+    assert got[0] == pytest.approx(0.0, abs=1e-6)          # exactly at the pivot
+    assert got[1] == pytest.approx(math.tanh(10 / 10))     # 10 above
+    assert got[2] == pytest.approx(math.tanh(-10 / 10))    # 10 below
+    assert got[1] > 0 and got[2] < 0 and got[3] < got[2]   # monotone in size
+
+
+def test_draw_pile_health_not_zeroed_at_position_0():
+    # point-in-time read (unlike pacing/running prefixes): a full opening draw pile scores
+    ctx = vf.ValueContext(
+        [types.SimpleNamespace(draw_pile=[0] * 26)], [0], actions=[[]],
+        win=False, s0=1.0, s1=1.0,
+    )
+    assert vf.draw_pile_health(ctx)[0] > 0.0
+
+
+def test_other_hand_health_range_on_real_game(seeded):
+    ctx = _ctx(seeded)
+    out = vf.other_hand_health(ctx)
+    assert out.shape == (len(ctx.positions),) and out.dtype == np.float32
+    assert (out >= -1.0).all() and (out <= 1.0).all()
+
+
+def test_other_hand_health_excludes_active_and_averages():
+    # 3 players, active=0 with a wild count that must NOT affect the result; expected avg
+    # for 3p is 3, scale 3 -> tanh((cards - 3) / 3) meaned over players 1 and 2.
+    hands = [[0] * 99, [0] * 6, [0] * 0]  # active hoards; teammates at 6 and 0
+    ph = types.SimpleNamespace(num_players=3, active_player=0, player_cards=hands)
+    ctx = vf.ValueContext([ph], [0], actions=[[]], win=False, s0=1.0, s1=1.0)
+    want = (math.tanh((6 - 3) / 3) + math.tanh((0 - 3) / 3)) / 2
+    assert vf.other_hand_health(ctx)[0] == pytest.approx(want, abs=1e-6)
+
+
+def test_other_hand_health_sign():
+    mk = lambda counts, active=0: types.SimpleNamespace(
+        num_players=len(counts), active_player=active,
+        player_cards=[[0] * c for c in counts],
+    )
+    # 2p (expected 4): a card-rich teammate reads +, a depleted one reads -
+    rich = vf.ValueContext([mk([0, 7])], [0], actions=[[]], win=False, s0=1.0, s1=1.0)
+    poor = vf.ValueContext([mk([0, 1])], [0], actions=[[]], win=False, s0=1.0, s1=1.0)
+    assert vf.other_hand_health(rich)[0] > 0.0
+    assert vf.other_hand_health(poor)[0] < 0.0
 
 
 # --------------------------------------------------------------------------- #
@@ -306,6 +368,7 @@ def test_combine_convex_stays_in_range(seeded):
 _NEW_VALUE_FNS = [
     "paced", "atk", "atk-blk", "paced-atk", "atk-draw", "paced-blk",
     "atk-C", "atk-D", "atk-H", "atk-S",
+    "draw", "hand", "paced-draw", "paced-hand", "draw-hand",
 ]
 
 

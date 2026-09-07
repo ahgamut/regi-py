@@ -75,11 +75,13 @@ def hp(ctx: ValueContext) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
-# component functions: each maps a finished game to a per-record RUNNING-PREFIX
-# array (one value per ctx.positions entry) in a fixed range. The prefix at record
-# k reflects only what happened up to that decision's snapshot position, so an
-# intermediate state is credited with the bonuses accrued SO FAR, not the whole
-# game's total. Value functions are fixed convex combinations of these (see
+# component functions: each maps a finished game to a per-record array (one value per
+# ctx.positions entry) in a fixed range. MOST are RUNNING PREFIXES (via `_running`): the
+# value at record k reflects only what accrued up to that decision's snapshot position, so
+# an intermediate state is credited with the bonuses SO FAR, not the whole game's total.
+# A few (`pacing`, `draw_pile_health`, `other_hand_health`) are instead POINT-IN-TIME reads
+# of that record's snapshot phase (a state, not an accrual) -- they are NOT zeroed at
+# position 0. Value functions are fixed convex combinations of these (see
 # `combine`); a convex combo of [-1, 1] terms stays in [-1, 1] for the Tanh value
 # head. Suit index of a card location is ``location // 14`` (CLUBS=0, DIAMONDS=1,
 # HEARTS=2, SPADES=3). `NUM_ENEMIES` (12) and the scales below are the fixed spec.
@@ -89,6 +91,12 @@ _SUITS = {"clubs": 0, "diamonds": 1, "hearts": 2, "spades": 3}
 _EMPTY_DRAW_SCALE = 20.0
 _PACE_RATE = 4.0     # on-pace baseline: expected enemy HP cleared per phase
 _PACE_SCALE = 40.0   # tanh scale for the HP-cleared-vs-pace deviation
+_DRAW_PIVOT = 15.0   # draw-pile size scoring 0 (above -> +, below -> -)
+_DRAW_SCALE = 10.0   # tanh scale for the draw-pile deviation from the pivot
+# expected per-player hand size by player count (max hand is 9 - num_players); a teammate
+# above this reads +, below -. Falls back to (6 - n) for an off-spec player count.
+_EXPECTED_CARDS = {2: 4, 3: 3, 4: 2}
+_HAND_SCALE = 3.0    # tanh scale for a teammate's card-count deviation from expected
 
 
 def _combo_from_locations(locs):
@@ -200,6 +208,36 @@ def pacing(ctx: ValueContext) -> np.ndarray:
     return out
 
 
+def draw_pile_health(ctx: ValueContext) -> np.ndarray:
+    """Per-phase ``tanh((draw_pile_size - PIVOT) / SCALE)`` in (-1, 1), read at each
+    record's snapshot phase: a fuller draw pile (further from deck-out) reads positive, a
+    low one negative, ``PIVOT`` (15) cards -> 0. A POINT-IN-TIME state read, NOT a running
+    prefix, so position 0 (the opening, full draw pile) is scored on its merits, not zeroed."""
+    out = np.zeros(len(ctx.positions), dtype=np.float32)
+    for k, p in enumerate(ctx.positions):
+        n = len(ctx.snapshot[p].draw_pile)
+        out[k] = math.tanh((n - _DRAW_PIVOT) / _DRAW_SCALE)
+    return out
+
+
+def other_hand_health(ctx: ValueContext) -> np.ndarray:
+    """Per-phase MEAN over the OTHER players (excluding the active player) of
+    ``tanh((their card count - expected) / SCALE)`` in (-1, 1), read at each record's
+    snapshot phase: teammates holding more than the per-player-count expected hand
+    (`_EXPECTED_CARDS`, {2:4, 3:3, 4:2}) read positive, fewer negative. The mean of terms
+    in (-1, 1) stays in (-1, 1). A POINT-IN-TIME state read, NOT a running prefix."""
+    out = np.zeros(len(ctx.positions), dtype=np.float32)
+    for k, p in enumerate(ctx.positions):
+        ph = ctx.snapshot[p]
+        avg = _EXPECTED_CARDS.get(ph.num_players, 6 - ph.num_players)
+        others = [j for j in range(ph.num_players) if j != ph.active_player]
+        if not others:
+            continue
+        devs = [math.tanh((len(ph.player_cards[j]) - avg) / _HAND_SCALE) for j in others]
+        out[k] = float(sum(devs) / len(devs))
+    return out
+
+
 def combine(ctx: ValueContext, terms) -> np.ndarray:
     """Element-wise convex combination of ``terms`` -> per-record values in [-1, 1].
 
@@ -278,6 +316,31 @@ def atk_hearts(ctx: ValueContext) -> np.ndarray:
 @register("atk-S")
 def atk_spades(ctx: ValueContext) -> np.ndarray:
     return _atk_suit(ctx, _SUITS["spades"])
+
+
+@register("draw")
+def draw(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.2, draw_pile_health)])
+
+
+@register("hand")
+def hand(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.2, other_hand_health)])
+
+
+@register("paced-draw")
+def paced_draw(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.1, pacing), (0.1, draw_pile_health)])
+
+
+@register("paced-hand")
+def paced_hand(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.1, pacing), (0.1, other_hand_health)])
+
+
+@register("draw-hand")
+def draw_hand(ctx: ValueContext) -> np.ndarray:
+    return combine(ctx, [(0.8, hp), (0.1, draw_pile_health), (0.1, other_hand_health)])
 
 
 def phase_snapshot(phases):
