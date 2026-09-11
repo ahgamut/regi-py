@@ -1,0 +1,43 @@
+{
+  "net": "attntrunk",
+  "paradigm": "az",
+  "opset": 18,
+  "inputs": [
+    {
+      "name": "location",
+      "shape": [
+        1,
+        8,
+        56,
+        9
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "used_pile",
+      "shape": [
+        1,
+        8,
+        56,
+        22
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "capability",
+      "shape": [
+        1,
+        8,
+        56,
+        2
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "outputs": [
+    "v",
+    "k",
+    "a"
+  ],
+  "max_history": 8
+}

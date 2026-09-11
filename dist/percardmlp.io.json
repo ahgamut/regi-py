@@ -1,0 +1,22 @@
+{
+  "net": "percardmlp",
+  "paradigm": "az",
+  "opset": 18,
+  "inputs": [
+    {
+      "name": "tokens",
+      "shape": [
+        1,
+        56,
+        264
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "outputs": [
+    "v",
+    "k",
+    "a"
+  ],
+  "max_history": 8
+}

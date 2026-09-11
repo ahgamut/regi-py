@@ -1,0 +1,327 @@
+:root {
+  --bg: #14161c; --panel: #1e2129; --panel2: #262a35; --line: #333844;
+  --ink: #e7e9ee; --dim: #9aa2b1; --accent: #6ea8fe; --good: #4cc38a; --bad: #f2545b;
+  --card: #f6f7f9; --cardink: #1a1c22; --red: #d64550; --gold: #e8b64c;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } /* no auto text inflation on mobile */
+body { margin: 0; background: var(--bg); color: var(--ink); overflow-x: hidden;
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+h1, h2, h3 { margin: 0; font-weight: 650; }
+a { color: var(--accent); }
+.mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+
+/* ---------- buttons ---------- */
+.btn { font: inherit; cursor: pointer; background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px; font-weight: 650;
+  touch-action: manipulation; transition: transform .1s, border-color .15s, background .15s; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--accent); color: #0b0e14; border-color: transparent; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.07); }
+.btn.ghost { background: transparent; }
+.btn.big { padding: 12px 26px; font-size: 16px; }
+.btn.small { padding: 5px 10px; font-size: 13px; }
+
+/* ---------- screens ---------- */
+.screen { display: none; min-height: 100%; }
+.screen.show { display: block; }
+#screen-loading.show, #screen-intro.show, #screen-howto.show, #screen-menu.show {
+  display: flex; align-items: center; justify-content: center; padding: 24px; }
+
+/* ---------- loading screen ---------- */
+.meter.load { max-width: 30rem; margin: 22px auto 0; height: 10px; }
+.meter.load > span { background: var(--accent); }
+.load-status { color: var(--dim); font-size: 12px; margin-top: 8px; min-height: 1em; }
+.load-steps { list-style: none; padding: 0; margin: 18px auto 0; max-width: 22rem;
+  text-align: left; font-size: 13px; }
+.load-step { display: flex; align-items: center; gap: 8px; padding: 3px 0; color: var(--dim); }
+.load-step::before { content: "○"; color: var(--line); width: 1em; text-align: center; }
+.load-step.done { color: var(--ink); }
+.load-step.done::before { content: "✓"; color: var(--good); }
+.load-step.fail { color: var(--dim); }
+.load-step.fail::before { content: "–"; color: var(--bad); }
+.load-error { margin: 20px auto 0; color: var(--bad); font-size: 13px; max-width: 30rem;
+  background: var(--panel); border: 1px solid var(--bad); border-radius: 9px; padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-word; }
+
+/* ---------- loading failure page ---------- */
+.logo.fail { color: var(--bad); filter: grayscale(0.3); }
+.fail-note { margin-top: 16px; color: var(--dim); font-size: 12px; }
+
+/* ---------- intro ---------- */
+.hero { text-align: center; max-width: 620px; }
+.hero .logo { font-size: 30px; letter-spacing: 8px; color: var(--gold); margin-bottom: 6px; }
+.hero-title { font-size: 64px; font-weight: 850; letter-spacing: .02em; margin: 0; }
+.hero-sub { color: var(--dim); font-size: 15px; margin: 14px auto 26px; max-width: 30rem; }
+.hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.hero-links { margin-top: 22px; display: flex; gap: 20px; justify-content: center; font-size: 13px; }
+.boot-note { margin-top: 26px; color: var(--dim); font-size: 12px; }
+
+/* ---------- sheets (howto / menu) ---------- */
+.sheet { width: 100%; max-width: 640px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 14px; padding: 22px 24px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.sheet-head h2 { font-size: 24px; }
+.sheet-foot { display: flex; gap: 12px; justify-content: flex-end; margin-top: 22px;
+  border-top: 1px solid var(--line); padding-top: 18px; }
+
+/* howto tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.tab { font: inherit; cursor: pointer; background: transparent; color: var(--dim);
+  border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; font-weight: 650; margin-bottom: -1px; }
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.howto-pane { min-height: 190px; }
+
+/* howto */
+.howto { color: #cfd4de; }
+.howto h3 { margin: 18px 0 8px; font-size: 15px; color: var(--accent); }
+.howto p, .howto li { margin: 6px 0; }
+.howto ol, .howto ul { padding-left: 20px; }
+.howto b { color: var(--ink); }
+.suit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 6px 0; }
+.suit-grid > div { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.pip { font-size: 16px; } .pip.red { color: var(--red); }
+
+/* ---------- menu form ---------- */
+.form { display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { color: var(--dim); font-size: 13px; }
+.field .hint { color: var(--line); }
+.field input[type=text], .field input[type=number], .field select {
+  background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px; font: inherit; max-width: 260px; }
+.field.check { flex-direction: row; align-items: center; gap: 9px; color: var(--dim); }
+.field textarea, .expert-body textarea { background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical; width: 100%; }
+/* collapsible "expert" option (paste-a-phase) */
+.expert { border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); }
+.expert > summary { cursor: pointer; padding: 9px 12px; color: var(--dim); font-size: 13px; user-select: none; }
+.expert > summary:hover { color: var(--ink); }
+.expert[open] > summary { border-bottom: 1px solid var(--line); color: var(--ink); }
+.expert-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.phase-load-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cfg-phase-msg { font-size: 12px; color: var(--dim); }
+.cfg-phase-msg.ok { color: var(--good); }
+.cfg-phase-msg.err { color: var(--bad); }
+.opponents { display: flex; flex-direction: column; gap: 8px; }
+.opp-row { display: flex; align-items: center; gap: 10px; background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; }
+.opp-row .seat-name { font-weight: 650; min-width: 84px; }
+.opp-row select { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 7px; padding: 5px 8px; font: inherit; }
+.opp-row .tag { margin-left: auto; color: var(--dim); font-size: 12px; }
+
+/* ---------- game: topbar ---------- */
+.topbar { display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+  background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+.topbar .brand { font-weight: 800; font-size: 17px; }
+.topbar .spacer { flex: 1; }
+.turn-pill { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 14px; font-weight: 650; color: var(--dim); }
+.turn-pill.you { color: #06202a; background: var(--accent); border-color: transparent; }
+.turn-pill.think { color: var(--gold); }
+.turn-pill.win { color: #06202a; background: var(--good); border-color: transparent; }
+.turn-pill.loss { color: #fff; background: var(--bad); border-color: transparent; }
+
+/* ---------- game: board ---------- */
+/* enemy (dungeon) on the LEFT with the used pile below it; the party, your hand
+   and the event log stack on the RIGHT. */
+.board { max-width: 1160px; margin: 0 auto; padding: 16px;
+  display: grid; gap: 14px; align-items: start;
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  grid-template-areas:
+    "enemy party"
+    "enemy you"
+    "used  you"
+    "used  log"; }
+.board .enemy-panel { grid-area: enemy; }
+.board .used-panel  { grid-area: used; }
+.board .party-panel { grid-area: party; }
+.board .you-panel   { grid-area: you; }
+.board .log-panel   { grid-area: log; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 14px; }
+.panel h3 { color: var(--dim); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 10px; }
+.panel h3 .note { text-transform: none; letter-spacing: 0; color: var(--dim); font-weight: 500; }
+
+/* dungeon table: draw pile · current royal · discard pile */
+.table-row { display: flex; align-items: flex-start; justify-content: center; gap: 28px; padding: 6px 0 12px; }
+.pile-slot, .royal-slot { text-align: center; }
+.pile { display: inline-block; }
+.pile-label, .royal-label { margin-top: 8px; color: var(--dim); font-size: 12px; }
+.pile-label b, .royal-label { color: var(--ink); }
+.royal-label { font-weight: 650; }
+.hp-block { max-width: 520px; margin: 0 auto; }
+.stat-line { margin: 6px 0; color: var(--ink); text-align: center; } .stat-line.dim { color: var(--dim); }
+.stat-line b { color: var(--ink); } .stat-line .sep { color: var(--line); margin: 0 4px; }
+.meter { height: 9px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin: 4px 0; }
+.meter > span { display: block; height: 100%; transition: width .35s; }
+.meter.hp > span { background: var(--bad); }
+.meter.prog > span { background: var(--good); }
+.meter-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 6px; }
+#incoming { color: var(--bad); font-weight: 650; }
+#incoming.blocked { color: var(--good); }
+
+/* seats */
+.seats { display: flex; flex-wrap: wrap; gap: 10px; }
+.seat { background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; min-width: 116px; }
+.seat.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.seat.you-seat .who::after { content: " ★"; color: var(--gold); }
+.seat .who { font-weight: 700; }
+.seat .kind { color: var(--dim); font-size: 12px; margin-top: 2px; }
+
+/* ---------- cards ---------- */
+.hand, .used { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.card { position: relative; width: 46px; height: 64px; border-radius: 7px;
+  background: var(--card); color: var(--cardink); border: 1px solid #c9ced7;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center;
+  font-weight: 800; user-select: none; }
+.card .rank { position: absolute; top: 3px; left: 5px; font-size: 12px; line-height: 1; }
+.card .rank.br { top: auto; left: auto; bottom: 3px; right: 5px; transform: rotate(180deg); }
+.card .suit { font-size: 22px; }
+.card.red { color: var(--red); }
+.card.mini { width: 34px; height: 48px; }
+.card.mini .rank { font-size: 10px; } .card.mini .suit { font-size: 15px; }
+.card.joker { background: linear-gradient(135deg,#f6f7f9,#e7d7a6); }
+
+/* the current royal, face up and larger */
+.card.royal { width: 64px; height: 88px; border: 2px solid var(--gold);
+  box-shadow: 0 3px 8px rgba(0,0,0,.5); }
+.card.royal .rank { font-size: 15px; } .card.royal .suit { font-size: 32px; }
+.card.royal.empty { background: var(--panel2); color: var(--dim); border-style: dashed; border-color: var(--line); box-shadow: none; }
+
+/* draw / discard piles: a patterned card back, stacked shadows imply depth */
+.card.back { background: repeating-linear-gradient(45deg, #35507a, #35507a 6px, #294066 6px, #294066 12px);
+  border-color: #4a6188; box-shadow: 3px 3px 0 #232734, 6px 6px 0 #1c2029, 2px 2px 5px rgba(0,0,0,.45); }
+.card.back.empty { background: var(--panel2); border-style: dashed; border-color: var(--line); box-shadow: none; }
+
+/* selectable hand */
+.hand.pickable .card { cursor: pointer; touch-action: manipulation;
+  transition: transform .12s, box-shadow .12s, outline-color .12s;
+  outline: 2px solid transparent; outline-offset: 1px; }
+.hand.pickable .card:hover { transform: translateY(-4px); }
+.card.sel { transform: translateY(-10px); outline-color: var(--accent);
+  box-shadow: 0 6px 10px rgba(0,0,0,.45); }
+.hand.locked .card { opacity: .8; }
+
+/* used combos: each combo is a little stacked group */
+.used { gap: 12px; }
+.combo-group { display: flex; }
+.combo-group .card.mini + .card.mini { margin-left: -18px; }
+
+/* combat status */
+.combat { min-height: 22px; margin-bottom: 10px; font-weight: 650; }
+.combat .dmg { color: var(--bad); } .combat .dmg.blocked { color: var(--good); }
+.combat .need { color: var(--dim); font-weight: 500; margin-left: 8px; }
+.combat .sel-sum { color: var(--accent); margin-left: 8px; }
+
+.actions { display: flex; gap: 10px; margin-top: 12px; }
+
+/* log */
+#log { max-height: 220px; overflow-y: auto; font-size: 13px; }
+#log .row { padding: 3px 0; border-bottom: 1px solid var(--line); color: var(--dim); }
+#log .row b { color: var(--ink); }
+#log .row.win { color: var(--good); font-weight: 700; }
+#log .row.loss { color: var(--bad); font-weight: 700; }
+#log .row.bad { color: var(--gold); }
+#log .row.kill { color: var(--gold); }
+#log .row.joker { color: var(--accent); }
+#log .row .ev { display: inline-block; width: 1.3em; text-align: center; opacity: .9; }
+/* C3: staged reveal — rows fade/slide in one at a time during bot & auto turns */
+#log .row.reveal { opacity: 0; transform: translateY(-4px); }
+#log .row.reveal.shown { opacity: 1; transform: none;
+  transition: opacity .22s ease, transform .22s ease; }
+
+/* C4: foreground the event log while a bot is thinking/acting (revert on your turn) */
+.log-panel { transition: border-color .2s, box-shadow .2s; }
+.you-panel { transition: opacity .2s; }
+.board.bot-turn .log-panel { border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 6px 22px rgba(110,168,254,.16); }
+.board.bot-turn .log-panel h3 { color: var(--accent); }
+.board.bot-turn #log { max-height: 300px; }
+.board.bot-turn .you-panel { opacity: .55; }
+
+/* ---------- overlay ---------- */
+.overlay { position: fixed; inset: 0; background: rgba(10,12,18,.85); display: none;
+  align-items: center; justify-content: center; z-index: 20; padding: 16px; overflow-y: auto; }
+.overlay.show { display: flex; }
+.overlay .card2 { background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 30px 44px; text-align: center; }
+.overlay .res { font-size: 42px; font-weight: 850; margin-bottom: 6px; }
+.overlay .res.win { color: var(--good); } .overlay .res.loss { color: var(--bad); }
+.overlay-sub { color: var(--dim); margin-bottom: 18px; }
+/* end-of-game summary stats (royals cleared / damage / moves) */
+.overlay-stats { display: flex; gap: 26px; justify-content: center; margin-bottom: 20px; }
+.overlay-stats .stat { text-align: center; }
+.overlay-stats .stat .num { font-size: 24px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.overlay-stats .stat .lbl { font-size: 11px; color: var(--dim); text-transform: uppercase;
+  letter-spacing: .05em; margin-top: 2px; }
+.overlay-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+/* floating "bring the result back" button shown while reviewing the finished board */
+.summary-fab { position: fixed; right: 18px; bottom: 18px; z-index: 15;
+  box-shadow: 0 6px 22px rgba(0,0,0,.35); }
+/* view-start: seed + opening phase string, collapsed by default */
+.overlay-start { text-align: left; margin: 0 auto 18px; max-width: 420px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); }
+.overlay-start > summary { cursor: pointer; padding: 9px 14px; font-weight: 650;
+  color: var(--dim); list-style-position: inside; }
+.overlay-start[open] > summary { border-bottom: 1px solid var(--line); }
+.start-body { padding: 12px 14px; }
+.start-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.start-lbl { color: var(--dim); font-size: 13px; min-width: 60px; }
+.start-body code { font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 2px 6px; }
+.start-body code.phase-str { display: block; flex: 1; max-height: 74px; overflow: auto;
+  word-break: break-all; }
+.start-note { color: var(--dim); font-size: 12px; margin: 8px 0 0; }
+
+/* ---------- responsive ---------- */
+/* tablet / narrow: one-column board */
+@media (max-width: 860px) {
+  .board { grid-template-columns: 1fr;
+    grid-template-areas: "enemy" "used" "party" "you" "log"; }
+  .hero-title { font-size: 46px; }
+  .suit-grid { grid-template-columns: 1fr; }
+}
+
+/* phone: tighten padding/gaps, keep everything within the viewport width */
+@media (max-width: 560px) {
+  #screen-loading.show, #screen-intro.show, #screen-howto.show, #screen-menu.show { padding: 14px; }
+  .hero-title { font-size: 38px; }
+  .hero .logo { font-size: 24px; letter-spacing: 6px; }
+  .hero-sub { font-size: 14px; }
+
+  .sheet { padding: 18px 15px; border-radius: 12px; }
+  .sheet-head h2 { font-size: 20px; }
+  .sheet-foot { flex-wrap: wrap; }
+  .field input[type=text], .field input[type=number], .field select { max-width: none; }
+
+  /* opponent rows can wrap so the selects never overflow a narrow screen */
+  .opp-row { flex-wrap: wrap; gap: 8px; }
+  .opp-row .seat-name { min-width: 0; }
+  .opp-row select { flex: 1 1 40%; }
+  .opp-row .tag { flex-basis: 100%; margin-left: 0; text-align: right; }
+
+  /* game screen */
+  .topbar { gap: 8px; padding: 9px 12px; }
+  .topbar .brand { display: none; } /* the turn pill + Menu button are what matter here */
+  /* let a long turn label shrink+ellipsize instead of pushing the Menu button away */
+  .turn-pill { font-size: 12px; padding: 4px 10px; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .board { padding: 12px; gap: 12px; }
+  .panel { padding: 12px; }
+  .table-row { gap: 14px; }
+  .seat { min-width: 0; flex: 1 1 44%; }
+
+  /* result overlay fits the screen */
+  .overlay .card2 { padding: 24px 18px; max-width: 100%; }
+  .overlay .res { font-size: 34px; }
+  .overlay-stats { gap: 16px; }
+  .overlay-stats .stat .num { font-size: 20px; }
+  .summary-fab { right: 12px; bottom: 12px; }
+}

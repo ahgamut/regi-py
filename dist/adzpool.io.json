@@ -1,0 +1,57 @@
+{
+  "net": "adzpool",
+  "paradigm": "adz",
+  "opset": 18,
+  "inputs": [
+    {
+      "name": "cand_feats",
+      "shape": [
+        1,
+        128,
+        9
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "cand_mask",
+      "shape": [
+        1,
+        128
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "cand_idx",
+      "shape": [
+        1,
+        128,
+        7
+      ],
+      "dtype": "int64"
+    },
+    {
+      "name": "cand_partmask",
+      "shape": [
+        1,
+        128,
+        7
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "tokens",
+      "shape": [
+        1,
+        56,
+        264
+      ],
+      "dtype": "float32"
+    }
+  ],
+  "outputs": [
+    "value",
+    "cand_logits",
+    "keepy"
+  ],
+  "max_history": 8
+}
