@@ -8,6 +8,30 @@
 </head>
 <body>
 
+<!-- ===================== NO JAVASCRIPT ===================== -->
+<!-- Rendered only when scripting is disabled; its inline <style> hides the JS-driven
+     screens (which would otherwise sit frozen on "loading…") and shows this message. -->
+<noscript>
+  <style>
+    .screen { display: none !important; }
+    #noscript-screen { display: flex; align-items: center; justify-content: center;
+      min-height: 100%; padding: 24px; }
+  </style>
+  <section id="noscript-screen">
+    <div class="hero">
+      <div class="logo">♠ ♥ ♦ ♣</div>
+      <h1 class="hero-title mono">regi-py</h1>
+      <p class="hero-sub">This app runs the whole game engine and its neural-net bots
+        locally in your browser, so it needs <b>JavaScript</b> and <b>WebAssembly</b>
+        enabled. Please enable them and reload the page.</p>
+      <div class="hero-links">
+        <a href="https://github.com/ahgamut/regi-py">GitHub</a>
+        <a href="https://www.regicidegame.com/site_files/33132/upload_files/RegicideRulesA4.pdf">Full rules (PDF)</a>
+      </div>
+    </div>
+  </section>
+</noscript>
+
 <!-- ============================ LOADING ============================ -->
 <!-- Shown first: the engine (WASM), every bot net (onnxruntime session), the
      combomap, and every player-count's opening presets all load here before the
@@ -21,7 +45,24 @@
     <div class="meter load"><span id="load-bar" style="width:0%"></span></div>
     <div class="load-status" id="load-status">starting…</div>
     <ul class="load-steps" id="load-steps"></ul>
-    <div class="load-error" id="load-error" hidden></div>
+  </div>
+</section>
+
+<!-- ======================= LOADING FAILURE ======================= -->
+<!-- Shown by boot() if the engine, onnxruntime, or every net fails to load. -->
+<section class="screen" id="screen-loadfail">
+  <div class="hero">
+    <div class="logo fail">♠ ♥ ♦ ♣</div>
+    <h1 class="hero-title mono">something went wrong</h1>
+    <p class="hero-sub">regi-py couldn’t finish loading. If you’ve turned off
+      <b>JavaScript</b> or <b>WebAssembly</b>, re-enable them and try again — otherwise
+      this one’s on us, so please let the developers know.</p>
+    <div class="load-error" id="loadfail-reason">Unknown error.</div>
+    <div class="hero-actions">
+      <button class="btn primary big" id="loadfail-reload">Try again</button>
+      <a class="btn ghost big" href="https://github.com/ahgamut/regi-py/issues" target="_blank" rel="noopener">Report an issue</a>
+    </div>
+    <p class="fail-note">Please include the message above when you report it.</p>
   </div>
 </section>
 

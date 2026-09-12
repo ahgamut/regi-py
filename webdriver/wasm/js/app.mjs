@@ -14,9 +14,9 @@ import { ExplorerBot } from './mcts.mjs';
 //   no-npm, CDN:    https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/
 //   no-npm, vendor: ../vendor/
 const ORT_DIST = '../node_modules/onnxruntime-web/dist/';
-const ort = await import(ORT_DIST + 'ort.wasm.bundle.min.mjs');
-ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-COEP
-// ort.env.wasm.wasmPaths = ORT_DIST; // where the ort-wasm-*.wasm sidecar is fetched from
+let ort = null; // loaded in boot() so a failure to fetch it routes to the failure page
+// (once loaded: ort.env.wasm.numThreads = 1 -> single-thread, no SharedArrayBuffer / COOP-COEP;
+//  ort.env.wasm.wasmPaths = ORT_DIST would override where the ort-wasm-*.wasm sidecar is fetched)
 
 // Selectable bots. ADZ (candidate-scoring) + AZ (card-space) Direct-net nets;
 // attntrunk is intentionally omitted (heaviest payload, redundant with basic).
@@ -76,13 +76,19 @@ function addLoadStep(text) { const li = el('li', 'load-step', text); $('load-ste
 function markStep(li, ok, text) { if (text) li.textContent = text; li.classList.add(ok ? 'done' : 'fail'); }
 
 async function boot() {
-  const total = 2 + NETS.length; // engine, presets, then one step per net
+  const total = 3 + NETS.length; // engine, onnxruntime, presets, then one step per net
   let done = 0;
   try {
     const s1 = addLoadStep('Game engine (WebAssembly)');
+    if (typeof WebAssembly === 'undefined') throw new Error('WebAssembly is disabled or unsupported in this browser — enable it and reload');
     M = await RegiModule();
     comboMap = M.combo_map();
     markStep(s1, true); setLoadBar(++done, total, 'engine ready');
+
+    const s0 = addLoadStep('Neural-net runtime (onnxruntime-web)');
+    ort = await import(ORT_DIST + 'ort.wasm.bundle.min.mjs');
+    ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-COEP
+    markStep(s0, true); setLoadBar(++done, total, 'runtime ready');
 
     const s2 = addLoadStep('Opening deals (presets)');
     await Promise.all([2, 3, 4].map(loadPresets));
@@ -104,17 +110,16 @@ async function boot() {
       setLoadBar(++done, total);
     }
 
-    if (!availableNets.length) throw new Error('no bot nets could be loaded from ./dist');
+    if (!availableNets.length) throw new Error('no bot nets could be loaded from ./dist (build + export first)');
     setLoadBar(total, total, 'ready');
     showScreen('intro');
   } catch (err) {
-    const box = $('load-error');
-    box.hidden = false;
-    box.textContent = `Could not start: ${err?.message || err}. Build the engine and export the ` +
-      `nets into ./dist (see README), then reload.`;
-    $('load-status').textContent = 'failed to load';
+    console.error('boot failed:', err);
+    $('loadfail-reason').textContent = err?.message ? String(err.message) : String(err);
+    showScreen('loadfail');
   }
 }
+$('loadfail-reload').addEventListener('click', () => location.reload());
 boot();
 
 /* ================= menu ================= */
