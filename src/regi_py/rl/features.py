@@ -19,7 +19,8 @@ from regi_py import combomap
 
 import numpy as np
 
-# These featurizers now delegate to the shared C++ core; the pre-delegation pure-Python numpy versions are at 61d59c6d5eaac838bcef94c15bab3246908adc09:src/regi_py/rl/features.py -- restore from there if the C++ path slows or errors out during training.
+# in case we need them, pure-Python numpy featurizers
+# are at 45a471421b9fbf380d542f66a5d931683a3d1f19
 
 # per-card capability channels: [attack_capability, defense_capability]
 CAP_CHANNELS = 2
