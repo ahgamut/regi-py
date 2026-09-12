@@ -349,3 +349,5 @@ lerna-debug.log
 # System Files
 .DS_Store
 Thumbs.db
+
+webdriver/wasm/deploy_pages.sh
