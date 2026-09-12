@@ -152,11 +152,16 @@ class _ExpansionStrategy(BaseStrategy):
         self.force_bitwise = None
         self.at_root = True
         self.captured = None
+        # opt-in: the phase at the root decision node (where root_offered is
+        # captured). Off by default so the MCTS hot path pays no export cost.
+        self.capture_root_phase = False
+        self.root_phase_info = None
 
     def arm(self, force_bitwise):
         self.force_bitwise = force_bitwise
         self.at_root = True
         self.captured = None
+        self.root_phase_info = None
 
     def setup(self, player, game):
         return 0
@@ -168,6 +173,12 @@ class _ExpansionStrategy(BaseStrategy):
     def _choose(self, combos, game):
         if self.at_root:
             self.root_offered = list(combos)
+            # the root decision may be reached only after stepping over auto-
+            # resolved phases (e.g. a full block), so this phase can differ from
+            # the one the expander was seeded with -- capture it for callers that
+            # must featurize the ACTUAL decision (see PhaseExpander.decision_phase).
+            if self.capture_root_phase:
+                self.root_phase_info = game.export_phaseinfo()
             self.at_root = False
             if self.force_bitwise is not None:
                 # a forced combo always comes from this same offer set; fall back
@@ -206,6 +217,7 @@ class PhaseExpander:
         for _ in range(root_phase.num_players):
             self._tmp.add_player(self._strat)
         self._offered = None
+        self._decision_phase = None
 
     def _run(self, force_bitwise):
         self._strat.arm(force_bitwise)
@@ -233,6 +245,19 @@ class PhaseExpander:
                     combos = get_nonbad_defends(None, combos)
             self._offered = combos
         return self._offered
+
+    def decision_phase(self):
+        """The phase at the root decision node -- i.e. where ``offered()``'s
+        combos are actually chosen. Differs from ``root_phase`` when the seeded
+        phase auto-resolves (e.g. a full block) before any decision, in which
+        case featurizing ``root_phase`` would use the wrong seat/perspective.
+        Callers that must featurize the real decision (gen_golden, faithful
+        parity) use this; MCTS does not, so the capture stays opt-in."""
+        if self._decision_phase is None:
+            self._strat.capture_root_phase = True
+            self._run(None)
+            self._decision_phase = self._strat.root_phase_info
+        return self._decision_phase
 
     def step(self, combo_bitwise):
         return self._run(combo_bitwise)

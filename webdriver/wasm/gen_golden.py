@@ -64,13 +64,22 @@ def generate(net_name, weights_path, out_path, n, seed):
         for s in _collect_phase_strings(seed + num_players, n_games=25, num_players=num_players):
             if len(cases) >= n:
                 break
-            phase = PhaseInfo.from_string(s)
-            combos = PhaseExpander(phase).offered()
+            expander = PhaseExpander(PhaseInfo.from_string(s))
+            combos = expander.offered()
             if not combos:
+                continue
+            # Featurize the phase AT THE DECISION, not the loaded phase: a loaded
+            # phase can auto-resolve (e.g. a full block) and advance to a decision
+            # on a different seat before any choice is made, so the loaded phase's
+            # perspective would not match the offered combos (this is what the
+            # browser's live GameDriver featurizes, and what check_golden.mjs
+            # reloads to). Store that decision phase so both sides align.
+            phase = expander.decision_phase()
+            if phase is None:
                 continue
             index, k = _direct_index(net, phase, combos)
             cases.append({
-                "phase": s,
+                "phase": phase.to_string(),
                 "num_players": int(phase.num_players),
                 "attacking": bool(phase.phase_attacking),
                 "k": k,
