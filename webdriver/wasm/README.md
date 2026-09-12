@@ -65,9 +65,9 @@ ignore, like `combomap.json`).
 
 Instead of a preset you can **paste a phase string** (any exported opening or
 mid-game state — e.g. the one the end-of-game overlay's *Copy opening phase* gives)
-into the menu and hit *Use this phase*: if it parses into a runnable 2–4 player game
-the table is set to its player count (you still pick the bots), otherwise an inline
-error explains why it was rejected.
+into the menu's **Expert Mode** box and hit *Use this phase*: if it parses into a
+runnable 2–4 player game the table is set to its player count (you still pick the
+bots), otherwise an inline error explains why it was rejected.
 
 ### Running without npm
 
@@ -122,5 +122,8 @@ available net.
 - Bots play either **Direct-net** (search-free argmax) or an **MCTS Explorer**
   (net-guided search, ~iters+1 forward passes/move; picked per bot, 16–128 iters).
 - When a game ends, the result overlay shows summary stats (royals cleared / damage
-  dealt / moves) and its opening deal; **Review board** dismisses it to inspect the
-  finished board, and a floating **Show result** button brings the summary back.
+  dealt / moves) and its opening deal. **Play again** opens a menu of three restarts,
+  all reusing the same bots: *same seed* (replay the identical game), *different seed*
+  (same opening deal, new play-out), and *new deal* (a fresh random deal). **Review
+  board** dismisses the overlay to inspect the finished board (a floating **Show
+  result** button brings the summary back), and **Menu** returns to setup.

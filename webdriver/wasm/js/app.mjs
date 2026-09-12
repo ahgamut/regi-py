@@ -79,7 +79,7 @@ async function boot() {
   const total = 3 + NETS.length; // engine, onnxruntime, presets, then one step per net
   let done = 0;
   try {
-    const s1 = addLoadStep('Game engine (WebAssembly)');
+    const s1 = addLoadStep('Game engine');
     if (typeof WebAssembly === 'undefined') throw new Error('WebAssembly is disabled or unsupported in this browser — enable it and reload');
     M = await RegiModule();
     comboMap = M.combo_map();
@@ -294,9 +294,45 @@ async function startGame() {
   loop(loopToken);
 }
 
+/* Restart the just-played game reusing the SAME bots/seats (the live driver — no
+ * reload). `deal`: 'same' replays the identical opening (driver.startPhase), 'new'
+ * deals fresh. `seed`: 'same' reuses the original per-cycle seed (a bit-identical
+ * replay), 'new' picks a fresh one (same deal, different play-out). */
+function restartGame({ deal, seed }) {
+  if (!driver) return;
+  const startPhase = deal === 'same' ? driver.startPhase : null;
+  driver.rng = ((seed === 'same' ? driver.startSeed : (Date.now() & 0x7fffffff)) >>> 0) || 1;
+  driver.newGame(startPhase);
+
+  moveCount = 0;
+  $('log').replaceChildren();
+  $('overlay').classList.remove('show');
+  $('show-summary').hidden = true;
+  setBotTurn(false);
+  $('you-seat-note').textContent = `· you are “${playerName}”`;
+  const opening = deal === 'same' ? 'same deal' : 'a new deal';
+  log(`New ${driver.numPlayers}-player game (${opening}) — you are <b>Player ${humanSeat + 1}</b>.`);
+  showScreen('game');
+  loopToken++;
+  loop(loopToken);
+}
+
 $('game-menu').addEventListener('click', () => { loopToken++; setBotTurn(false); $('show-summary').hidden = true; showScreen('menu'); });
 $('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); $('show-summary').hidden = true; setBotTurn(false); showScreen('menu'); });
-$('overlay-again').addEventListener('click', startGame);
+// "Play again" is a dropdown: it opens a small menu of the three restart choices.
+const againPop = $('again-pop'), againBtn = $('overlay-again');
+function closeAgainMenu() { againPop.hidden = true; againBtn.setAttribute('aria-expanded', 'false'); }
+againBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = againPop.hidden; // opening if currently hidden
+  againPop.hidden = !open;
+  againBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('click', (e) => { if (!$('again-menu').contains(e.target)) closeAgainMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAgainMenu(); });
+$('overlay-same').addEventListener('click', () => { closeAgainMenu(); restartGame({ deal: 'same', seed: 'same' }); });
+$('overlay-diff').addEventListener('click', () => { closeAgainMenu(); restartGame({ deal: 'same', seed: 'new' }); });
+$('overlay-new').addEventListener('click', () => { closeAgainMenu(); restartGame({ deal: 'new', seed: 'new' }); });
 // Dismiss the result overlay to look over the finished board; a floating button
 // (bottom-right) brings the summary back. Both keep you on the game screen.
 $('overlay-review').addEventListener('click', () => { $('overlay').classList.remove('show'); $('show-summary').hidden = false; });
@@ -338,7 +374,19 @@ function royalName(label) {
 }
 function renderPile(id, count) {
   const p = $(id); p.replaceChildren();
-  p.appendChild(el('div', 'card back' + (count > 0 ? '' : ' empty')));
+  const c = el('div', 'card back' + (count > 0 ? '' : ' empty'));
+  if (count > 0) {
+    // thickness = stacked offset-shadow "edges" down-right, growing with the count
+    const depth = Math.max(1, Math.min(8, Math.round(count / 5)));
+    const layers = [];
+    for (let i = 1; i <= depth; i++) {
+      const o = (i * 1.3).toFixed(1);
+      layers.push(`${o}px ${o}px 0 ${i % 2 ? '#2a2f3c' : '#20242e'}`);
+    }
+    layers.push('2px 2px 5px rgba(0,0,0,.45)'); // soft drop on top of the stack
+    c.style.boxShadow = layers.join(', ');
+  }
+  p.appendChild(c);
 }
 
 /* ================= board render ================= */
