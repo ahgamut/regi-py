@@ -147,6 +147,17 @@
         </select>
       </label>
 
+      <div class="field">
+        <span class="field-label">…or paste a phase
+          <span class="hint">(an exported opening / mid-game state)</span></span>
+        <textarea id="cfg-phase" rows="2" placeholder="paste a phase string, then “Use this phase”"></textarea>
+        <div class="phase-load-row">
+          <button class="btn ghost small" id="cfg-phase-load" type="button">Use this phase</button>
+          <button class="btn ghost small" id="cfg-phase-clear" type="button" hidden>Clear</button>
+          <span class="cfg-phase-msg" id="cfg-phase-msg"></span>
+        </div>
+      </div>
+
       <label class="field">
         <span class="field-label">Seed <span class="hint">(optional — repeat a deal)</span></span>
         <input type="number" id="cfg-seed" placeholder="random" />

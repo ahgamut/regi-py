@@ -50,15 +50,22 @@ python3 -m http.server 8000                   # serve (no npm needed for this st
 
 Export any nets you want to offer as bots (`adzpool`/`adzmulti` are ADZ;
 `basic`/`percardmlp`/`cardtx`/`mixer`/`movetoken` are AZ — the AZ nets also need
-`tables/combomap.json`, which is committed). Open `http://localhost:8000`, set the
-player count, pick each opponent's net AND its search depth (Direct, or an MCTS
-Explorer at 16/32/64/128 iterations), choose the **opening deal** (a random deal, or
-one of the committed presets for that player count), then play your (shuffled) seat.
+`tables/combomap.json`, which is committed). Everything (engine, every net, presets)
+loads once on a **loading screen** before the menu opens. Set the player count, pick
+each opponent's net AND its search depth (Direct, or an MCTS Explorer at
+16/32/64/128 iterations), choose the **opening deal** (a random deal, or one of the
+committed presets for that player count), then play your (shuffled) seat.
 
 The presets in `tables/presets_{2,3,4}p.json` are fixed opening deals (replayed via
 `init_string`) so a known scenario can be re-played; regenerate them with
 `node gen_presets.mjs` (they're committed with `git add -f`, past the global `*.json`
 ignore, like `combomap.json`).
+
+Instead of a preset you can **paste a phase string** (any exported opening or
+mid-game state — e.g. the one the end-of-game overlay's *Copy opening phase* gives)
+into the menu and hit *Use this phase*: if it parses into a runnable 2–4 player game
+the table is set to its player count (you still pick the bots), otherwise an inline
+error explains why it was rejected.
 
 ### Running without npm
 

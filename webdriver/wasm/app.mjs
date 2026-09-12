@@ -40,6 +40,7 @@ const botCache = new Map();      // net name -> bot (session reused across games
 const presetCache = new Map();   // numPlayers -> preset opening phase strings (fetched once)
 let driver = null;
 let playerName = 'Player';
+let pastedPhase = null;          // a validated pasted phase string; overrides #cfg-preset
 let loopToken = 0;               // bumped to abandon an in-flight game loop
 let moveCount = 0;               // decisions committed this game (for the end summary)
 
@@ -143,8 +144,63 @@ function buildOpponents() {
     wrap.appendChild(row);
   }
 }
-$('cfg-players').addEventListener('change', () => { buildOpponents(); refreshPresets(); });
+$('cfg-players').addEventListener('change', () => { clearPastedPhase(); buildOpponents(); refreshPresets(); });
 $('menu-start').addEventListener('click', startGame);
+
+/* ---- paste-a-phase opening ---- */
+/* Validate a pasted phase string the way GameDriver.newGame(startPhase) will replay
+ * it: it must parse, name 2–4 players, and load into a runnable game. Returns
+ * { ok, numPlayers } or { ok:false, error }. Leaks nothing (every handle deleted). */
+function validatePhase(text) {
+  if (!M) return { ok: false, error: 'engine not loaded yet' };
+  const s = text.trim();
+  if (!s) return { ok: false, error: 'paste a phase string first' };
+  let n;
+  try { const ph = M.PhaseInfo.from_string(s); n = ph.num_players; ph.delete(); }
+  catch { return { ok: false, error: 'that is not a valid phase string' }; }
+  if (!(n >= 2 && n <= 4)) return { ok: false, error: `this phase has ${n} players (only 2–4 are supported)` };
+  // Confirm it actually loads into a runnable game (same init_string path newGame uses).
+  const log = new M.NoOpLog();
+  const g = new M.GameState(log);
+  const seats = [];
+  let runnable = false;
+  try {
+    for (let i = 0; i < n; i++) { const st = new M.RandomStrategy(); seats.push(st); g.add_player(st); }
+    g.init_string(s);
+    runnable = g.is_runnable();
+  } catch { runnable = false; }
+  seats.forEach((st) => st.delete());
+  g.delete(); log.delete();
+  if (!runnable) return { ok: false, error: 'this phase does not load into a playable game' };
+  return { ok: true, numPlayers: n };
+}
+function setPhaseMsg(text, kind) { const m = $('cfg-phase-msg'); m.textContent = text; m.className = 'cfg-phase-msg' + (kind ? ' ' + kind : ''); }
+/* Drop a loaded pasted phase (e.g. the user changed players / picked a preset / edited
+ * the box). The textarea text is left alone; only the *loaded* state is cleared. */
+function clearPastedPhase() {
+  if (pastedPhase === null && !$('cfg-phase-msg').textContent) return;
+  pastedPhase = null;
+  $('cfg-phase-clear').hidden = true;
+  setPhaseMsg('', null);
+}
+$('cfg-phase-load').addEventListener('click', () => {
+  const res = validatePhase($('cfg-phase').value);
+  if (!res.ok) { pastedPhase = null; $('cfg-phase-clear').hidden = true; setPhaseMsg(res.error, 'err'); return; }
+  pastedPhase = $('cfg-phase').value.trim();
+  // Match the table to the phase's player count and rebuild the bot rows so the human
+  // can still configure each opponent. Set directly (not via a change event) so this
+  // doesn't clear the phase we just loaded.
+  $('cfg-players').value = String(res.numPlayers);
+  buildOpponents();
+  refreshPresets();
+  $('cfg-preset').value = ''; // the pasted phase is the opening now, not a preset
+  $('cfg-phase-clear').hidden = false;
+  setPhaseMsg(`loaded — ${res.numPlayers} players; set the bots above, then Start`, 'ok');
+});
+$('cfg-phase-clear').addEventListener('click', () => { clearPastedPhase(); });
+// Editing the box or picking a preset invalidates a previously-loaded phase.
+$('cfg-phase').addEventListener('input', clearPastedPhase);
+$('cfg-preset').addEventListener('change', clearPastedPhase);
 
 /* Fetch (once) the committed starter openings for a player count. A preset is an
  * opening phase string GameDriver.newGame(startPhase) replays via init_string; on any
@@ -185,10 +241,18 @@ async function startGame() {
   $('opponents').querySelectorAll('select.opp-net').forEach((s) => { botNets.push(s.value); });
   $('opponents').querySelectorAll('select.opp-iters').forEach((s) => { botIters.push(parseInt(s.value, 10) || 0); });
 
-  // A chosen preset replays a fixed opening deal; "Random deal" ('') deals fresh.
+  // Opening: a validated pasted phase wins; else a chosen preset; else a fresh deal.
   const presetVal = $('cfg-preset').value;
   let startPhase = null;
-  if (presetVal !== '') { const phases = await loadPresets(numPlayers); startPhase = phases[parseInt(presetVal, 10)] || null; }
+  let opening = 'a random deal';
+  if (pastedPhase) {
+    startPhase = pastedPhase;
+    opening = 'a pasted phase';
+  } else if (presetVal !== '') {
+    const phases = await loadPresets(numPlayers);
+    startPhase = phases[parseInt(presetVal, 10)] || null;
+    if (startPhase) opening = `preset ${parseInt(presetVal, 10) + 1}`;
+  }
 
   // Shuffle the human into a random seat so turn order varies each game.
   humanSeat = Math.floor(Math.random() * numPlayers);
@@ -217,7 +281,6 @@ async function startGame() {
   $('show-summary').hidden = true;
   setBotTurn(false);
   $('you-seat-note').textContent = `· you are “${playerName}”`;
-  const opening = startPhase ? `preset ${parseInt(presetVal, 10) + 1}` : 'a random deal';
   log(`New ${numPlayers}-player game (${opening}) — you are <b>Player ${humanSeat + 1}</b>.`);
   showScreen('game');
   loopToken++;
