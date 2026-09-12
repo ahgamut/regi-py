@@ -219,7 +219,16 @@ a { color: var(--accent); }
 .overlay .res { font-size: 42px; font-weight: 850; margin-bottom: 6px; }
 .overlay .res.win { color: var(--good); } .overlay .res.loss { color: var(--bad); }
 .overlay-sub { color: var(--dim); margin-bottom: 18px; }
-.overlay-actions { display: flex; gap: 12px; justify-content: center; }
+/* end-of-game summary stats (royals cleared / damage / moves) */
+.overlay-stats { display: flex; gap: 26px; justify-content: center; margin-bottom: 20px; }
+.overlay-stats .stat { text-align: center; }
+.overlay-stats .stat .num { font-size: 24px; font-weight: 800; color: var(--ink); line-height: 1.1; }
+.overlay-stats .stat .lbl { font-size: 11px; color: var(--dim); text-transform: uppercase;
+  letter-spacing: .05em; margin-top: 2px; }
+.overlay-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+/* floating "bring the result back" button shown while reviewing the finished board */
+.summary-fab { position: fixed; right: 18px; bottom: 18px; z-index: 15;
+  box-shadow: 0 6px 22px rgba(0,0,0,.35); }
 /* view-start: seed + opening phase string, collapsed by default */
 .overlay-start { text-align: left; margin: 0 auto 18px; max-width: 420px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); }

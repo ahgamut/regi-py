@@ -99,3 +99,6 @@ npm run golden
   `combomap` grid + keepyness defense fallback). `attntrunk` is omitted.
 - Bots play either **Direct-net** (search-free argmax) or an **MCTS Explorer**
   (net-guided search, ~iters+1 forward passes/move; picked per bot, 16–128 iters).
+- When a game ends, the result overlay shows summary stats (royals cleared / damage
+  dealt / moves) and its opening deal; **Review board** dismisses it to inspect the
+  finished board, and a floating **Show result** button brings the summary back.

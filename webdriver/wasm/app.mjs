@@ -40,6 +40,7 @@ const presetCache = new Map();   // numPlayers -> preset opening phase strings (
 let driver = null;
 let playerName = 'Player';
 let loopToken = 0;               // bumped to abandon an in-flight game loop
+let moveCount = 0;               // decisions committed this game (for the end summary)
 
 /* ================= screens ================= */
 function showScreen(id) {
@@ -159,8 +160,10 @@ async function startGame() {
   driver = new GameDriver(M, { numPlayers, seatBots, maxHistory, seed });
   driver.newGame(startPhase);
 
+  moveCount = 0;
   $('log').replaceChildren();
   $('overlay').classList.remove('show');
+  $('show-summary').hidden = true;
   setBotTurn(false);
   $('you-seat-note').textContent = `· you are “${playerName}”`;
   const opening = startPhase ? `preset ${parseInt(presetVal, 10) + 1}` : 'a random deal';
@@ -170,9 +173,13 @@ async function startGame() {
   loop(loopToken);
 }
 
-$('game-menu').addEventListener('click', () => { loopToken++; setBotTurn(false); showScreen('menu'); });
-$('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); setBotTurn(false); showScreen('menu'); });
+$('game-menu').addEventListener('click', () => { loopToken++; setBotTurn(false); $('show-summary').hidden = true; showScreen('menu'); });
+$('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); $('show-summary').hidden = true; setBotTurn(false); showScreen('menu'); });
 $('overlay-again').addEventListener('click', startGame);
+// Dismiss the result overlay to look over the finished board; a floating button
+// (bottom-right) brings the summary back. Both keep you on the game screen.
+$('overlay-review').addEventListener('click', () => { $('overlay').classList.remove('show'); $('show-summary').hidden = false; });
+$('show-summary').addEventListener('click', () => { $('overlay').classList.add('show'); $('show-summary').hidden = true; });
 
 /* ================= card rendering ================= */
 const SUIT_SYM = { C: '♣', D: '♦', H: '♥', S: '♠' };
@@ -490,6 +497,7 @@ async function loop(token) {
         if (token !== loopToken) return;
       }
       driver.commit(index, redirect);
+      moveCount++;
       render(driver.snapshot());
       await emitLines(eventLines(driver.lastEvents, moveText(dec, index)), token);
       if (token !== loopToken) return;
@@ -504,13 +512,18 @@ async function loop(token) {
         if (token !== loopToken) return;
       }
       driver.commit(index, redirect);
+      moveCount++;
       logLines(eventLines(driver.lastEvents, moveText(dec, index)));
     }
   }
 }
 
+function statEl(num, lbl) {
+  const s = el('div', 'stat'); s.appendChild(el('div', 'num', num)); s.appendChild(el('div', 'lbl', lbl)); return s;
+}
 function finish(endValue) {
   const won = endValue === 1;
+  const snap = driver.snapshot();
   setPill(won ? 'Victory' : 'Defeat', won ? 'win' : 'loss');
   $('combat').replaceChildren();
   $('your-hand').classList.add('locked');
@@ -518,6 +531,13 @@ function finish(endValue) {
   $('overlay-res').textContent = won ? 'Victory' : 'Defeat';
   $('overlay-res').className = 'res ' + (won ? 'win' : 'loss');
   $('overlay-sub').textContent = won ? 'All royals cleared.' : 'A player could not block, or ran out of moves.';
+  // Final progress: royals cleared out of 12, damage dealt out of 360, moves played.
+  $('overlay-stats').replaceChildren(
+    statEl(`${12 - snap.enemiesLeft} / 12`, 'Royals cleared'),
+    statEl(`${snap.progress} / 360`, 'Damage dealt'),
+    statEl(String(moveCount), moveCount === 1 ? 'Move' : 'Moves'),
+  );
+  $('show-summary').hidden = true;
   // View-start: show the seed + opening phase this game began from (so it can be
   // replayed via the menu's Seed field, or shared). Collapsed until the player opens it.
   $('start-seed').textContent = driver?.startSeed ?? '—';

@@ -222,6 +222,7 @@
   <div class="card2">
     <div class="res" id="overlay-res">—</div>
     <div class="overlay-sub" id="overlay-sub"></div>
+    <div class="overlay-stats" id="overlay-stats"></div>
     <details class="overlay-start" id="overlay-start">
       <summary>This game's opening deal</summary>
       <div class="start-body">
@@ -233,10 +234,14 @@
     </details>
     <div class="overlay-actions">
       <button class="btn primary" id="overlay-again">Play again</button>
+      <button class="btn ghost" id="overlay-review">Review board</button>
       <button class="btn ghost" id="overlay-menu">Menu</button>
     </div>
   </div>
 </div>
+
+<!-- while reviewing the finished board, a floating button brings the summary back -->
+<button class="btn primary summary-fab" id="show-summary" hidden>Show result</button>
 
 <script type="module" src="./app.mjs"></script>
 </body>
