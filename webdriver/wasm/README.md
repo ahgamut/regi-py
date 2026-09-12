@@ -90,12 +90,23 @@ The ESM loads its `.wasm` sidecar (~10 MB) from `ORT_DIST` (set as
 ## Tests
 
 ```bash
-npm run smoke     # engine + featurizer + bot-feed + full-driver smoke (node)
-# JS-vs-Python Direct-net parity (needs a fixture from the torch env):
+npm run smoke     # runs every smoke_*.mjs suite in one process (smoke_all.mjs)
+npm run golden    # JS-vs-Python Direct-net parity for EVERY net that has both a
+                  # golden fixture (golden/<net>.json) and an export (dist/<net>.onnx)
+
+# A single suite / single net (each smoke file is still runnable on its own):
+node smoke_driver.mjs
+node check_golden.mjs --net adzpool
+
+# The golden fixtures come from the torch env (one per net):
 python -m webdriver.wasm.gen_golden --net adzpool \
     --weights weights/best_adzpool.pt --out webdriver/wasm/golden/adzpool.json
-npm run golden
+python -m webdriver.wasm.az_gen_golden --net basic \
+    --weights weights/best_basic.pt --out webdriver/wasm/golden/basic.json
 ```
+
+`smoke_all.mjs` imports each suite's `runSmoke()` and calls it (summing failures);
+`check_golden.mjs` with no `--net` discovers and checks every available net.
 
 ## Notes
 
