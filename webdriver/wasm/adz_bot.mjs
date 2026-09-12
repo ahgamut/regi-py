@@ -15,33 +15,11 @@
  *   outputs value (1,1), cand_logits (1,128) raw (-inf on pads), keepy (1,56)
  * JS reads cand_logits[0:K] over the K real candidates and argmaxes. */
 
-const MAX_CARDS = 56;
+import { MAX_CARDS, trimmedHistory, comboLocations, softmaxK } from './net_common.mjs';
+
 const MAX_CANDIDATES = 128;
 const MAX_PARTS = 7; // adzpool: max member locations in an offered subset (7-card hand)
 const CAND_FEATURE_DIM = 9;
-
-/* trimmed_history (rl/adz/explorer.py): the last `maxhist` phases ending at `phase`,
- * left-padded with the oldest frame when short. */
-function trimmedHistory(history, phase, maxhist) {
-  const tmp = [...history, phase];
-  if (tmp.length >= maxhist) return tmp.slice(tmp.length - maxhist);
-  return new Array(maxhist - tmp.length).fill(tmp[0]).concat(tmp);
-}
-
-/* Member card locations of a combo (== set bits of its bitwise); yield -> [].
- * CONSUMES `combo` (deletes the handle), since callers pass a fresh combos.get(i).*/
-function comboLocations(combo) {
-  const parts = combo.parts;
-  const locs = [];
-  for (let i = 0; i < parts.size(); i++) {
-    const card = parts.get(i);
-    locs.push(card.location);
-    card.delete();
-  }
-  parts.delete();
-  combo.delete();
-  return locs;
-}
 
 export class NetBot {
   /* `contract` is the parsed <net>.io.json ({net, paradigm, inputs:[{name,...}],
@@ -124,26 +102,30 @@ export class NetBot {
     return { feeds, K };
   }
 
-  /* Pick the highest-scoring offered-combo index (argmax over the K real
-   * candidates' logits; softmax preserves the argmax, so scoring the raw logits is
-   * equivalent). Returns -1 for an empty offer. */
-  /* Run a pre-built feed dict and argmax over the K real candidates. Split out of
-   * choose() so a caller can build the feeds synchronously (while the offered
-   * VectorCombo is alive) and run the async forward pass later. Returns -1 if K==0.*/
-  async runFeeds(feeds, K) {
-    if (K === 0) return -1;
+  /* One forward pass -> the K real candidates' raw logits as a Float32Array (softmax
+   * preserves the argmax, so scoring raw logits is equivalent). */
+  async scoreCombos(built) {
+    const { feeds, K } = built;
     const out = await this.session.run(feeds);
     const logits = out[this.logitsName].data; // Float32Array length MAX_CANDIDATES
-    let best = 0, bestVal = logits[0];
-    for (let i = 1; i < K; i++) {
-      if (logits[i] > bestVal) { bestVal = logits[i]; best = i; }
-    }
+    const scores = new Float32Array(K);
+    for (let i = 0; i < K; i++) scores[i] = logits[i];
+    return scores;
+  }
+
+  /* Argmax over the K real candidates (ties -> first, like np.argmax). Split from
+   * choose() so a caller can build the feeds synchronously (while the offered
+   * VectorCombo is alive) and run the async forward pass later. Returns -1 if K==0. */
+  async runFeeds(built) {
+    if (built.K === 0) return -1;
+    const scores = await this.scoreCombos(built);
+    let best = 0;
+    for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
     return best;
   }
 
   async choose(rawPhase, combos, priorHistory = [], opts = {}) {
-    const { K, feeds } = this.buildFeeds(rawPhase, combos, priorHistory, opts);
-    return this.runFeeds(feeds, K);
+    return this.runFeeds(this.buildFeeds(rawPhase, combos, priorHistory, opts));
   }
 }
 

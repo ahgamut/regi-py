@@ -4,7 +4,7 @@
  * screen the human picks CARDS from their hand (not a move list) and submits. */
 import RegiModule from './dist/regicore.mjs';
 import { GameDriver } from './game_driver.mjs';
-import { loadNetBot } from './adz_bot.mjs';
+import { loadBot } from './load_bot.mjs';
 
 // ---- onnxruntime-web source (edit these two lines to change where ORT loads) ----
 //   npm:            ./node_modules/onnxruntime-web/dist/
@@ -15,7 +15,9 @@ const ort = await import(ORT_DIST + 'ort.wasm.bundle.min.mjs');
 ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-COEP
 // ort.env.wasm.wasmPaths = ORT_DIST; // where the ort-wasm-*.wasm sidecar is fetched from
 
-const NETS = ['adzpool', 'adzmulti'];
+// Selectable bots. ADZ (candidate-scoring) + AZ (card-space) Direct-net nets;
+// attntrunk is intentionally omitted (heaviest payload, redundant with basic).
+const NETS = ['adzpool', 'adzmulti', 'basic', 'percardmlp', 'cardtx', 'mixer'];
 const BOT_MOVE_DELAY_MS = 550; // let the human watch bot moves
 
 let humanSeat = 0; // which seat (turn-order position) the human took THIS game; shuffled at start
@@ -27,7 +29,8 @@ const $ = (id) => document.getElementById(id);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
 let M = null;
-const botCache = new Map();      // net name -> NetBot (session reused across games)
+let comboMap = null;             // AZ nets' bitwise -> grid cell map (built once at boot)
+const botCache = new Map();      // net name -> bot (session reused across games)
 let driver = null;
 let playerName = 'Player';
 let loopToken = 0;               // bumped to abandon an in-flight game loop
@@ -49,7 +52,7 @@ document.querySelectorAll('#howto-tabs .tab').forEach((t) => t.addEventListener(
 
 /* boot the engine, then unlock Play */
 $('intro-play').disabled = true;
-RegiModule().then((mod) => { M = mod; $('boot').textContent = 'engine ready'; $('intro-play').disabled = false; });
+RegiModule().then((mod) => { M = mod; comboMap = mod.combo_map(); $('boot').textContent = 'engine ready'; $('intro-play').disabled = false; });
 
 /* ================= menu ================= */
 function buildOpponents() {
@@ -96,7 +99,7 @@ async function startGame() {
     if (i === humanSeat) { seatBots.push(null); continue; }
     const net = botNets[bi++] || 'adzpool';
     let bot = botCache.get(net);
-    if (!bot) { bot = await loadNetBot(M, ort, './dist', net); botCache.set(net, bot); }
+    if (!bot) { bot = await loadBot(M, ort, './dist', net, { comboMap }); botCache.set(net, bot); }
     seatBots.push(bot);
   }
   $('menu-start').disabled = false;
@@ -372,6 +375,18 @@ function presentRedirect(dec) {
   });
 }
 
+/* When a bot plays a Joker, decide who takes the next turn the way that bot's
+   reference strategy does: AZ nets value-argmax the other seats (AZBot.chooseRedirect,
+   N-1 forward passes); ADZ nets have no redirect head -- returning null lets the driver
+   fall back to a random OTHER player (== rl/adz/explorer.py _random_redirect). */
+async function botRedirect(bot, dec) {
+  if (typeof bot.chooseRedirect !== 'function') return null;
+  const phase = M.PhaseInfo.from_string(dec.decisionPhaseString);
+  const target = await bot.chooseRedirect(phase, driver.history, driver.numPlayers);
+  phase.delete();
+  return target;
+}
+
 /* ================= main loop ================= */
 async function loop(token) {
   while (token === loopToken) {
@@ -384,9 +399,18 @@ async function loop(token) {
     if (dec.isBot) {
       setPill(`${seatLabel(dec.activeSeat)} is thinking…`, 'think');
       $('combat').replaceChildren(el('span', 'note', 'waiting for the other players'));
-      const index = await driver.seatBots[dec.activeSeat].runFeeds(dec.feeds, dec.K);
+      const bot = driver.seatBots[dec.activeSeat];
+      const index = await bot.runFeeds(dec.built);
       if (token !== loopToken) return;
-      driver.commit(index);
+      // A bot Joker attack redirects like its reference strategy (AZ value-argmax,
+      // ADZ random-other); non-joker moves pass null (no redirect asked).
+      const played = dec.comboData[index];
+      let redirect = null;
+      if (dec.attacking && played && played.isJoker && driver.numPlayers > 1) {
+        redirect = await botRedirect(bot, dec);
+        if (token !== loopToken) return;
+      }
+      driver.commit(index, redirect);
       logLines(eventLines(driver.lastEvents, moveText(dec, index)));
       render(driver.snapshot());
       await new Promise((r) => setTimeout(r, BOT_MOVE_DELAY_MS));

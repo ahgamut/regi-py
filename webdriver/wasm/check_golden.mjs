@@ -16,6 +16,7 @@
 import { readFileSync } from 'node:fs';
 import RegiModule from './dist/regicore.mjs';
 import { NetBot } from './adz_bot.mjs';
+import { AZBot } from './az_bot.mjs';
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`);
@@ -35,12 +36,14 @@ const contract = JSON.parse(readFileSync(`${DIST}/${NET}.io.json`, 'utf8'));
 const golden = JSON.parse(readFileSync(GOLDEN, 'utf8'));
 if (golden.net !== NET) throw new Error(`fixture net ${golden.net} != --net ${NET}`);
 const session = await ort.InferenceSession.create(`${DIST}/${NET}.onnx`);
-const bot = new NetBot(M, ort, session, contract);
+const bot = contract.paradigm === 'az'
+  ? new AZBot(M, ort, session, contract, M.combo_map())
+  : new NetBot(M, ort, session, contract);
 
 const sameArr = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
 /* Drive one loaded phase to its decision and build the feeds there (sync, while the
- * offered VectorCombo is valid). Returns {feeds, K, combosLocs} or null. */
+ * offered VectorCombo is valid). Returns {built, combosLocs} or null. */
 function buildForCase(c) {
   const log = new M.NoOpLog();
   const g = new M.GameState(log);
@@ -57,9 +60,9 @@ function buildForCase(c) {
         parts.delete(); cb.delete();
         combosLocs.push(locs.sort((a, b) => a - b));
       }
-      const { feeds, K } = bot.buildFeeds(phase, combos, [], { reshuffle: false });
+      const built = bot.buildFeeds(phase, combos, [], { reshuffle: false });
       phase.delete();
-      captured = { feeds, K, combosLocs };
+      captured = { built, combosLocs };
     },
     getAttackIndex(combos, player, yieldAllowed, game) { this.capture(combos, game); return 0; },
     getDefenseIndex(combos, player, damage, game) { this.capture(combos, game); return 0; },
@@ -75,8 +78,12 @@ function buildForCase(c) {
   return captured;
 }
 
-let checked = 0, comboMismatch = 0, indexMismatch = 0;
-const examples = [], gaps = [];
+// A mismatch whose score gap (js pick vs py pick) is below this is a benign fp
+// near-tie -- two combos the net scores equally, resolved differently by torch vs ORT
+// op-ordering (e.g. two equally-discardable cards, keepy ~0). Not a real divergence.
+const TIE_TOL = 1e-6;
+let checked = 0, comboMismatch = 0, indexMismatch = 0, ties = 0;
+const examples = [];
 for (let ci = 0; ci < golden.cases.length; ci++) {
   const c = golden.cases[ci];
   const built = buildForCase(c);
@@ -92,27 +99,24 @@ for (let ci = 0; ci < golden.cases.length; ci++) {
     continue;
   }
 
-  const out = await session.run(built.feeds);
-  const logits = out.cand_logits.data;
-  let best = 0, bestVal = logits[0];
-  for (let i = 1; i < built.K; i++) if (logits[i] > bestVal) { bestVal = logits[i]; best = i; }
+  // Each bot scores the offered combos its own way (ADZ: cand_logits; AZ: combomap
+  // grid for attack, keepy for defense) -- the same code the live app argmaxes.
+  const scores = await bot.scoreCombos(built.built);
+  let best = 0;
+  for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
   if (best !== c.index) {
-    indexMismatch++;
-    // gap = how much the JS pick beats the Python pick's logit (>= 0). A tiny gap
-    // means a near-tie flipped by fp noise; a large gap means a real divergence.
-    const gap = logits[best] - logits[c.index];
-    gaps.push(gap);
-    if (examples.length < 12) examples.push(`case ${ci}: js=${best} py=${c.index} k=${built.K} ${c.attacking ? 'atk' : 'def'} gap=${gap.toExponential(2)}`);
+    const gap = scores[best] - scores[c.index]; // >= 0
+    if (gap <= TIE_TOL) {
+      ties++; // benign fp near-tie: both picks score equally
+    } else {
+      indexMismatch++;
+      if (examples.length < 12) examples.push(`case ${ci}: js=${best} py=${c.index} k=${built.built.K} ${c.attacking ? 'atk' : 'def'} gap=${gap.toExponential(2)}`);
+    }
   }
   checked++;
 }
 
-console.log(`\n${NET}: ${checked} cases with matching combo order, ${indexMismatch} index mismatch, ${comboMismatch} combo-order/capture failures`);
-if (gaps.length) {
-  gaps.sort((a, b) => a - b);
-  const lt = (t) => gaps.filter((g) => g < t).length;
-  console.log(`mismatch logit gaps: min=${gaps[0].toExponential(2)} median=${gaps[gaps.length >> 1].toExponential(2)} max=${gaps[gaps.length - 1].toExponential(2)} | <1e-3:${lt(1e-3)} <1e-2:${lt(1e-2)} <1e-1:${lt(1e-1)} of ${gaps.length}`);
-}
+console.log(`\n${NET} (${contract.paradigm}): ${checked} cases with matching combo order, ${indexMismatch} index mismatch, ${ties} benign fp ties, ${comboMismatch} combo-order/capture failures`);
 if (examples.length) console.log('examples:\n  ' + examples.join('\n  '));
 const ok = indexMismatch === 0 && comboMismatch === 0 && checked > 0;
 console.log(ok ? 'GOLDEN CHECK PASSED' : 'GOLDEN CHECK FAILED');

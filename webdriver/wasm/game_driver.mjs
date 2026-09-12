@@ -140,8 +140,9 @@ export class GameDriver {
    *                                                            (e.g. a full block)
    *   { kind:'decision', activeSeat, attacking, isBot,
    *     comboData:[{index,locations,labels,isYield}], feeds, K }
-   * For a bot seat the net feeds are built here while the offered combos are alive;
-   * the caller runs them with bot.runFeeds(feeds, K), then calls commit(index). */
+   * For a bot seat the net feeds are built here while the offered combos are alive
+   * (returned as `built`); the caller runs them with bot.runFeeds(built), then calls
+   * commit(index). `decisionPhaseString` is provided for Explorer bots that search. */
   prepare() {
     const M = this.M;
     const history = this.history;
@@ -160,14 +161,17 @@ export class GameDriver {
         parts.delete(); c.delete();
         comboData.push({ index: i, locations: locs, labels, isYield, isJoker });
       }
-      let feeds = null, K = combos.size();
+      const K = combos.size();
       const seatBot = this.seatBots[activeSeat] || null;
-      if (seatBot) { const built = seatBot.buildFeeds(phase, combos, history, { reshuffle: true }); feeds = built.feeds; K = built.K; }
+      // The decision phase string is the search root for an Explorer (MCTS) bot; a
+      // Direct bot instead uses `built` (feeds assembled here while the combos live).
+      const decisionPhaseString = phase.to_string();
+      const built = seatBot ? seatBot.buildFeeds(phase, combos, history, { reshuffle: true }) : null;
       phase.delete();
       // `damage` (defense: what must be blocked) and `yieldAllowed` (attack: an
       // empty combo is offered) drive the human panel's combat readout + yield gate.
-      captured = { kind: 'decision', activeSeat, attacking, isBot: !!seatBot, comboData, feeds, K,
-        damage: extra.damage ?? null, yieldAllowed: !!extra.yieldAllowed };
+      captured = { kind: 'decision', activeSeat, attacking, isBot: !!seatBot, comboData, built, K,
+        decisionPhaseString, damage: extra.damage ?? null, yieldAllowed: !!extra.yieldAllowed };
       return 0; // throwaway; commit() replays this onePhase with the real index
     };
     // Capture events even on the peek so a game-ending onePhase (a loss's

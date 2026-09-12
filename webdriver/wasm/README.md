@@ -13,6 +13,9 @@ per-move round-trip** — the static host just ships blobs (the `.wasm` engine, 
 | `dist/regicore.{mjs,wasm}` | built engine module (git-ignored) |
 | `dist/<net>.onnx`, `dist/<net>.io.json` | exported net + its IO contract (git-ignored) |
 | `adz_bot.mjs` | `NetBot` — featurize + onnxruntime forward + argmax (ADZ Direct) |
+| `az_bot.mjs` | `AZBot` — card-space Direct bot (combomap grid / keepy defense) |
+| `load_bot.mjs` | `loadBot`/`buildBot` — pick `NetBot`/`AZBot` from the net's contract |
+| `tables/combomap.json` | AZ combo bitwise → `(loc, played-status)` grid cell map |
 | `game_driver.mjs` | `GameDriver` — the browser game loop (`prepare()`/`commit()`) |
 | `app.mjs`, `index.html`, `app.css` | the UI |
 | `smoke*.mjs` | node smoke tests (engine, featurizer, bot feeds, full driver) |
@@ -41,8 +44,10 @@ npm install                                   # installs into node_modules/ (the
 python3 -m http.server 8000                   # serve (no npm needed for this step)
 ```
 
-Open `http://localhost:8000`, pick the player count / bot net (or **Spectate** to
-watch bots), and play seat 0.
+Export any nets you want to offer as bots (`adzpool`/`adzmulti` are ADZ;
+`basic`/`percardmlp`/`cardtx`/`mixer` are AZ — the AZ nets also need
+`tables/combomap.json`, which is committed). Open `http://localhost:8000`, set the
+player count and pick each opponent's net, then play your (shuffled) seat.
 
 ### Running without npm
 
@@ -78,7 +83,7 @@ npm run golden
 
 - **Single-threaded** onnxruntime-web (no SharedArrayBuffer), so no COOP/COEP
   headers are required — a plain static host (or GitHub Pages) works.
-- Only **ADZ** nets (`adzpool`, `adzmulti`) are wired as bots so far; the AZ
-  card-space nets (`basic`, `cardtx`, …) would need the `combomap` bijection
-  shipped as JSON plus the keepyness defense fallback.
+- Both paradigms are wired as bots: **ADZ** (`adzpool`, `adzmulti`, candidate
+  scoring) and **AZ** (`basic`, `percardmlp`, `cardtx`, `mixer`, card-space via the
+  `combomap` grid + keepyness defense fallback). `attntrunk` is omitted.
 - Bots play **Direct-net** (search-free argmax). MCTS Explorer is a later phase.

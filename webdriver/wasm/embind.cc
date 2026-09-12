@@ -8,7 +8,10 @@
 #include <dfsel.h>
 #include <phaseinfo.h>
 #include <featurize.h>
+#include <combotable.h>
+#include <card.h>
 #include <rng.h>
+#include <cstdint>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -241,6 +244,44 @@ static val featFuseCardTokens(const std::vector<PhaseInfo> &phases, int persp)
     return toFloat32Array(fuseCardTokens(phases, persp));
 }
 
+/* The combo <-> ComboTable-cell bijection (combomap.py analogue), as a JS object
+ * { "<bitwise>": [loc, pst] }. The AZ card-space nets output a (56,22) policy grid
+ * indexed by (location, played_status); to score an offered combo the browser looks
+ * up its bitwise here. Built once from ComboTable::allViableEntries + the same
+ * createComboFromTableEntry the pybind combomap uses. Yield normalizes to key "0"
+ * (a played yield is the empty combo, bitwise 0). bitwise is the u64 OR of
+ * (1 << card.location) over the combo's parts -- emitted as a decimal STRING to
+ * dodge u64<->BigInt marshaling; JS forms the same key via BigInt(...).toString(). */
+static val comboMap()
+{
+    val out = val::object();
+    auto table = ComboTable::allViableEntries();
+    for (i32 loc = 0; loc < ComboTable::rows; ++loc)
+    {
+        for (i32 j = 0; j < ComboTable::cols; ++j)
+        {
+            PlayedStatus pst = static_cast<PlayedStatus>(j);
+            if (table->get(loc, pst) == 0) { continue; }
+            val cell = val::array();
+            cell.set(0, loc);
+            cell.set(1, j);
+            if (loc == LOCATION_YIELD && pst == PLAYED_SELF)
+            {
+                out.set(std::string("0"), cell); // played yield == empty combo
+                continue;
+            }
+            Combo combo = ComboTable::createComboFromTableEntry(loc, j);
+            std::uint64_t bw = 0;
+            for (const Card &card : combo.parts)
+            {
+                bw |= (static_cast<std::uint64_t>(1) << card.toLocation());
+            }
+            out.set(std::to_string(bw), cell);
+        }
+    }
+    return out;
+}
+
 EMSCRIPTEN_BINDINGS(regicore)
 {
     enum_<GameStatus>("GameStatus")
@@ -338,4 +379,7 @@ EMSCRIPTEN_BINDINGS(regicore)
     function("features_used_pile_array", &featUsedPileArray);
     function("features_candidate_semantics", &featCandidateSemantics);
     function("features_fuse_card_tokens", &featFuseCardTokens);
+
+    // combo bitwise -> (location, played_status) cell map, for the AZ policy grid.
+    function("combo_map", &comboMap);
 }

@@ -9,11 +9,12 @@
  * snapshot stays well-formed throughout. */
 import { readFileSync } from 'node:fs';
 import RegiModule from './dist/regicore.mjs';
-import { NetBot } from './adz_bot.mjs';
+import { buildBot } from './load_bot.mjs';
 import { GameDriver } from './game_driver.mjs';
 
 function arg(name, def) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : def; }
-const NET = arg('net', 'adzpool');
+const NET = arg('net', 'adzpool');       // ADZ net for the two-bot / mixed games
+const AZ_NET = arg('az-net', 'basic');   // AZ net to exercise loadBot's paradigm dispatch
 const DIST = arg('dist', './dist');
 const ORT_PKG = arg('ort', 'onnxruntime-web');
 
@@ -23,10 +24,13 @@ const M = await RegiModule();
 let failures = 0;
 const check = (name, cond) => { console.log(`${cond ? 'ok  ' : 'FAIL'}  ${name}`); if (!cond) failures++; };
 
-async function makeBot() {
-  const contract = JSON.parse(readFileSync(`${DIST}/${NET}.io.json`, 'utf8'));
-  const session = await ort.InferenceSession.create(`${DIST}/${NET}.onnx`);
-  return new NetBot(M, ort, session, contract);
+// buildBot is the exact dispatch app.mjs's loadBot uses (adz -> NetBot, az -> AZBot
+// + combomap); here we read the files ourselves since node fetch can't take a path.
+const comboMap = M.combo_map();
+async function makeBot(net = NET) {
+  const contract = JSON.parse(readFileSync(`${DIST}/${net}.io.json`, 'utf8'));
+  const session = await ort.InferenceSession.create(`${DIST}/${net}.onnx`);
+  return buildBot(M, ort, session, contract, { comboMap });
 }
 
 function snapshotOk(s) {
@@ -45,7 +49,7 @@ async function playGame(driver, decideFor) {
     if (dec.kind === 'auto') { driver.commit(-1); autos++; continue; }
     if (!snapshotOk(driver.snapshot())) badSnap++;
     let index;
-    if (dec.isBot) index = await driver.seatBots[dec.activeSeat].runFeeds(dec.feeds, dec.K);
+    if (dec.isBot) index = await driver.seatBots[dec.activeSeat].runFeeds(dec.built);
     else index = decideFor(dec.attacking ? 'attack' : 'defense', dec, dec.activeSeat);
     if (!(index >= 0 && index < dec.comboData.length)) { badIndex++; index = 0; }
     driver.commit(index);
@@ -73,6 +77,35 @@ async function playGame(driver, decideFor) {
   const r = await playGame(driver, (kind, dec) => dec.comboData.length - 1);
   check(`mixed human/bot game terminates (moves=${r.moves})`, r.ended && r.moves > 0);
   check('board snapshot well-formed throughout (mixed)', r.badSnap === 0);
+  driver.dispose();
+}
+
+// 3) AZ card-space bot drives through the SAME prepare/commit `built` path (loadBot
+//    must have dispatched to AZBot, which scores via the combomap grid / keepy).
+{
+  const bot = await makeBot(AZ_NET);
+  check(`loadBot('${AZ_NET}') dispatches to an AZ bot (has chooseRedirect)`, typeof bot.chooseRedirect === 'function');
+  const driver = new GameDriver(M, { numPlayers: 4, seatBots: [bot, bot, bot, bot], maxHistory: 8, seed: 7 });
+  const r = await playGame(driver, () => 0);
+  check(`AZ-net 4-bot game reaches a terminal state (moves=${r.moves})`, r.ended && r.moves > 0);
+  check('AZ bot never returned an out-of-range index', r.badIndex === 0);
+
+  // 4) botRedirect path: on a real decision phase, chooseRedirect (AZ value-argmax)
+  //    must hand off to a VALID other seat -- what app.mjs asks on a bot Joker attack.
+  driver.newGame();
+  let redirOk = true, redirChecked = 0;
+  for (let steps = 0; steps < 200 && redirChecked < 5; steps++) {
+    const dec = driver.prepare();
+    if (dec.kind === 'ended') { driver.newGame(); continue; }
+    if (dec.kind === 'auto') { driver.commit(-1); continue; }
+    const phase = M.PhaseInfo.from_string(dec.decisionPhaseString);
+    const t = await bot.chooseRedirect(phase, driver.history, driver.numPlayers);
+    phase.delete();
+    if (!(t >= 0 && t < driver.numPlayers && t !== dec.activeSeat)) redirOk = false;
+    redirChecked++;
+    driver.commit(await bot.runFeeds(dec.built));
+  }
+  check(`AZ chooseRedirect returns a valid other seat (checked=${redirChecked})`, redirOk && redirChecked > 0);
   driver.dispose();
 }
 
