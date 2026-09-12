@@ -16,8 +16,12 @@ ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-
 // ort.env.wasm.wasmPaths = ORT_DIST; // where the ort-wasm-*.wasm sidecar is fetched from
 
 const NETS = ['adzpool', 'adzmulti'];
-const HUMAN_SEAT = 0;          // the human always takes seat 0
 const BOT_MOVE_DELAY_MS = 550; // let the human watch bot moves
+
+let humanSeat = 0; // which seat (turn-order position) the human took THIS game; shuffled at start
+// Player labels are 1-indexed for display ("Player 1".."Player N"); the human's
+// own seat shows their name. Seat ids stay 0-indexed internally.
+const seatLabel = (seat) => (seat === humanSeat ? playerName : `Player ${seat + 1}`);
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
@@ -52,13 +56,15 @@ function buildOpponents() {
   const numPlayers = parseInt($('cfg-players').value, 10);
   const wrap = $('opponents');
   const prev = {};
-  wrap.querySelectorAll('select').forEach((s) => { prev[s.dataset.seat] = s.value; });
+  wrap.querySelectorAll('select').forEach((s) => { prev[s.dataset.bot] = s.value; });
   wrap.replaceChildren();
-  for (let i = 1; i < numPlayers; i++) { // seat 0 is you
+  // Configure the N-1 bot opponents; their turn-order seats are decided (shuffled)
+  // at game start, so these are just numbered bots, not fixed seats.
+  for (let i = 1; i < numPlayers; i++) {
     const row = el('div', 'opp-row');
-    row.appendChild(el('span', 'seat-name', `Seat ${i}`));
+    row.appendChild(el('span', 'seat-name', `Bot ${i}`));
     const sel = el('select');
-    sel.dataset.seat = i;
+    sel.dataset.bot = i;
     for (const n of NETS) { const o = el('option', null, n); o.value = n; sel.appendChild(o); }
     sel.value = prev[i] || 'adzpool';
     row.appendChild(sel);
@@ -76,14 +82,19 @@ async function startGame() {
   const seed = seedRaw === '' ? null : (parseInt(seedRaw, 10) >>> 0);
   playerName = ($('cfg-name').value.trim() || 'Player').slice(0, 16);
 
-  const netForSeat = {};
-  $('opponents').querySelectorAll('select').forEach((s) => { netForSeat[+s.dataset.seat] = s.value; });
+  // The configured bot nets, in menu order (N-1 of them).
+  const botNets = [];
+  $('opponents').querySelectorAll('select').forEach((s) => { botNets.push(s.value); });
+
+  // Shuffle the human into a random seat so turn order varies each game.
+  humanSeat = Math.floor(Math.random() * numPlayers);
 
   $('menu-start').disabled = true;
   const seatBots = [];
+  let bi = 0;
   for (let i = 0; i < numPlayers; i++) {
-    if (i === HUMAN_SEAT) { seatBots.push(null); continue; }
-    const net = netForSeat[i] || 'adzpool';
+    if (i === humanSeat) { seatBots.push(null); continue; }
+    const net = botNets[bi++] || 'adzpool';
     let bot = botCache.get(net);
     if (!bot) { bot = await loadNetBot(M, ort, './dist', net); botCache.set(net, bot); }
     seatBots.push(bot);
@@ -98,7 +109,7 @@ async function startGame() {
   $('log').replaceChildren();
   $('overlay').classList.remove('show');
   $('you-seat-note').textContent = `· you are “${playerName}”`;
-  log(`New ${numPlayers}-player game — you are seat 0.`);
+  log(`New ${numPlayers}-player game — you are <b>Player ${humanSeat + 1}</b>.`);
   showScreen('game');
   loopToken++;
   loop(loopToken);
@@ -161,10 +172,12 @@ function render(snap) {
 
   $('enemy-strength').textContent = enemy ? enemy.strength : 0;
   $('cur-block').textContent = snap.currentBlock;
+  // The engine sets each royal's max HP = 2 * its attack (Jack 20, Queen 30, King 40),
+  // so the bar is scaled to THIS royal's max and shown as "current / max".
   const hp = enemy ? Math.max(0, enemy.hp) : 0;
-  const hpMax = enemy ? Math.max(hp, enemy.strength, 10) : 10;
-  $('enemy-hp-lbl').textContent = enemy ? `${enemy.hp}` : '—';
-  $('enemy-hp-bar').style.width = `${enemy ? Math.min(100, (hp / hpMax) * 100) : 0}%`;
+  const hpMax = enemy ? 2 * enemy.strength : 0;
+  $('enemy-hp-lbl').textContent = enemy ? `${hp} / ${hpMax}` : '—';
+  $('enemy-hp-bar').style.width = `${enemy && hpMax > 0 ? Math.max(0, Math.min(100, (hp / hpMax) * 100)) : 0}%`;
 
   const incoming = enemy ? Math.max(0, enemy.strength - snap.currentBlock) : 0;
   const inc = $('incoming');
@@ -177,9 +190,9 @@ function render(snap) {
 
   const seats = $('seats'); seats.replaceChildren();
   for (let i = 0; i < snap.numPlayers; i++) {
-    const you = i === HUMAN_SEAT;
+    const you = i === humanSeat;
     const s = el('div', 'seat' + (i === snap.activeSeat ? ' active' : '') + (you ? ' you-seat' : ''));
-    s.appendChild(el('div', 'who', you ? playerName : `Seat ${i}`));
+    s.appendChild(el('div', 'who', `Player ${i + 1}${you ? ` · ${playerName}` : ''}`));
     s.appendChild(el('div', 'kind', `${snap.handCounts[i]} cards · ${you ? 'you' : 'bot'}`));
     seats.appendChild(s);
   }
@@ -196,16 +209,64 @@ function render(snap) {
   // your hand, read-only here (presentHuman makes it pickable on your turn)
   const hand = $('your-hand'); hand.replaceChildren();
   hand.classList.remove('pickable'); hand.classList.add('locked');
-  for (const c of (snap.hands[HUMAN_SEAT] || [])) hand.appendChild(cardEl(c));
+  for (const c of (snap.hands[humanSeat] || [])) hand.appendChild(cardEl(c));
 }
 
 /* ================= log + status ================= */
 function log(html, cls) { const row = el('div', 'row' + (cls ? ' ' + cls : '')); row.innerHTML = html; $('log').prepend(row); }
+/* Prepend a turn's lines so they read top-to-bottom in chronological order while the
+   newest turn still sits on top (the log is newest-first). */
+function logLines(lines) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const r = el('div', 'row' + (lines[i].cls ? ' ' + lines[i].cls : ''));
+    r.innerHTML = lines[i].html;
+    $('log').prepend(r);
+  }
+}
+function prettyLabel(label) { const p = parseCard(label); return p.joker ? '★' : `${p.disp}${p.suit}`; }
 function moveText(dec, idx) {
   const c = dec.comboData[idx];
-  const who = dec.isBot ? `Seat ${dec.activeSeat}` : playerName;
-  const what = !c ? '?' : c.isYield ? 'yields' : `${dec.attacking ? 'attacks' : 'defends'} with ${c.labels.join(' ')}`;
+  const who = seatLabel(dec.activeSeat);
+  const what = !c ? '?' : c.isYield ? 'yields'
+    : `${dec.attacking ? 'attacks' : 'defends'} with ${c.labels.map(prettyLabel).join(' ')}`;
   return `<b>${who}</b> ${what}`;
+}
+/* Turn a commit()'s captured engine events into log lines (chronological). An
+   optional leading `actionHtml` (the chosen-move text) heads the block. */
+function eventLines(events, actionHtml) {
+  const lines = [];
+  if (actionHtml) lines.push({ html: actionHtml });
+  if (!events) return lines;
+  let draws = new Map();
+  const flushDraws = () => {
+    if (!draws.size) return;
+    const parts = [...draws.entries()].map(([p, k]) => `<b>${seatLabel(p)}</b> +${k}`);
+    lines.push({ html: `<span class="ev">♦</span> draw — ${parts.join(', ')}` });
+    draws = new Map();
+  };
+  for (const e of events) {
+    if (e.type === 'draw') { draws.set(e.player, (draws.get(e.player) || 0) + 1); continue; }
+    flushDraws();
+    switch (e.type) {
+      case 'replenish':
+        if (e.amount > 0) lines.push({ html: `<span class="ev">♥</span> heal — ${e.amount} card${e.amount > 1 ? 's' : ''} back under the deck` });
+        break;
+      case 'redirect':
+        lines.push({ html: `<span class="ev">★</span> <b>${seatLabel(e.player)}</b> plays a Joker — <b>${seatLabel(e.target)}</b> plays next`, cls: 'joker' });
+        break;
+      case 'enemyKill':
+        lines.push({ html: `<span class="ev">☠</span> <b>${prettyLabel(e.enemy)}</b> defeated`, cls: 'kill' });
+        break;
+      case 'fullBlock':
+        lines.push({ html: `<span class="ev">🛡</span> <b>${seatLabel(e.player)}</b> fully blocks (${e.block} block ≥ ${e.damage})` });
+        break;
+      case 'failBlock':
+        lines.push({ html: `<span class="ev">✖</span> <b>${seatLabel(e.player)}</b> can't block ${e.damage} (only ${e.block})`, cls: 'bad' });
+        break;
+    }
+  }
+  flushDraws();
+  return lines;
 }
 function setPill(text, cls) { const p = $('turn-status'); p.textContent = text; p.className = 'turn-pill' + (cls ? ' ' + cls : ''); }
 
@@ -242,7 +303,7 @@ function presentHuman(dec, snap) {
     return -1;
   };
   const refresh = () => {
-    let sum = 0; for (const c of (snap.hands[HUMAN_SEAT] || [])) if (selected.has(c.location)) sum += cardStrength(c.label);
+    let sum = 0; for (const c of (snap.hands[humanSeat] || [])) if (selected.has(c.location)) sum += cardStrength(c.label);
     selSum.textContent = selected.size ? `— selected ${selected.size} card${selected.size > 1 ? 's' : ''} (${sum})` : '';
     sb.disabled = !(matchIndex() >= 0 || canYield());
     sb.textContent = submitLabel();
@@ -285,29 +346,61 @@ function flashInvalid() {
   setTimeout(() => w.remove(), 1600);
 }
 
+/* Jester: after you play a Joker, choose which OTHER player takes the next turn
+   (the engine/reference bots never redirect to self). Resolves to that seat id. */
+function presentRedirect(dec) {
+  setPill('You played a Joker — choose who plays next', 'you');
+  const combat = $('combat'); combat.replaceChildren();
+  combat.appendChild(el('span', 'dmg', '★ Joker — who plays next?'));
+  const actions = $('actions');
+  const submit = $('btn-submit'), clear = $('btn-clear');
+  submit.hidden = true; clear.hidden = true;
+  const btns = [];
+  return new Promise((resolve) => {
+    const done = (seat) => {
+      for (const b of btns) b.remove();
+      submit.hidden = false; clear.hidden = false;
+      resolve(seat);
+    };
+    for (let i = 0; i < driver.numPlayers; i++) {
+      if (i === dec.activeSeat) continue;
+      const b = el('button', 'btn primary', `Player ${i + 1}`);
+      b.onclick = () => done(i);
+      actions.appendChild(b);
+      btns.push(b);
+    }
+  });
+}
+
 /* ================= main loop ================= */
 async function loop(token) {
   while (token === loopToken) {
     const dec = driver.prepare();
     const snap = driver.snapshot();
     render(snap);
-    if (dec.kind === 'ended') { finish(dec.endValue); return; }
-    if (dec.kind === 'auto') { driver.commit(-1); continue; }
+    if (dec.kind === 'ended') { logLines(eventLines(dec.events, null)); finish(dec.endValue); return; }
+    if (dec.kind === 'auto') { driver.commit(-1); logLines(eventLines(driver.lastEvents, null)); render(driver.snapshot()); continue; }
 
     if (dec.isBot) {
-      setPill(`Seat ${dec.activeSeat} is thinking…`, 'think');
+      setPill(`${seatLabel(dec.activeSeat)} is thinking…`, 'think');
       $('combat').replaceChildren(el('span', 'note', 'waiting for the other players'));
       const index = await driver.seatBots[dec.activeSeat].runFeeds(dec.feeds, dec.K);
       if (token !== loopToken) return;
-      log(moveText(dec, index));
       driver.commit(index);
+      logLines(eventLines(driver.lastEvents, moveText(dec, index)));
       render(driver.snapshot());
       await new Promise((r) => setTimeout(r, BOT_MOVE_DELAY_MS));
     } else {
       const index = await presentHuman(dec, snap);
       if (token !== loopToken) return;
-      log(moveText(dec, index));
-      driver.commit(index);
+      const played = dec.comboData[index];
+      let redirect = null;
+      if (dec.attacking && played && played.isJoker && driver.numPlayers > 1) {
+        redirect = await presentRedirect(dec);
+        if (token !== loopToken) return;
+      }
+      driver.commit(index, redirect);
+      logLines(eventLines(driver.lastEvents, moveText(dec, index)));
     }
   }
 }

@@ -167,6 +167,8 @@
 
       <div class="hp-block">
         <div class="meter-label"><span>Royal HP</span><span id="enemy-hp-lbl">—</span></div>
+        <!-- enemy-hp-lbl shows current / max (e.g. 13 / 20) -->
+
         <div class="meter hp"><span id="enemy-hp-bar" style="width:0%"></span></div>
         <div class="stat-line">Attack <b id="enemy-strength">0</b>
           <span class="sep">·</span> Block <b id="cur-block">0</b>
@@ -177,16 +179,16 @@
       </div>
     </div>
 
-    <!-- players -->
-    <div class="panel">
-      <h3>Party</h3>
-      <div class="seats" id="seats"></div>
-    </div>
-
-    <!-- used combos -->
-    <div class="panel">
+    <!-- used combos (below the enemy, left column) -->
+    <div class="panel used-panel">
       <h3>Played on this royal</h3>
       <div class="used" id="used-combos"></div>
+    </div>
+
+    <!-- players -->
+    <div class="panel party-panel">
+      <h3>Party</h3>
+      <div class="seats" id="seats"></div>
     </div>
 
     <!-- your hand + actions -->
@@ -201,8 +203,8 @@
     </div>
 
     <!-- log -->
-    <div class="panel">
-      <h3>Log</h3>
+    <div class="panel log-panel">
+      <h3>Event log</h3>
       <div id="log"></div>
     </div>
   </div>

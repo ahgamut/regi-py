@@ -21,6 +21,7 @@ export class GameDriver {
     this.seatBots = seatBots;
     this.maxHistory = maxHistory;
     this.phaseString = null;
+    this.lastEvents = []; // engine side-effect events from the most recent commit()
     this.history = []; // past decision phases (PhaseInfo), newest last, <= maxHistory
     // Per-cycle RNG seed: prepare() and commit() each simulate ONE onePhase and MUST
     // seed identically so the phase they produce (and any card draw in it) matches,
@@ -55,16 +56,19 @@ export class GameDriver {
   }
 
   /* Seat `numPlayers` copies of one JS Strategy (built by makeMethods) on a game
-   * seeded from the current phase string, and return it for the caller to step. */
-  _seat(makeMethods) {
+   * seeded from the current phase string, and return it for the caller to step.
+   * An optional `log` (e.g. an EventLog) captures the engine's side-effect events
+   * for that onePhase; when omitted a throwaway NoOpLog is used and disposed. */
+  _seat(makeMethods, log = null) {
     const M = this.M;
-    const log = new M.NoOpLog();
+    const ownLog = log === null;
+    if (ownLog) log = new M.NoOpLog();
     const g = new M.GameState(log);
     const Strat = M.Strategy.extend('Strategy', makeMethods);
     const seats = [];
     for (let i = 0; i < this.numPlayers; i++) { const s = new Strat(); seats.push(s); g.add_player(s); }
     g.init_string(this.phaseString);
-    return { g, log, seats, done() { seats.forEach((s) => s.delete()); g.delete(); log.delete(); } };
+    return { g, log, seats, done() { seats.forEach((s) => s.delete()); g.delete(); if (ownLog) log.delete(); } };
   }
 
   /* Board snapshot for rendering (mirrors serialize.game_to_dict's readable fields,
@@ -151,8 +155,10 @@ export class GameDriver {
         const c = combos.get(i), parts = c.parts, locs = [], labels = [];
         for (let j = 0; j < parts.size(); j++) { const cd = parts.get(j); locs.push(cd.location); labels.push(cd.label); cd.delete(); }
         const isYield = parts.size() === 0;
+        // a joker card stringifies as "X!"; playing one triggers the jester redirect
+        const isJoker = labels.some((lb) => lb[0] === 'X');
         parts.delete(); c.delete();
-        comboData.push({ index: i, locations: locs, labels, isYield });
+        comboData.push({ index: i, locations: locs, labels, isYield, isJoker });
       }
       let feeds = null, K = combos.size();
       const seatBot = this.seatBots[activeSeat] || null;
@@ -164,13 +170,18 @@ export class GameDriver {
         damage: extra.damage ?? null, yieldAllowed: !!extra.yieldAllowed };
       return 0; // throwaway; commit() replays this onePhase with the real index
     };
+    // Capture events even on the peek so a game-ending onePhase (a loss's
+    // failBlock, the final NO_ENEMIES) -- which is never committed -- can still be
+    // reported. On a decision/auto peek these events are discarded; commit() re-runs
+    // the same onePhase and re-captures them for real.
+    const evlog = new M.EventLog();
     this._seedCycle();
     const ctx = this._seat({
       setup() { return 0; },
       getAttackIndex(combos, p, y, game) { return grab(combos, game, { yieldAllowed: y }); },
       getDefenseIndex(combos, p, d, game) { return grab(combos, game, { damage: d }); },
       getRedirectIndex() { return 0; },
-    });
+    }, evlog);
     const running = ctx.g.is_runnable();
     if (running) ctx.g.step(); // exactly one onePhase
     let result;
@@ -179,32 +190,45 @@ export class GameDriver {
       const term = ctx.g.export_string();
       const tp = M.PhaseInfo.from_string(term); const endValue = tp.game_endvalue; tp.delete();
       this.phaseString = term; // freeze the terminal board for snapshot()
-      result = { kind: 'ended', endValue };
+      result = { kind: 'ended', endValue, events: evlog.drain() };
     } else {
       result = { kind: 'auto' }; // a no-decision onePhase; commit(-1) skips it
     }
     ctx.done();
+    evlog.delete();
     return result;
   }
 
   /* Commit the onePhase prepare() showed, replaying it under the SAME cycle seed and
    * applying `index` at the decision (ignored for an 'auto' phase; pass -1). Updates
-   * the phase string, records the decided phase into history, advances the seed. */
-  commit(index) {
+   * the phase string, records the decided phase into history, advances the seed.
+   *
+   * If `index` plays a JOKER, the engine also asks who takes the next turn (the
+   * jester). `redirectTarget` names that seat; when null (a bot, or a non-joker move)
+   * it defaults to a random OTHER player -- matching the ADZ reference
+   * `_random_redirect`. Never self. */
+  commit(index, redirectTarget = null) {
     const M = this.M;
     const decided = M.PhaseInfo.from_string(this.phaseString);
     const isDecision = index >= 0;
-    const redirectTarget = (decided.active_player + 1) % this.numPlayers; // valid default (rare)
+    const n = this.numPlayers;
+    const active = decided.active_player;
+    const redir = (redirectTarget != null && redirectTarget >= 0)
+      ? redirectTarget
+      : (active + 1 + Math.floor(Math.random() * (n - 1))) % n;
+    const evlog = new M.EventLog();
     this._seedCycle();
     const ctx = this._seat({
       setup() { return 0; },
       getAttackIndex() { return index; },
       getDefenseIndex() { return index; },
-      getRedirectIndex() { return redirectTarget; },
-    });
+      getRedirectIndex() { return redir; },
+    }, evlog);
     if (ctx.g.is_runnable()) ctx.g.step(); // the same onePhase, same seed as prepare()
     this.phaseString = ctx.g.export_string();
+    this.lastEvents = evlog.drain(); // side-effect events for this committed onePhase
     ctx.done();
+    evlog.delete();
     this._bumpCycle();
     if (isDecision) this._pushHistory(decided); else decided.delete();
     return this.snapshot();

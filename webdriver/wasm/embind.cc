@@ -46,6 +46,106 @@ struct NoOpLog : public BaseLog
     void postgame(const GameState &) override {}
 };
 
+/* Capturing log: records the engine's side-effect events (attacks, heals, draws,
+ * spade block, joker redirects, kills, block outcomes) into a JS array so the UI
+ * can show a real event log instead of only the chosen-move text. Everything is
+ * flattened to primitives/strings at capture time, so the returned objects stay
+ * valid after the C++ Player/Enemy/Combo they came from are gone. drain() hands
+ * the accumulated events to JS and resets. */
+struct EventLog : public BaseLog
+{
+    val events = val::array();
+    int n = 0;
+    void push(val e) { events.set(n++, e); }
+    static val mk(const char *type)
+    {
+        val e = val::object();
+        e.set("type", std::string(type));
+        return e;
+    }
+    void attack(const Player &p, const Enemy &en, const Combo &, const i32 dmg,
+                const GameState &) override
+    {
+        val e = mk("attack");
+        e.set("player", p.id);
+        e.set("damage", (int)dmg);
+        e.set("enemy", stringify(en));
+        e.set("enemyHp", (int)en.hp);
+        push(e);
+    }
+    void defend(const Player &p, const Combo &, const i32 dmg, const GameState &) override
+    {
+        val e = mk("defend");
+        e.set("player", p.id);
+        e.set("damage", (int)dmg);
+        push(e);
+    }
+    void redirect(const Player &p, const i32 target, const GameState &) override
+    {
+        val e = mk("redirect");
+        e.set("player", p.id);
+        e.set("target", (int)target);
+        push(e);
+    }
+    void failBlock(const Player &p, const i32 dmg, const i32 blk, const GameState &) override
+    {
+        val e = mk("failBlock");
+        e.set("player", p.id);
+        e.set("damage", (int)dmg);
+        e.set("block", (int)blk);
+        push(e);
+    }
+    void fullBlock(const Player &p, const i32 dmg, const i32 blk, const GameState &) override
+    {
+        val e = mk("fullBlock");
+        e.set("player", p.id);
+        e.set("damage", (int)dmg);
+        e.set("block", (int)blk);
+        push(e);
+    }
+    void drawOne(const Player &p) override
+    {
+        val e = mk("draw");
+        e.set("player", p.id);
+        push(e);
+    }
+    void cannotDrawDeckEmpty(const Player &p, const GameState &) override
+    {
+        val e = mk("cannotDraw");
+        e.set("player", p.id);
+        push(e);
+    }
+    void replenish(const i32 count) override
+    {
+        val e = mk("replenish");
+        e.set("amount", (int)count);
+        push(e);
+    }
+    void enemyKill(const Enemy &en, const GameState &) override
+    {
+        val e = mk("enemyKill");
+        e.set("enemy", stringify(en));
+        push(e);
+    }
+    void state(const GameState &) override {}
+    void debug(const GameState &) override {}
+    void startgame(const GameState &) override {}
+    void endgame(EndGameReason reason, const GameState &) override
+    {
+        val e = mk("endgame");
+        e.set("reason", (int)reason);
+        push(e);
+    }
+    void postgame(const GameState &) override {}
+    val drain()
+    {
+        val out = events;
+        events = val::array();
+        n = 0;
+        return out;
+    }
+};
+
 /* JS-subclassable Strategy: JS implements the four decision methods. */
 struct StrategyWrapper : public wrapper<Strategy>
 {
@@ -197,6 +297,9 @@ EMSCRIPTEN_BINDINGS(regicore)
 
     class_<BaseLog>("BaseLog");
     class_<NoOpLog, base<BaseLog>>("NoOpLog").constructor<>();
+    class_<EventLog, base<BaseLog>>("EventLog")
+        .constructor<>()
+        .function("drain", &EventLog::drain);
 
     class_<Strategy>("Strategy")
         .allow_subclass<StrategyWrapper>("StrategyWrapper")

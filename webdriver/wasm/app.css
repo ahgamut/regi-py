@@ -95,11 +95,21 @@ a { color: var(--accent); }
 .turn-pill.loss { color: #fff; background: var(--bad); border-color: transparent; }
 
 /* ---------- game: board ---------- */
-.board { max-width: 1080px; margin: 0 auto; padding: 16px;
-  display: grid; gap: 14px; grid-template-columns: 1fr 1fr;
-  grid-template-areas: "enemy enemy" "party used" "you you" "log log"; }
+/* enemy (dungeon) on the LEFT with the used pile below it; the party, your hand
+   and the event log stack on the RIGHT. */
+.board { max-width: 1160px; margin: 0 auto; padding: 16px;
+  display: grid; gap: 14px; align-items: start;
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  grid-template-areas:
+    "enemy party"
+    "enemy you"
+    "used  you"
+    "used  log"; }
 .board .enemy-panel { grid-area: enemy; }
-.board .you-panel { grid-area: you; }
+.board .used-panel  { grid-area: used; }
+.board .party-panel { grid-area: party; }
+.board .you-panel   { grid-area: you; }
+.board .log-panel   { grid-area: log; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 11px; padding: 14px; }
 .panel h3 { color: var(--dim); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 10px; }
 .panel h3 .note { text-transform: none; letter-spacing: 0; color: var(--dim); font-weight: 500; }
@@ -183,6 +193,9 @@ a { color: var(--accent); }
 #log .row.win { color: var(--good); font-weight: 700; }
 #log .row.loss { color: var(--bad); font-weight: 700; }
 #log .row.bad { color: var(--gold); }
+#log .row.kill { color: var(--gold); }
+#log .row.joker { color: var(--accent); }
+#log .row .ev { display: inline-block; width: 1.3em; text-align: center; opacity: .9; }
 
 /* ---------- overlay ---------- */
 .overlay { position: fixed; inset: 0; background: rgba(10,12,18,.85); display: none;
@@ -196,8 +209,9 @@ a { color: var(--accent); }
 .overlay-actions { display: flex; gap: 12px; justify-content: center; }
 
 /* ---------- responsive ---------- */
-@media (max-width: 760px) {
-  .board { grid-template-columns: 1fr; grid-template-areas: "enemy" "party" "used" "you" "log"; }
+@media (max-width: 860px) {
+  .board { grid-template-columns: 1fr;
+    grid-template-areas: "enemy" "used" "party" "you" "log"; }
   .hero-title { font-size: 46px; }
   .suit-grid { grid-template-columns: 1fr; }
 }
