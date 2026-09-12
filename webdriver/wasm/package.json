@@ -6,8 +6,8 @@
   "description": "Client-side Regicide: the C++ engine (WASM) + net bots (onnxruntime-web) run entirely in the browser.",
   "scripts": {
     "serve": "python3 -m http.server 8000",
-    "smoke": "node smoke_all.mjs",
-    "golden": "node check_golden.mjs"
+    "smoke": "node tests/smoke_all.mjs",
+    "golden": "node tests/check_golden.mjs"
   },
   "dependencies": {
     "onnxruntime-web": "^1.29.0"

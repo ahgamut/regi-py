@@ -17,9 +17,9 @@
  * byte-for-byte (no RNG). A combo-order check runs first, so an index mismatch is
  * never masked by the two sides enumerating the offered combos differently. */
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
-import RegiModule from './dist/regicore.mjs';
-import { NetBot } from './adz_bot.mjs';
-import { AZBot } from './az_bot.mjs';
+import RegiModule from '../dist/regicore.mjs';
+import { NetBot } from '../js/adz_bot.mjs';
+import { AZBot } from '../js/az_bot.mjs';
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`);

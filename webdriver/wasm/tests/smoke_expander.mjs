@@ -13,10 +13,10 @@
  * Exports runSmoke() so smoke_all.mjs can call it as a function (returns the failure
  * count); running this file directly runs just this suite and exits non-zero on fail. */
 import { pathToFileURL } from 'node:url';
-import RegiModule from './dist/regicore.mjs';
-import { GameDriver } from './game_driver.mjs';
-import { PhaseExpander } from './phase_expander.mjs';
-import { bitwiseOfLocations } from './net_common.mjs';
+import RegiModule from '../dist/regicore.mjs';
+import { GameDriver } from '../js/game_driver.mjs';
+import { PhaseExpander } from '../js/phase_expander.mjs';
+import { bitwiseOfLocations } from '../js/net_common.mjs';
 
 const bitwiseSet = (arr) => new Set(arr.map((x) => x.toString()));
 const eqSet = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));

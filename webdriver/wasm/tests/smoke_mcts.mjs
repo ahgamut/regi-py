@@ -14,10 +14,10 @@
  * count); running this file directly runs just this suite and exits non-zero on fail. */
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
-import RegiModule from './dist/regicore.mjs';
-import { buildBot } from './load_bot.mjs';
-import { ExplorerBot } from './mcts.mjs';
-import { GameDriver } from './game_driver.mjs';
+import RegiModule from '../dist/regicore.mjs';
+import { buildBot } from '../js/load_bot.mjs';
+import { ExplorerBot } from '../js/mcts.mjs';
+import { GameDriver } from '../js/game_driver.mjs';
 
 function arg(name, def) { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : def; }
 const ADZ = arg('adz', 'adzpool');

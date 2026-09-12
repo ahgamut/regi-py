@@ -7,7 +7,7 @@
  * Exports runSmoke() so smoke_all.mjs can call it as a function (returns the failure
  * count); running this file directly runs just this suite and exits non-zero on fail. */
 import { pathToFileURL } from 'node:url';
-import RegiModule from './dist/regicore.mjs';
+import RegiModule from '../dist/regicore.mjs';
 
 export async function runSmoke() {
   const M = await RegiModule();

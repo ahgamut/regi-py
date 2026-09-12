@@ -2,16 +2,18 @@
  * (onnxruntime-web) run entirely in the browser -- no server game state, no
  * per-move round-trip. Four screens (intro / how-to / menu / game); on the game
  * screen the human picks CARDS from their hand (not a move list) and submits. */
-import RegiModule from './dist/regicore.mjs';
+import RegiModule from '../dist/regicore.mjs';
 import { GameDriver } from './game_driver.mjs';
 import { loadBot } from './load_bot.mjs';
 import { ExplorerBot } from './mcts.mjs';
 
 // ---- onnxruntime-web source (edit these two lines to change where ORT loads) ----
-//   npm:            ./node_modules/onnxruntime-web/dist/
+// Paths are relative to THIS module (js/app.mjs), so they climb one level to the
+// wasm root (../); a CDN URL is absolute and unaffected.
+//   npm:            ../node_modules/onnxruntime-web/dist/
 //   no-npm, CDN:    https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/
-//   no-npm, vendor: ./vendor/
-const ORT_DIST = './node_modules/onnxruntime-web/dist/';
+//   no-npm, vendor: ../vendor/
+const ORT_DIST = '../node_modules/onnxruntime-web/dist/';
 const ort = await import(ORT_DIST + 'ort.wasm.bundle.min.mjs');
 ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-COEP
 // ort.env.wasm.wasmPaths = ORT_DIST; // where the ort-wasm-*.wasm sidecar is fetched from

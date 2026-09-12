@@ -12,18 +12,20 @@ per-move round-trip** — the static host just ships blobs (the `.wasm` engine, 
 | `CMakeLists.txt`, `embind.cc` | WASM build of the core engine + Embind bindings |
 | `dist/regicore.{mjs,wasm}` | built engine module (git-ignored) |
 | `dist/<net>.onnx`, `dist/<net>.io.json` | exported net + its IO contract (git-ignored) |
-| `adz_bot.mjs` | `NetBot` — featurize + onnxruntime forward + argmax (ADZ Direct) |
-| `az_bot.mjs` | `AZBot` — card-space Direct bot (combomap grid / keepy defense) |
-| `load_bot.mjs` | `loadBot`/`buildBot` — pick `NetBot`/`AZBot`/`ExplorerBot` from the contract + iters |
+| `js/` | all browser runtime modules (below); `index.html` loads `js/app.mjs` |
+| `js/adz_bot.mjs` | `NetBot` — featurize + onnxruntime forward + argmax (ADZ Direct) |
+| `js/az_bot.mjs` | `AZBot` — card-space Direct bot (combomap grid / keepy defense) |
+| `js/load_bot.mjs` | `loadBot`/`buildBot` — pick `NetBot`/`AZBot`/`ExplorerBot` from the contract + iters |
+| `js/phase_expander.mjs` | `PhaseExpander` — step to the next decision node (MCTS child gen) |
+| `js/mcts.mjs` | `MCTSNode` + `ExplorerBot` — net-guided search (both paradigms) |
+| `js/net_common.mjs` | shared helpers (perspectivize, bitwise, history trim, softmax) |
+| `js/game_driver.mjs` | `GameDriver` — the browser game loop (`prepare()`/`commit()`) |
+| `js/app.mjs`, `index.html`, `app.css` | the UI |
 | `tables/combomap.json` | AZ combo bitwise → `(loc, played-status)` grid cell map |
 | `tables/presets_{2,3,4}p.json` | committed starter openings (phase strings) the menu offers |
-| `gen_presets.mjs` | regenerate the preset openings from the WASM engine (node) |
-| `phase_expander.mjs` | `PhaseExpander` — step to the next decision node (MCTS child gen) |
-| `mcts.mjs` | `MCTSNode` + `ExplorerBot` — net-guided search (both paradigms) |
-| `game_driver.mjs` | `GameDriver` — the browser game loop (`prepare()`/`commit()`) |
-| `app.mjs`, `index.html`, `app.css` | the UI |
-| `smoke*.mjs` | node smoke tests (engine, featurizer, bot feeds, full driver) |
-| `gen_golden.py`, `check_golden.mjs` | JS-vs-Python Direct-net index parity check |
+| `gen_combomap.mjs`, `gen_presets.mjs` | (node) regenerate the combomap / preset openings from the WASM engine |
+| `tests/smoke*.mjs` | node smoke suites; `tests/smoke_all.mjs` runs them all (`npm run smoke`) |
+| `gen_golden.py`, `az_gen_golden.py`, `tests/check_golden.mjs` | JS-vs-Python Direct-net index parity check |
 
 ## Build & run
 
@@ -71,7 +73,7 @@ error explains why it was rejected.
 
 Serving never needs npm — any static server works (`python3 -m http.server 8000`).
 Only onnxruntime-web has to come from somewhere; set `ORT_DIST` at the top of
-`app.mjs` to one of:
+`js/app.mjs` to one of (relative paths are resolved from `js/`, hence the `../`):
 
 - **CDN** (needs network once, then browser-cached):
   `const ORT_DIST = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/';`
@@ -81,7 +83,7 @@ Only onnxruntime-web has to come from somewhere; set `ORT_DIST` at the top of
   base=https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist
   curl -LO $base/ort.wasm.bundle.min.mjs
   curl -LO $base/ort-wasm-simd-threaded.wasm
-  cd .. # then: const ORT_DIST = './vendor/';
+  cd .. # then (in js/app.mjs): const ORT_DIST = '../vendor/';
   ```
 
 The ESM loads its `.wasm` sidecar (~10 MB) from `ORT_DIST` (set as
@@ -90,13 +92,13 @@ The ESM loads its `.wasm` sidecar (~10 MB) from `ORT_DIST` (set as
 ## Tests
 
 ```bash
-npm run smoke     # runs every smoke_*.mjs suite in one process (smoke_all.mjs)
+npm run smoke     # runs every tests/smoke_*.mjs suite in one process (tests/smoke_all.mjs)
 npm run golden    # JS-vs-Python Direct-net parity for EVERY net that has both a
                   # golden fixture (golden/<net>.json) and an export (dist/<net>.onnx)
 
-# A single suite / single net (each smoke file is still runnable on its own):
-node smoke_driver.mjs
-node check_golden.mjs --net adzpool
+# A single suite / single net (run from wasm/; each file is still runnable alone):
+node tests/smoke_driver.mjs
+node tests/check_golden.mjs --net adzpool
 
 # The golden fixtures come from the torch env (one per net):
 python -m webdriver.wasm.gen_golden --net adzpool \
@@ -105,8 +107,9 @@ python -m webdriver.wasm.az_gen_golden --net basic \
     --weights weights/best_basic.pt --out webdriver/wasm/golden/basic.json
 ```
 
-`smoke_all.mjs` imports each suite's `runSmoke()` and calls it (summing failures);
-`check_golden.mjs` with no `--net` discovers and checks every available net.
+`tests/smoke_all.mjs` imports each suite's `runSmoke()` and calls it (summing
+failures); `tests/check_golden.mjs` with no `--net` discovers and checks every
+available net.
 
 ## Notes
 

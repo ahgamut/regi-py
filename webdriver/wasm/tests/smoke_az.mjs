@@ -11,10 +11,10 @@
  * count); running this file directly runs just this suite and exits non-zero on fail. */
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
-import RegiModule from './dist/regicore.mjs';
-import { GameDriver } from './game_driver.mjs';
-import { AZBot } from './az_bot.mjs';
-import { bitwiseOfLocations } from './net_common.mjs';
+import RegiModule from '../dist/regicore.mjs';
+import { GameDriver } from '../js/game_driver.mjs';
+import { AZBot } from '../js/az_bot.mjs';
+import { bitwiseOfLocations } from '../js/net_common.mjs';
 
 const NETS = ['basic', 'percardmlp', 'cardtx', 'mixer'];
 const snapshotOk = (s) => s && s.numPlayers >= 2 && s.hands.length === s.numPlayers &&

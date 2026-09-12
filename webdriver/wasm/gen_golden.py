@@ -4,7 +4,7 @@ For many real ADZ decisions this records the serialized phase and the combo inde
 the Python ADZDirectStrategy would play -- computed WITHOUT perspectivize (raw
 phase, empty history) so the browser's NetBot.buildFeeds(..., {reshuffle:false})
 featurizes the byte-identical phase and the check has no RNG to sync. The companion
-webdriver/wasm/check_golden.mjs replays each case through NetBot and asserts the
+webdriver/wasm/tests/check_golden.mjs replays each case through NetBot and asserts the
 same index, proving featurizer + ONNX + argmax parity end to end.
 
   python -m webdriver.wasm.gen_golden --net adzpool --weights weights/best_adzpool.pt \
