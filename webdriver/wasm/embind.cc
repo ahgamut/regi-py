@@ -10,10 +10,21 @@
 #include <featurize.h>
 #include <rng.h>
 #include <string>
+#include <sstream>
 #include <vector>
 
 using namespace emscripten;
 using namespace regi;
+
+/* Human-readable label via the core's operator<< (the WASM analogue of exports.cc's
+ * stringify<T>, which backs the pybind __str__). Used by the UI to name cards. */
+template <typename T>
+static std::string stringify(const T &t)
+{
+    std::ostringstream ss;
+    ss << t;
+    return ss.str();
+}
 
 /* No-op log so a GameState can run without ConsoleLog's stdout I/O. */
 struct NoOpLog : public BaseLog
@@ -148,15 +159,19 @@ EMSCRIPTEN_BINDINGS(regicore)
         .property("suit", +[](const Card &c) { return (int)c.suit(); })
         .property("strength", &Card::strength)
         .property("location", &Card::toLocation)
-        .property("is_yield", &Card::isYield);
+        .property("is_yield", &Card::isYield)
+        .property("label", +[](const Card &c) { return stringify(c); });
 
-    class_<Enemy, base<Card>>("Enemy").property("hp", &Enemy::hp);
+    class_<Enemy, base<Card>>("Enemy")
+        .property("hp", &Enemy::hp)
+        .property("label", +[](const Enemy &e) { return stringify(e); });
 
     class_<Combo>("Combo")
         .property("parts", &Combo::parts)
         .property("base_damage", &Combo::getBaseDamage)
         .property("base_defense", &Combo::getBaseDefense)
-        .property("can_attack", +[](const Combo &c) { return c.valid(true) != 0; });
+        .property("can_attack", +[](const Combo &c) { return c.valid(true) != 0; })
+        .property("label", +[](const Combo &c) { return stringify(c); });
 
     class_<Player>("Player")
         .property("id", &Player::id)

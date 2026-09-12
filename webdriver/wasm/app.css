@@ -1,0 +1,82 @@
+:root {
+  --bg: #14161c; --panel: #1e2129; --panel2: #262a35; --line: #333844;
+  --ink: #e7e9ee; --dim: #9aa2b1; --accent: #6ea8fe; --good: #4cc38a; --bad: #f2545b;
+  --card: #f4f5f7; --cardink: #1a1c22; --red: #d64550;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+h1, h2, h3 { margin: 0; font-weight: 650; }
+button { font: inherit; cursor: pointer; }
+.wrap { max-width: 900px; margin: 0 auto; padding: 16px; }
+
+/* config bar */
+.bar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.bar .title { font-size: 18px; font-weight: 750; margin-right: 6px; }
+.bar label { color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+.bar select, .bar input[type=number] { background: var(--panel2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; }
+.bar .go { background: var(--accent); color: #0b0e14; border: 0; border-radius: 8px;
+  padding: 7px 14px; font-weight: 700; }
+.bar .go:disabled { opacity: .5; cursor: default; }
+
+.grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+.panel h3 { color: var(--dim); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 10px; }
+
+/* enemy */
+.enemy { display: flex; align-items: center; gap: 16px; }
+.enemy .big { font-size: 30px; font-weight: 800; letter-spacing: .02em; }
+.enemy .stats { color: var(--dim); }
+.enemy .stats b { color: var(--ink); }
+.bars { flex: 1; min-width: 160px; }
+.meter { height: 9px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin: 5px 0; }
+.meter > span { display: block; height: 100%; }
+.meter.hp > span { background: var(--bad); }
+.meter.prog > span { background: var(--good); }
+.meter-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+
+/* opponents */
+.seats { display: flex; flex-wrap: wrap; gap: 10px; }
+.seat { background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; min-width: 108px; }
+.seat.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.seat .who { font-weight: 700; }
+.seat .kind { color: var(--dim); font-size: 12px; }
+
+/* cards */
+.hand, .combo-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+.pc { background: var(--card); color: var(--cardink); border-radius: 7px; min-width: 34px; height: 46px;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 750; font-size: 15px;
+  border: 1px solid #cfd3da; padding: 0 6px; }
+.pc.suit-H, .pc.suit-D { color: var(--red); }
+
+/* moves */
+.moves { display: flex; flex-wrap: wrap; gap: 8px; }
+.move { background: var(--panel2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.move:hover:not(:disabled) { border-color: var(--accent); }
+.move .lab { font-size: 11px; color: var(--dim); }
+.move.yield { justify-content: center; align-items: center; min-width: 80px; }
+.status { color: var(--dim); margin-bottom: 10px; min-height: 20px; }
+.status.you { color: var(--accent); font-weight: 650; }
+.status.think { color: var(--dim); }
+
+/* log */
+#log { max-height: 200px; overflow-y: auto; font-size: 13px; }
+#log .row { padding: 3px 0; border-bottom: 1px solid var(--line); color: var(--dim); }
+#log .row b { color: var(--ink); }
+#log .row.win { color: var(--good); font-weight: 700; }
+#log .row.loss { color: var(--bad); font-weight: 700; }
+
+/* end overlay */
+.overlay { position: fixed; inset: 0; background: rgba(10,12,18,.82); display: none;
+  align-items: center; justify-content: center; }
+.overlay.show { display: flex; }
+.overlay .card2 { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 28px 40px; text-align: center; }
+.overlay .res { font-size: 40px; font-weight: 850; margin-bottom: 8px; }
+.overlay .res.win { color: var(--good); } .overlay .res.loss { color: var(--bad); }
+.overlay button { margin-top: 14px; background: var(--accent); color: #0b0e14; border: 0;
+  border-radius: 8px; padding: 9px 20px; font-weight: 700; }
+.hidden { display: none !important; }

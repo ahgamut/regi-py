@@ -127,8 +127,10 @@ export class NetBot {
   /* Pick the highest-scoring offered-combo index (argmax over the K real
    * candidates' logits; softmax preserves the argmax, so scoring the raw logits is
    * equivalent). Returns -1 for an empty offer. */
-  async choose(rawPhase, combos, priorHistory = [], opts = {}) {
-    const { K, feeds } = this.buildFeeds(rawPhase, combos, priorHistory, opts);
+  /* Run a pre-built feed dict and argmax over the K real candidates. Split out of
+   * choose() so a caller can build the feeds synchronously (while the offered
+   * VectorCombo is alive) and run the async forward pass later. Returns -1 if K==0.*/
+  async runFeeds(feeds, K) {
     if (K === 0) return -1;
     const out = await this.session.run(feeds);
     const logits = out[this.logitsName].data; // Float32Array length MAX_CANDIDATES
@@ -137,6 +139,11 @@ export class NetBot {
       if (logits[i] > bestVal) { bestVal = logits[i]; best = i; }
     }
     return best;
+  }
+
+  async choose(rawPhase, combos, priorHistory = [], opts = {}) {
+    const { K, feeds } = this.buildFeeds(rawPhase, combos, priorHistory, opts);
+    return this.runFeeds(feeds, K);
   }
 }
 

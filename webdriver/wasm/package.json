@@ -1,0 +1,15 @@
+{
+  "name": "regi-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-side Regicide: the C++ engine (WASM) + net bots (onnxruntime-web) run entirely in the browser.",
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "smoke": "node smoke.mjs && node smoke_features.mjs && node smoke_bot.mjs && node smoke_driver.mjs",
+    "golden": "node check_golden.mjs --net adzpool --dist ./dist --golden ./golden/adzpool.json"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.29.0"
+  }
+}

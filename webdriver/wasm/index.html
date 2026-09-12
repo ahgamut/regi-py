@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Regicide — client-side WASM</title>
+  <link rel="stylesheet" href="./app.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="bar">
+      <span class="title">Regicide</span>
+      <label>Players
+        <select id="cfg-players">
+          <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+        </select>
+      </label>
+      <label>Bot net
+        <select id="cfg-net">
+          <option value="adzpool">adzpool</option>
+          <option value="adzmulti">adzmulti</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="cfg-spectate" /> Spectate (all bots)</label>
+      <label>Seed <input type="number" id="cfg-seed" placeholder="random" style="width:96px" /></label>
+      <button class="go" id="new-game">New game</button>
+      <span id="boot" style="color:var(--dim)">loading engine…</span>
+    </div>
+
+    <div class="grid">
+      <div class="panel" id="enemy-panel">
+        <h3>Current enemy</h3>
+        <div class="enemy">
+          <div class="big" id="enemy-name">—</div>
+          <div class="stats"><b id="enemy-strength">0</b> attack</div>
+          <div class="bars">
+            <div class="meter-label"><span>Enemy HP</span><span id="enemy-hp-txt">—</span></div>
+            <div class="meter hp"><span id="enemy-hp-bar" style="width:0%"></span></div>
+            <div class="meter-label"><span>Dungeon progress</span><span id="prog-txt">0 / 360</span></div>
+            <div class="meter prog"><span id="prog-bar" style="width:0%"></span></div>
+          </div>
+        </div>
+        <div class="stats" style="margin-top:8px">
+          Enemies left <b id="enemies-left">—</b> · Draw pile <b id="draw-size">—</b> · Current block <b id="cur-block">0</b>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Players</h3>
+        <div class="seats" id="seats"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Used on this enemy</h3>
+        <div class="hand" id="used-combos"></div>
+      </div>
+
+      <div class="panel" id="you-panel">
+        <h3>Your hand <span id="you-seat-note" style="text-transform:none;color:var(--dim)"></span></h3>
+        <div class="hand" id="your-hand"></div>
+        <div style="height:12px"></div>
+        <div class="status" id="turn-status">Start a new game.</div>
+        <div class="moves" id="moves"></div>
+      </div>
+
+      <div class="panel">
+        <h3>Log</h3>
+        <div id="log"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="card2">
+      <div class="res" id="overlay-res">—</div>
+      <div id="overlay-sub" style="color:var(--dim)"></div>
+      <button id="overlay-again">New game</button>
+    </div>
+  </div>
+
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
