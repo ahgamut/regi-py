@@ -58,9 +58,61 @@ document.querySelectorAll('#howto-tabs .tab').forEach((t) => t.addEventListener(
   document.querySelectorAll('.howto-pane').forEach((p) => { p.hidden = p.dataset.pane !== t.dataset.howto; });
 }));
 
-/* boot the engine, then unlock Play */
-$('intro-play').disabled = true;
-RegiModule().then((mod) => { M = mod; comboMap = mod.combo_map(); $('boot').textContent = 'engine ready'; $('intro-play').disabled = false; });
+/* ================= boot / loading screen ================= */
+// Everything the app needs is loaded up front on the loading screen: the WASM
+// engine, the combomap (AZ policy grid), every player-count's opening presets, and
+// an onnxruntime session per net. Nets whose artifacts aren't in ./dist just get
+// dropped from the menu (marked "unavailable") rather than blocking play.
+const availableNets = []; // NETS that loaded a session (also warmed into botCache)
+
+function setLoadBar(done, total, status) {
+  $('load-bar').style.width = `${total ? Math.round((done / total) * 100) : 0}%`;
+  if (status != null) $('load-status').textContent = status;
+}
+function addLoadStep(text) { const li = el('li', 'load-step', text); $('load-steps').appendChild(li); return li; }
+function markStep(li, ok, text) { if (text) li.textContent = text; li.classList.add(ok ? 'done' : 'fail'); }
+
+async function boot() {
+  const total = 2 + NETS.length; // engine, presets, then one step per net
+  let done = 0;
+  try {
+    const s1 = addLoadStep('Game engine (WebAssembly)');
+    M = await RegiModule();
+    comboMap = M.combo_map();
+    markStep(s1, true); setLoadBar(++done, total, 'engine ready');
+
+    const s2 = addLoadStep('Opening deals (presets)');
+    await Promise.all([2, 3, 4].map(loadPresets));
+    markStep(s2, true); setLoadBar(++done, total, 'presets ready');
+
+    // A Direct bot session per net; an Explorer just wraps it, so this warms every
+    // selectable bot. loadBot fetches <net>.onnx + <net>.io.json from ./dist.
+    for (const net of NETS) {
+      const step = addLoadStep(`Bot: ${net}`);
+      setLoadBar(done, total, `loading ${net}…`);
+      try {
+        botCache.set(net, await loadBot(M, ort, './dist', net, { comboMap }));
+        availableNets.push(net);
+        markStep(step, true);
+      } catch (err) {
+        console.warn(`net ${net} unavailable:`, err);
+        markStep(step, false, `Bot: ${net} — unavailable`);
+      }
+      setLoadBar(++done, total);
+    }
+
+    if (!availableNets.length) throw new Error('no bot nets could be loaded from ./dist');
+    setLoadBar(total, total, 'ready');
+    showScreen('intro');
+  } catch (err) {
+    const box = $('load-error');
+    box.hidden = false;
+    box.textContent = `Could not start: ${err?.message || err}. Build the engine and export the ` +
+      `nets into ./dist (see README), then reload.`;
+    $('load-status').textContent = 'failed to load';
+  }
+}
+boot();
 
 /* ================= menu ================= */
 function buildOpponents() {
@@ -78,8 +130,9 @@ function buildOpponents() {
     row.appendChild(el('span', 'seat-name', `Bot ${i}`));
     const net = el('select', 'opp-net');
     net.dataset.bot = i;
-    for (const n of NETS) { const o = el('option', null, n); o.value = n; net.appendChild(o); }
-    net.value = prevNet[i] || 'adzpool';
+    for (const n of availableNets) { const o = el('option', null, n); o.value = n; net.appendChild(o); }
+    const dflt = availableNets.includes('adzpool') ? 'adzpool' : availableNets[0];
+    net.value = availableNets.includes(prevNet[i]) ? prevNet[i] : dflt;
     row.appendChild(net);
     const iters = el('select', 'opp-iters');
     iters.dataset.bot = i;
@@ -140,21 +193,18 @@ async function startGame() {
   // Shuffle the human into a random seat so turn order varies each game.
   humanSeat = Math.floor(Math.random() * numPlayers);
 
-  $('menu-start').disabled = true;
   const seatBots = [];
   let bi = 0;
   for (let i = 0; i < numPlayers; i++) {
     if (i === humanSeat) { seatBots.push(null); continue; }
-    const net = botNets[bi] || 'adzpool';
+    const net = botNets[bi] || availableNets[0];
     const iters = botIters[bi] || 0;
     bi++;
-    // Cache the Direct bot (session) per net; an Explorer just wraps it, so switching
-    // a seat's search depth doesn't reload the net.
-    let direct = botCache.get(net);
-    if (!direct) { direct = await loadBot(M, ort, './dist', net, { comboMap }); botCache.set(net, direct); }
+    // Every net was warmed into botCache during boot; an Explorer just wraps the
+    // cached Direct bot, so switching a seat's search depth reloads nothing.
+    const direct = botCache.get(net);
     seatBots.push(iters > 0 ? new ExplorerBot(M, direct, { iterations: iters }) : direct);
   }
-  $('menu-start').disabled = false;
 
   const maxHistory = seatBots.find((b) => b)?.maxHistory ?? 8;
   if (driver) driver.dispose();

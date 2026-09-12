@@ -8,8 +8,25 @@
 </head>
 <body>
 
+<!-- ============================ LOADING ============================ -->
+<!-- Shown first: the engine (WASM), every bot net (onnxruntime session), the
+     combomap, and every player-count's opening presets all load here before the
+     app is usable, so nothing loads mid-game. -->
+<section class="screen show" id="screen-loading">
+  <div class="hero">
+    <div class="logo">♠ ♥ ♦ ♣</div>
+    <h1 class="hero-title mono">regi-py</h1>
+    <p class="hero-sub">Loading the game engine, the neural-net bots, and the opening
+      deals — everything runs locally in your browser.</p>
+    <div class="meter load"><span id="load-bar" style="width:0%"></span></div>
+    <div class="load-status" id="load-status">starting…</div>
+    <ul class="load-steps" id="load-steps"></ul>
+    <div class="load-error" id="load-error" hidden></div>
+  </div>
+</section>
+
 <!-- ============================ INTRO ============================ -->
-<section class="screen show" id="screen-intro">
+<section class="screen" id="screen-intro">
   <div class="hero">
     <div class="logo">♠ ♥ ♦ ♣</div>
     <h1 class="hero-title mono">regi-py</h1>
@@ -24,7 +41,6 @@
       <a href="https://github.com/ahgamut/regi-py" target="_blank" rel="noopener">GitHub</a>
       <a href="https://www.regicidegame.com/site_files/33132/upload_files/RegicideRulesA4.pdf" target="_blank" rel="noopener">Full rules (PDF)</a>
     </div>
-    <div class="boot-note" id="boot">loading engine…</div>
   </div>
 </section>
 
