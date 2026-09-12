@@ -12,26 +12,20 @@ Raw per-phase arrays (on the 56-card-location axis):
 Targets (also architecture-independent): value, keepyness (56,), atk_probs
 (56, 22), attacking -- see ``shared_targets``.
 """
-from regi_py.core import LocationInfo, ComboTable, Card
+from regi_py.core import ComboTable
 from regi_py.core import MAX_CARDS_IN_GAME, MAX_LOCATIONS, MAX_PLAYED_STATUS
+from regi_py import core
 from regi_py import combomap
 
 import numpy as np
+
+# These featurizers now delegate to the shared C++ core; the pre-delegation pure-Python numpy versions are at 61d59c6d5eaac838bcef94c15bab3246908adc09:src/regi_py/rl/features.py -- restore from there if the C++ path slows or errors out during training.
 
 # per-card capability channels: [attack_capability, defense_capability]
 CAP_CHANNELS = 2
 # scale factor keeping capabilities roughly in [-1, 1]: a King has 40 HP -> -1.0
 # and deals 20 base damage -> -0.5
 CAP_SCALE = 40.0
-
-# static raw per-card strength by location; enemy-pile cards override this each
-# phase (their HP / base damage), so only the non-enemy part is precomputed
-_STRENGTH = np.zeros(MAX_CARDS_IN_GAME, dtype=np.float32)
-for _loc in range(MAX_CARDS_IN_GAME):
-    try:
-        _STRENGTH[_loc] = Card.from_location(_loc).strength
-    except Exception:
-        pass
 
 
 def card_capabilities(phase):
@@ -41,18 +35,11 @@ def card_capabilities(phase):
     A card *not* in the enemy pile contributes its own (non-negative) strength to
     both channels. A card *in* the enemy pile is a target, encoded negatively:
     attack = ``-max(0, current HP)``, defense = ``-(base damage it deals)``.
+
+    Delegates to the shared C++ kernel (``core.features_card_capabilities``) so
+    training and the browser featurize identically.
     """
-    attack = _STRENGTH.copy()
-    defense = _STRENGTH.copy()
-    for enemy in phase.enemy_pile:
-        loc = enemy.location
-        attack[loc] = -max(0, enemy.hp)
-        defense[loc] = -enemy.strength
-    caps = np.empty((MAX_CARDS_IN_GAME, CAP_CHANNELS), dtype=np.float32)
-    caps[:, 0] = attack
-    caps[:, 1] = defense
-    caps /= CAP_SCALE
-    return caps
+    return core.features_card_capabilities(phase)
 
 
 # content-keyed caches (by phase.to_string()) so the rolling history window and
@@ -76,15 +63,14 @@ def _location_array(phase, perspective, pstr):
     key = (pstr, perspective)
     a = _LOC_CACHE.get(key)
     if a is None:
-        loca0 = np.array(LocationInfo.from_current(phase, perspective), dtype=np.float32)
-        a = _cache_put(_LOC_CACHE, key, loca0 / loca0.sum(axis=1, keepdims=True))
+        a = _cache_put(_LOC_CACHE, key, core.features_location_array(phase, perspective))
     return a
 
 
 def _used_pile_array(phase, pstr):
     a = _USP_CACHE.get(pstr)
     if a is None:
-        a = _cache_put(_USP_CACHE, pstr, np.array(ComboTable.from_phase(phase), dtype=np.float32))
+        a = _cache_put(_USP_CACHE, pstr, core.features_used_pile_array(phase))
     return a
 
 
@@ -225,21 +211,7 @@ def candidate_semantics(phase, combos):
     no enemy remains (``combo_damage/block`` return 0, lethality features are 0). The
     same call is used at self-play export and at inference; ``K`` may be 0.
     """
-    enemy_hp = phase.enemy_pile[0].hp if len(phase.enemy_pile) else 0
-    feats = np.zeros((len(combos), CAND_FEATURE_DIM), dtype=np.float32)
-    for i, c in enumerate(combos):
-        dmg = phase.combo_damage(c)
-        blk = phase.combo_block(c)
-        feats[i, 0] = dmg / CAP_SCALE
-        feats[i, 1] = blk / CAP_SCALE
-        feats[i, 2] = c.base_damage / CAP_SCALE
-        feats[i, 3] = c.base_defense / CAP_SCALE
-        feats[i, 4] = 1.0 if c.can_attack else 0.0
-        feats[i, 5] = len(c.parts) / _PARTS_SCALE
-        feats[i, 6] = 1.0 if c.bitwise == 0 else 0.0
-        feats[i, 7] = 1.0 if (enemy_hp > 0 and dmg >= enemy_hp) else 0.0
-        feats[i, 8] = min(dmg / enemy_hp, 1.0) if enemy_hp > 0 else 0.0
-    return feats
+    return core.features_candidate_semantics(phase, list(combos))
 
 
 def keepy_marginal(bitwises, policy):

@@ -4,12 +4,15 @@
 #include <phaseinfo.h>
 #include <location.h>
 #include <combotable.h>
+#include <featurize.h>
 #include <rng.h>
 //
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/native_enum.h>
+#include <pybind11/numpy.h>
+#include <cstring>
 namespace py = pybind11;
 using namespace regi;
 
@@ -602,6 +605,52 @@ void bind_combotable(pybind11::object &m)
             });
 }
 
+static py::array_t<float> asArray2D(const std::vector<float> &data, py::ssize_t rows,
+                                    py::ssize_t cols)
+{
+    py::array_t<float> arr({rows, cols});
+    if (!data.empty())
+    {
+        std::memcpy(arr.mutable_data(), data.data(), data.size() * sizeof(float));
+    }
+    return arr;
+}
+
+void bind_features(py::module_ &m)
+{
+    m.def(
+        "features_card_capabilities",
+        [](const PhaseInfo &phase)
+        { return asArray2D(cardCapabilities(phase), MAX_CARDS_IN_GAME, CAP_CHANNELS); },
+        py::arg("phase"),
+        "Per-card (attack, defense) capability (56, 2) float32, scaled 1/CAP_SCALE.");
+    m.def(
+        "features_location_array",
+        [](const PhaseInfo &phase, i32 perspective)
+        {
+            return asArray2D(locationArray(phase, perspective), LocationInfo::rows,
+                             LocationInfo::cols);
+        },
+        py::arg("phase"), py::arg("perspective"),
+        "L1 row-normalized LocationInfo (56, 9) float32 from the given perspective.");
+    m.def(
+        "features_used_pile_array",
+        [](const PhaseInfo &phase)
+        {
+            return asArray2D(usedPileArray(phase), ComboTable::rows, ComboTable::cols);
+        },
+        py::arg("phase"), "ComboTable used-pile array (56, 22) float32.");
+    m.def(
+        "features_candidate_semantics",
+        [](const PhaseInfo &phase, const std::vector<Combo> &combos)
+        {
+            return asArray2D(candidateSemantics(phase, combos),
+                             static_cast<py::ssize_t>(combos.size()), CAND_FEATURE_DIM);
+        },
+        py::arg("phase"), py::arg("combos"),
+        "Per-candidate feature block (K, 9) float32 for the offered combos.");
+}
+
 PYBIND11_MODULE(core, m)
 {
     m.doc() = "c++ module for regicide game mechanics";
@@ -614,6 +663,7 @@ PYBIND11_MODULE(core, m)
     bind_location(m);
     bind_combotable(m);
     bind_gamestate(m);
+    bind_features(m);
     m.def("seed", &seed, py::arg("value"),
           "Seed the shared per-thread RNG for reproducible games.");
     m.def("cards_bitwise", &cardsBitrep, py::arg("cards"),
