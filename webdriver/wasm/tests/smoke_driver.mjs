@@ -120,9 +120,10 @@ export async function runSmoke() {
   {
     const numPlayers = 3;
     const preset = JSON.parse(readFileSync('./tables/presets_3p.json', 'utf8'));
-    check(`presets_3p.json is a ${numPlayers}p set with phases`,
-      preset.num_players === numPlayers && Array.isArray(preset.phases) && preset.phases.length > 0);
-    const startPhase = preset.phases[0];
+    check(`presets_3p.json is a ${numPlayers}p set with tiered phases`,
+      preset.num_players === numPlayers && Array.isArray(preset.tiers) && preset.tiers.length > 0 &&
+      Array.isArray(preset.tiers[0].phases) && preset.tiers[0].phases.length > 0);
+    const startPhase = preset.tiers[0].phases[0];
     const bot = await makeBot();
     const driver = new GameDriver(M, { numPlayers, seatBots: [bot, bot, bot], maxHistory: 8, seed: 4242 });
     const snap = driver.newGame(startPhase);

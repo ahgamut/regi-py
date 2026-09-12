@@ -22,7 +22,7 @@ per-move round-trip** — the static host just ships blobs (the `.wasm` engine, 
 | `js/game_driver.mjs` | `GameDriver` — the browser game loop (`prepare()`/`commit()`) |
 | `js/app.mjs`, `index.html`, `app.css` | the UI |
 | `tables/combomap.json` | AZ combo bitwise → `(loc, played-status)` grid cell map |
-| `tables/presets_{2,3,4}p.json` | committed starter openings (phase strings) the menu offers |
+| `tables/presets_{2,3,4}p.json` | committed starter openings the menu offers, in Easy/Medium/Hard tiers (5 each) |
 | `gen_combomap.mjs`, `gen_presets.mjs` | (node) regenerate the combomap / preset openings from the WASM engine |
 | `tests/smoke*.mjs` | node smoke suites; `tests/smoke_all.mjs` runs them all (`npm run smoke`) |
 | `gen_golden.py`, `tests/check_golden.mjs` | JS-vs-Python Direct-net index parity check (both paradigms) |
@@ -56,12 +56,15 @@ Export any nets you want to offer as bots (`adzpool`/`adzmulti` are ADZ;
 loads once on a **loading screen** before the menu opens. Set the player count, pick
 each opponent's net AND its search depth (Direct, or an MCTS Explorer at
 16/32/64/128 iterations), choose the **opening deal** (a random deal, or one of the
-committed presets for that player count), then play your (shuffled) seat.
+committed presets for that player count, grouped Easy/Medium/Hard), then play your
+(shuffled) seat.
 
 The presets in `tables/presets_{2,3,4}p.json` are fixed opening deals (replayed via
-`init_string`) so a known scenario can be re-played; regenerate them with
-`node gen_presets.mjs` (they're committed with `git add -f`, past the global `*.json`
-ignore, like `combomap.json`).
+`init_string`) so a known scenario can be re-played. Each file holds three difficulty
+tiers (`{num_players, tiers: [{name, phases[5]}]}`) = 15 presets/count, which the menu
+shows as "Easy 1"…"Hard 5". Regenerate them with `node gen_presets.mjs` (committed with
+`git add -f`, past the global `*.json` ignore, like `combomap.json`). NOTE: the deals are
+currently arbitrary placeholders -- the Easy/Medium/Hard split isn't tuned yet.
 
 Instead of a preset you can **paste a phase string** (any exported opening or
 mid-game state — e.g. the one the end-of-game overlay's *Copy opening phase* gives)
