@@ -18,7 +18,8 @@ ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-
 
 // Selectable bots. ADZ (candidate-scoring) + AZ (card-space) Direct-net nets;
 // attntrunk is intentionally omitted (heaviest payload, redundant with basic).
-const NETS = ['adzpool', 'adzmulti', 'basic', 'percardmlp', 'cardtx', 'mixer'];
+// movetoken is an AZ card-token net (reasons in move space, same v/k/a contract).
+const NETS = ['adzpool', 'adzmulti', 'basic', 'percardmlp', 'cardtx', 'mixer', 'movetoken'];
 // Search depth per bot: 0 = Direct-net (one forward pass, argmax); > 0 = an N-iteration
 // MCTS Explorer (~N+1 serial forward passes/move, so bigger = stronger but slower).
 const ITERS = [0, 16, 32, 64, 128];

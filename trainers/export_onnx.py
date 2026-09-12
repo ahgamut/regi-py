@@ -20,8 +20,10 @@ Paradigms (registries are disjoint, so ``--net`` is unambiguous):
     (``adzmulti``: ``cand_members (1,128,56)``; ``adzpool``: ``cand_idx (1,128,7)`` int64
     + ``cand_partmask (1,128,7)``).
 
-``movetoken`` is intentionally UNSUPPORTED: its in-place advanced-indexed scatter is
-export-hostile and its checkpoint is a training FAIL.
+``movetoken`` is an AZ card-token net (input ``tokens (1,56,264)``, same ``(v,k,a)``
+outputs) and IS exportable: its move-logit grid scatter uses the out-of-place
+``torch.Tensor.scatter`` (ONNX ScatterElements), so the browser AZBot scores it with
+no special handling.
 
 Usage (torch env; regi_py installed):
   python -m trainers.export_onnx export --net adzpool --weights weights/best_adzpool.pt \
@@ -54,8 +56,8 @@ from regi_py.rl.adz.nets.base import CandidateBaseNet
 # conv trunk (GroupNorm) needs opset >= 18; TransformerEncoder (SDPA) needs >= 17.
 # 18 covers both, so every net exports at one opset.
 OPSET = 18
-# movetoken: export-hostile in-place scatter + FAIL checkpoint (see module docstring).
-UNSUPPORTED = frozenset({"movetoken"})
+# Every registered net exports now that movetoken's grid scatter is out-of-place.
+UNSUPPORTED = frozenset()
 
 
 # ----------------------------------------------------------------------------

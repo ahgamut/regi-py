@@ -49,7 +49,7 @@ python3 -m http.server 8000                   # serve (no npm needed for this st
 ```
 
 Export any nets you want to offer as bots (`adzpool`/`adzmulti` are ADZ;
-`basic`/`percardmlp`/`cardtx`/`mixer` are AZ — the AZ nets also need
+`basic`/`percardmlp`/`cardtx`/`mixer`/`movetoken` are AZ — the AZ nets also need
 `tables/combomap.json`, which is committed). Open `http://localhost:8000`, set the
 player count, pick each opponent's net AND its search depth (Direct, or an MCTS
 Explorer at 16/32/64/128 iterations), choose the **opening deal** (a random deal, or
@@ -95,8 +95,9 @@ npm run golden
 - **Single-threaded** onnxruntime-web (no SharedArrayBuffer), so no COOP/COEP
   headers are required — a plain static host (or GitHub Pages) works.
 - Both paradigms are wired as bots: **ADZ** (`adzpool`, `adzmulti`, candidate
-  scoring) and **AZ** (`basic`, `percardmlp`, `cardtx`, `mixer`, card-space via the
-  `combomap` grid + keepyness defense fallback). `attntrunk` is omitted.
+  scoring) and **AZ** (`basic`, `percardmlp`, `cardtx`, `mixer`, `movetoken`,
+  card-space via the `combomap` grid + keepyness defense fallback). `attntrunk` is
+  omitted.
 - Bots play either **Direct-net** (search-free argmax) or an **MCTS Explorer**
   (net-guided search, ~iters+1 forward passes/move; picked per bot, 16–128 iters).
 - When a game ends, the result overlay shows summary stats (royals cleared / damage

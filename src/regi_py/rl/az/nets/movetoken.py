@@ -97,9 +97,15 @@ class MoveTokenNet(BaseNet):
         mt = self.move_encoder(mt)                            # (N, M, DIM)
         logits = self.move_logit(mt).squeeze(-1)              # (N, M)
 
-        # scatter move logits into the (56 x 22) grid, masked softmax over it
-        grid = self.neg_inf_grid.expand(n, -1).clone()
-        grid[:, self.move_cell_flat] = logits
+        # scatter move logits into the (56 x 22) grid, masked softmax over it.
+        # Use the out-of-place torch.Tensor.scatter, NOT an advanced-indexed in-place
+        # assignment (grid[:, self.move_cell_flat] = logits): the latter is export-
+        # hostile, while scatter maps straight to ONNX ScatterElements. The two are
+        # numerically identical here -- move_cell_flat is a bijection onto distinct
+        # grid cells, so there are no duplicate scatter targets -- and this keeps the
+        # net ONNX-exportable for the WASM webapp (see trainers/export_onnx.py).
+        cell_idx = self.move_cell_flat.unsqueeze(0).expand(n, -1)  # (N, M)
+        grid = self.neg_inf_grid.expand(n, -1).scatter(1, cell_idx, logits)
         a = torch.softmax(grid, dim=-1).reshape(n, 1, MAX_CARDS_IN_GAME, MAX_PLAYED_STATUS)
 
         k = torch.sigmoid(self.keepy(cardfeat).squeeze(-1))   # (N, 56)
