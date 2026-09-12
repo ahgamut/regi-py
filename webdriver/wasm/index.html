@@ -125,6 +125,13 @@
       </div>
 
       <label class="field">
+        <span class="field-label">Opening deal</span>
+        <select id="cfg-preset">
+          <option value="">Random deal</option>
+        </select>
+      </label>
+
+      <label class="field">
         <span class="field-label">Seed <span class="hint">(optional — repeat a deal)</span></span>
         <input type="number" id="cfg-seed" placeholder="random" />
       </label>
@@ -215,6 +222,15 @@
   <div class="card2">
     <div class="res" id="overlay-res">—</div>
     <div class="overlay-sub" id="overlay-sub"></div>
+    <details class="overlay-start" id="overlay-start">
+      <summary>This game's opening deal</summary>
+      <div class="start-body">
+        <div class="start-row"><span class="start-lbl">Seed</span><code id="start-seed">—</code></div>
+        <div class="start-row"><span class="start-lbl">Opening</span><code id="start-phase" class="phase-str">—</code></div>
+        <button class="btn ghost small" id="start-copy">Copy opening phase</button>
+        <p class="start-note">Enter the seed on the menu to replay this exact deal.</p>
+      </div>
+    </details>
     <div class="overlay-actions">
       <button class="btn primary" id="overlay-again">Play again</button>
       <button class="btn ghost" id="overlay-menu">Menu</button>

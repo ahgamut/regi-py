@@ -109,5 +109,38 @@ async function playGame(driver, decideFor) {
   driver.dispose();
 }
 
+// 5) preset opening: newGame(startPhase) replays a committed preset via init_string
+//    (what the menu's #cfg-preset does), captures start{Phase,Seed}, and plays out.
+{
+  const numPlayers = 3;
+  const preset = JSON.parse(readFileSync('./tables/presets_3p.json', 'utf8'));
+  check(`presets_3p.json is a ${numPlayers}p set with phases`,
+    preset.num_players === numPlayers && Array.isArray(preset.phases) && preset.phases.length > 0);
+  const startPhase = preset.phases[0];
+  const bot = await makeBot();
+  const driver = new GameDriver(M, { numPlayers, seatBots: [bot, bot, bot], maxHistory: 8, seed: 4242 });
+  const snap = driver.newGame(startPhase);
+  check('newGame(startPhase) deals the requested player count', snap.numPlayers === numPlayers);
+  check('newGame(startPhase) captures startPhase/startSeed', driver.startPhase === driver.phaseString && driver.startSeed === 4242);
+
+  // Same preset + same seed => identical opening board (reproducible replay).
+  const d2 = new GameDriver(M, { numPlayers, seatBots: [bot, bot, bot], maxHistory: 8, seed: 4242 });
+  const s2 = d2.newGame(startPhase);
+  check('preset replay is reproducible under a fixed seed',
+    d2.startPhase === driver.startPhase && s2.drawPileSize === snap.drawPileSize && JSON.stringify(s2.handCounts) === JSON.stringify(snap.handCounts));
+  d2.dispose();
+
+  // And it still drives to a terminal state.
+  let steps = 0, ended = false;
+  for (; steps < 40000; steps++) {
+    const dec = driver.prepare();
+    if (dec.kind === 'ended') { ended = true; break; }
+    if (dec.kind === 'auto') { driver.commit(-1); continue; }
+    driver.commit(dec.isBot ? await driver.seatBots[dec.activeSeat].runFeeds(dec.built) : 0);
+  }
+  check('preset game reaches a terminal state', ended);
+  driver.dispose();
+}
+
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exit(failures ? 1 : 0);

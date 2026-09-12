@@ -23,7 +23,7 @@ const NETS = ['adzpool', 'adzmulti', 'basic', 'percardmlp', 'cardtx', 'mixer'];
 // MCTS Explorer (~N+1 serial forward passes/move, so bigger = stronger but slower).
 const ITERS = [0, 16, 32, 64, 128];
 const itersLabel = (n) => (n === 0 ? 'Direct' : `MCTS ${n}`);
-const BOT_MOVE_DELAY_MS = 550; // let the human watch bot moves
+const EVENT_DELAY_MS = 450; // per-event reveal pace in the log during bot/auto turns
 
 let humanSeat = 0; // which seat (turn-order position) the human took THIS game; shuffled at start
 // Player labels are 1-indexed for display ("Player 1".."Player N"); the human's
@@ -36,6 +36,7 @@ const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) 
 let M = null;
 let comboMap = null;             // AZ nets' bitwise -> grid cell map (built once at boot)
 const botCache = new Map();      // net name -> bot (session reused across games)
+const presetCache = new Map();   // numPlayers -> preset opening phase strings (fetched once)
 let driver = null;
 let playerName = 'Player';
 let loopToken = 0;               // bumped to abandon an in-flight game loop
@@ -43,7 +44,7 @@ let loopToken = 0;               // bumped to abandon an in-flight game loop
 /* ================= screens ================= */
 function showScreen(id) {
   for (const s of document.querySelectorAll('.screen')) s.classList.toggle('show', s.id === `screen-${id}`);
-  if (id === 'menu') buildOpponents();
+  if (id === 'menu') { buildOpponents(); refreshPresets(); }
 }
 document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => showScreen(b.dataset.nav)));
 $('intro-play').addEventListener('click', () => showScreen('menu'));
@@ -87,8 +88,35 @@ function buildOpponents() {
     wrap.appendChild(row);
   }
 }
-$('cfg-players').addEventListener('change', buildOpponents);
+$('cfg-players').addEventListener('change', () => { buildOpponents(); refreshPresets(); });
 $('menu-start').addEventListener('click', startGame);
+
+/* Fetch (once) the committed starter openings for a player count. A preset is an
+ * opening phase string GameDriver.newGame(startPhase) replays via init_string; on any
+ * fetch error we just fall back to "Random deal" (an empty list). */
+async function loadPresets(numPlayers) {
+  if (presetCache.has(numPlayers)) return presetCache.get(numPlayers);
+  let phases = [];
+  try {
+    const data = await fetch(`./tables/presets_${numPlayers}p.json`).then((r) => r.json());
+    if (Array.isArray(data.phases)) phases = data.phases;
+  } catch { phases = []; }
+  presetCache.set(numPlayers, phases);
+  return phases;
+}
+
+/* Repopulate #cfg-preset for the current player count: "Random deal" + one entry per
+ * committed preset. Keeps the prior pick if it's still in range, else Random. */
+async function refreshPresets() {
+  const numPlayers = parseInt($('cfg-players').value, 10);
+  const sel = $('cfg-preset');
+  const prev = sel.value;
+  const phases = await loadPresets(numPlayers);
+  sel.replaceChildren();
+  const rand = el('option', null, 'Random deal'); rand.value = ''; sel.appendChild(rand);
+  phases.forEach((_, i) => { const o = el('option', null, `Preset ${i + 1}`); o.value = String(i); sel.appendChild(o); });
+  sel.value = [...sel.options].some((o) => o.value === prev) ? prev : '';
+}
 
 async function startGame() {
   if (!M) return;
@@ -101,6 +129,11 @@ async function startGame() {
   const botNets = [], botIters = [];
   $('opponents').querySelectorAll('select.opp-net').forEach((s) => { botNets.push(s.value); });
   $('opponents').querySelectorAll('select.opp-iters').forEach((s) => { botIters.push(parseInt(s.value, 10) || 0); });
+
+  // A chosen preset replays a fixed opening deal; "Random deal" ('') deals fresh.
+  const presetVal = $('cfg-preset').value;
+  let startPhase = null;
+  if (presetVal !== '') { const phases = await loadPresets(numPlayers); startPhase = phases[parseInt(presetVal, 10)] || null; }
 
   // Shuffle the human into a random seat so turn order varies each game.
   humanSeat = Math.floor(Math.random() * numPlayers);
@@ -124,19 +157,21 @@ async function startGame() {
   const maxHistory = seatBots.find((b) => b)?.maxHistory ?? 8;
   if (driver) driver.dispose();
   driver = new GameDriver(M, { numPlayers, seatBots, maxHistory, seed });
-  driver.newGame();
+  driver.newGame(startPhase);
 
   $('log').replaceChildren();
   $('overlay').classList.remove('show');
+  setBotTurn(false);
   $('you-seat-note').textContent = `· you are “${playerName}”`;
-  log(`New ${numPlayers}-player game — you are <b>Player ${humanSeat + 1}</b>.`);
+  const opening = startPhase ? `preset ${parseInt(presetVal, 10) + 1}` : 'a random deal';
+  log(`New ${numPlayers}-player game (${opening}) — you are <b>Player ${humanSeat + 1}</b>.`);
   showScreen('game');
   loopToken++;
   loop(loopToken);
 }
 
-$('game-menu').addEventListener('click', () => { loopToken++; showScreen('menu'); });
-$('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); showScreen('menu'); });
+$('game-menu').addEventListener('click', () => { loopToken++; setBotTurn(false); showScreen('menu'); });
+$('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); setBotTurn(false); showScreen('menu'); });
 $('overlay-again').addEventListener('click', startGame);
 
 /* ================= card rendering ================= */
@@ -289,6 +324,28 @@ function eventLines(events, actionHtml) {
   return lines;
 }
 function setPill(text, cls) { const p = $('turn-status'); p.textContent = text; p.className = 'turn-pill' + (cls ? ' ' + cls : ''); }
+/* C4: while a bot holds the turn, foreground the event log (CSS `.board.bot-turn`)
+   and dim your (idle) hand; cleared the moment it's your turn again, or the game ends. */
+function setBotTurn(on) { document.querySelector('.board')?.classList.toggle('bot-turn', on); }
+/* C3: reveal a turn's log lines one at a time so the action is followable. The whole
+   block is prepended first (keeping its final chronological order), then rows light up
+   top-to-bottom, EVENT_DELAY_MS apart. An interrupt (loopToken bumped) reveals the rest
+   at once and bails, so an abandoned game never leaves half-hidden rows. */
+async function emitLines(lines, token) {
+  if (!lines.length) return;
+  const rows = [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const r = el('div', 'row reveal' + (lines[i].cls ? ' ' + lines[i].cls : ''));
+    r.innerHTML = lines[i].html;
+    $('log').prepend(r);
+    rows.unshift(r);
+  }
+  for (const r of rows) {
+    if (token !== loopToken) { rows.forEach((x) => x.classList.add('shown')); return; }
+    r.classList.add('shown');
+    await new Promise((res) => setTimeout(res, EVENT_DELAY_MS));
+  }
+}
 
 /* ================= human decision (pick cards) ================= */
 function setCombat(dec, snap) {
@@ -410,10 +467,11 @@ async function loop(token) {
     const dec = driver.prepare();
     const snap = driver.snapshot();
     render(snap);
-    if (dec.kind === 'ended') { logLines(eventLines(dec.events, null)); finish(dec.endValue); return; }
-    if (dec.kind === 'auto') { driver.commit(-1); logLines(eventLines(driver.lastEvents, null)); render(driver.snapshot()); continue; }
+    if (dec.kind === 'ended') { setBotTurn(false); logLines(eventLines(dec.events, null)); finish(dec.endValue); return; }
+    if (dec.kind === 'auto') { driver.commit(-1); render(driver.snapshot()); await emitLines(eventLines(driver.lastEvents, null), token); continue; }
 
     if (dec.isBot) {
+      setBotTurn(true);
       setPill(`${seatLabel(dec.activeSeat)} is thinking…`, 'think');
       $('combat').replaceChildren(el('span', 'note', 'waiting for the other players'));
       const bot = driver.seatBots[dec.activeSeat];
@@ -432,10 +490,11 @@ async function loop(token) {
         if (token !== loopToken) return;
       }
       driver.commit(index, redirect);
-      logLines(eventLines(driver.lastEvents, moveText(dec, index)));
       render(driver.snapshot());
-      await new Promise((r) => setTimeout(r, BOT_MOVE_DELAY_MS));
+      await emitLines(eventLines(driver.lastEvents, moveText(dec, index)), token);
+      if (token !== loopToken) return;
     } else {
+      setBotTurn(false);
       const index = await presentHuman(dec, snap);
       if (token !== loopToken) return;
       const played = dec.comboData[index];
@@ -459,5 +518,30 @@ function finish(endValue) {
   $('overlay-res').textContent = won ? 'Victory' : 'Defeat';
   $('overlay-res').className = 'res ' + (won ? 'win' : 'loss');
   $('overlay-sub').textContent = won ? 'All royals cleared.' : 'A player could not block, or ran out of moves.';
+  // View-start: show the seed + opening phase this game began from (so it can be
+  // replayed via the menu's Seed field, or shared). Collapsed until the player opens it.
+  $('start-seed').textContent = driver?.startSeed ?? '—';
+  $('start-phase').textContent = driver?.startPhase ?? '—';
+  $('overlay-start').open = false;
+  $('start-copy').textContent = 'Copy opening phase';
   $('overlay').classList.add('show');
 }
+
+/* Copy the opening phase string to the clipboard (best-effort; clipboard API needs a
+   secure context, so fall back to selecting the text for a manual copy). */
+$('start-copy').addEventListener('click', async () => {
+  const text = driver?.startPhase || '';
+  if (!text) return;
+  const btn = $('start-copy');
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => { btn.textContent = 'Copy opening phase'; }, 1400);
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents($('start-phase'));
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    btn.textContent = 'Select + ⌘/Ctrl-C';
+    setTimeout(() => { btn.textContent = 'Copy opening phase'; }, 1800);
+  }
+});

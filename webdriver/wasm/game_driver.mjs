@@ -28,20 +28,35 @@ export class GameDriver {
     // else two independent re-seats diverge and the offered combos disagree. The seed
     // advances (LCG) after each committed onePhase so the game keeps varying.
     this.rng = (seed === null ? (Date.now() & 0x7fffffff) : (seed >>> 0)) || 1;
+    // The opening this game started from, captured by newGame() so the UI can show /
+    // share it (a preset phase string, or a fresh seeded deal): { startPhase, startSeed }.
+    this.startPhase = null;
+    this.startSeed = null;
   }
 
   _seedCycle() { this.M.seed(this.rng); }
   _bumpCycle() { this.rng = (Math.imul(this.rng, 1664525) + 1013904223) >>> 0 || 1; }
 
-  /* Deal a fresh game and record its opening phase string. */
-  newGame() {
+  /* Start a game and record its opening phase string. With no `startPhase`, deal a
+   * fresh game (seeded from `this.rng` so the deal is reproducible from the game seed);
+   * with a `startPhase` (a make_phases-style preset), replay that exact opening via
+   * init_string instead of dealing. Either way the opening + seed are captured on
+   * `startPhase`/`startSeed` for the view-start affordance. */
+  newGame(startPhase = null) {
     const M = this.M;
     const log = new M.NoOpLog();
     const g = new M.GameState(log);
     const seats = [];
     for (let i = 0; i < this.numPlayers; i++) { const s = new M.RandomStrategy(); seats.push(s); g.add_player(s); }
-    g.initialize();
+    this.startSeed = this.rng;
+    if (startPhase) {
+      g.init_string(startPhase); // replay the preset opening (num_players must match)
+    } else {
+      M.seed(this.rng); // reproducible fresh deal from the game seed
+      g.initialize();
+    }
     this.phaseString = g.export_string();
+    this.startPhase = this.phaseString;
     this._clearHistory();
     seats.forEach((s) => s.delete());
     g.delete(); log.delete();

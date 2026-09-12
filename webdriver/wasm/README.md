@@ -16,6 +16,8 @@ per-move round-trip** — the static host just ships blobs (the `.wasm` engine, 
 | `az_bot.mjs` | `AZBot` — card-space Direct bot (combomap grid / keepy defense) |
 | `load_bot.mjs` | `loadBot`/`buildBot` — pick `NetBot`/`AZBot`/`ExplorerBot` from the contract + iters |
 | `tables/combomap.json` | AZ combo bitwise → `(loc, played-status)` grid cell map |
+| `tables/presets_{2,3,4}p.json` | committed starter openings (phase strings) the menu offers |
+| `gen_presets.mjs` | regenerate the preset openings from the WASM engine (node) |
 | `phase_expander.mjs` | `PhaseExpander` — step to the next decision node (MCTS child gen) |
 | `mcts.mjs` | `MCTSNode` + `ExplorerBot` — net-guided search (both paradigms) |
 | `game_driver.mjs` | `GameDriver` — the browser game loop (`prepare()`/`commit()`) |
@@ -50,7 +52,13 @@ Export any nets you want to offer as bots (`adzpool`/`adzmulti` are ADZ;
 `basic`/`percardmlp`/`cardtx`/`mixer` are AZ — the AZ nets also need
 `tables/combomap.json`, which is committed). Open `http://localhost:8000`, set the
 player count, pick each opponent's net AND its search depth (Direct, or an MCTS
-Explorer at 16/32/64/128 iterations), then play your (shuffled) seat.
+Explorer at 16/32/64/128 iterations), choose the **opening deal** (a random deal, or
+one of the committed presets for that player count), then play your (shuffled) seat.
+
+The presets in `tables/presets_{2,3,4}p.json` are fixed opening deals (replayed via
+`init_string`) so a known scenario can be re-played; regenerate them with
+`node gen_presets.mjs` (they're committed with `git add -f`, past the global `*.json`
+ignore, like `combomap.json`).
 
 ### Running without npm
 
