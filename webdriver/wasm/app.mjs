@@ -1,130 +1,311 @@
-/* Client-side Regicide webapp: the C++ engine (WASM) + net bots (onnxruntime-web)
- * run entirely in the browser. No server game state, no per-move round-trip.
- * This module wires GameDriver's prepare()/commit() loop to the DOM: bot seats run
- * a NetBot forward pass, the human seat waits for a click on an offered move. */
+/* Client-side Regicide (regi-py) webapp. The C++ engine (WASM) + net bots
+ * (onnxruntime-web) run entirely in the browser -- no server game state, no
+ * per-move round-trip. Four screens (intro / how-to / menu / game); on the game
+ * screen the human picks CARDS from their hand (not a move list) and submits. */
 import RegiModule from './dist/regicore.mjs';
 import { GameDriver } from './game_driver.mjs';
 import { loadNetBot } from './adz_bot.mjs';
 
 // ---- onnxruntime-web source (edit these two lines to change where ORT loads) ----
-// The ESM loads its wasm sidecar (~10MB) from ORT_WASM_PATHS, NOT inlined, so both
-// must point at the same dist dir.
-//   npm:            ./node_modules/onnxruntime-web/dist/         (after `npm install`)
+//   npm:            ./node_modules/onnxruntime-web/dist/
 //   no-npm, CDN:    https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/
-//   no-npm, vendor: ./vendor/   (copy ort.wasm.bundle.min.mjs + ort-wasm-*.wasm there)
+//   no-npm, vendor: ./vendor/
 const ORT_DIST = './node_modules/onnxruntime-web/dist/';
 const ort = await import(ORT_DIST + 'ort.wasm.bundle.min.mjs');
-// single-threaded wasm backend: no SharedArrayBuffer, so no COOP/COEP headers
-// needed (works from a plain static host / GitHub Pages).
-ort.env.wasm.numThreads = 1;
-ort.env.wasm.wasmPaths = ORT_DIST; // where the ort-wasm-*.wasm sidecar is fetched from
+ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-COEP
+// ort.env.wasm.wasmPaths = ORT_DIST; // where the ort-wasm-*.wasm sidecar is fetched from
 
+const NETS = ['adzpool', 'adzmulti'];
+const HUMAN_SEAT = 0;          // the human always takes seat 0
 const BOT_MOVE_DELAY_MS = 550; // let the human watch bot moves
+
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
 let M = null;
-const botCache = new Map(); // net name -> NetBot (session reused across games)
+const botCache = new Map();      // net name -> NetBot (session reused across games)
 let driver = null;
-let humanSeat = 0;
-let running = false; // a game loop is active (guards New-game re-entrancy)
+let playerName = 'Player';
+let loopToken = 0;               // bumped to abandon an in-flight game loop
 
-RegiModule().then((mod) => { M = mod; $('boot').textContent = 'ready'; $('new-game').disabled = false; });
-$('new-game').disabled = true;
+/* ================= screens ================= */
+function showScreen(id) {
+  for (const s of document.querySelectorAll('.screen')) s.classList.toggle('show', s.id === `screen-${id}`);
+  if (id === 'menu') buildOpponents();
+}
+document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => showScreen(b.dataset.nav)));
+$('intro-play').addEventListener('click', () => showScreen('menu'));
+$('intro-howto').addEventListener('click', () => showScreen('howto'));
 
-/* ---- card rendering ---- */
-function cardEl(label) {
-  const e = el('span', 'pc', label);
-  const suit = label[label.length - 1];
-  if (suit === 'H' || suit === 'D') e.classList.add('suit-H');
+/* how-to tabs */
+document.querySelectorAll('#howto-tabs .tab').forEach((t) => t.addEventListener('click', () => {
+  document.querySelectorAll('#howto-tabs .tab').forEach((x) => x.classList.toggle('active', x === t));
+  document.querySelectorAll('.howto-pane').forEach((p) => { p.hidden = p.dataset.pane !== t.dataset.howto; });
+}));
+
+/* boot the engine, then unlock Play */
+$('intro-play').disabled = true;
+RegiModule().then((mod) => { M = mod; $('boot').textContent = 'engine ready'; $('intro-play').disabled = false; });
+
+/* ================= menu ================= */
+function buildOpponents() {
+  const numPlayers = parseInt($('cfg-players').value, 10);
+  const wrap = $('opponents');
+  const prev = {};
+  wrap.querySelectorAll('select').forEach((s) => { prev[s.dataset.seat] = s.value; });
+  wrap.replaceChildren();
+  for (let i = 1; i < numPlayers; i++) { // seat 0 is you
+    const row = el('div', 'opp-row');
+    row.appendChild(el('span', 'seat-name', `Seat ${i}`));
+    const sel = el('select');
+    sel.dataset.seat = i;
+    for (const n of NETS) { const o = el('option', null, n); o.value = n; sel.appendChild(o); }
+    sel.value = prev[i] || 'adzpool';
+    row.appendChild(sel);
+    row.appendChild(el('span', 'tag', 'bot'));
+    wrap.appendChild(row);
+  }
+}
+$('cfg-players').addEventListener('change', buildOpponents);
+$('menu-start').addEventListener('click', startGame);
+
+async function startGame() {
+  if (!M) return;
+  const numPlayers = parseInt($('cfg-players').value, 10);
+  const seedRaw = $('cfg-seed').value.trim();
+  const seed = seedRaw === '' ? null : (parseInt(seedRaw, 10) >>> 0);
+  playerName = ($('cfg-name').value.trim() || 'Player').slice(0, 16);
+
+  const netForSeat = {};
+  $('opponents').querySelectorAll('select').forEach((s) => { netForSeat[+s.dataset.seat] = s.value; });
+
+  $('menu-start').disabled = true;
+  const seatBots = [];
+  for (let i = 0; i < numPlayers; i++) {
+    if (i === HUMAN_SEAT) { seatBots.push(null); continue; }
+    const net = netForSeat[i] || 'adzpool';
+    let bot = botCache.get(net);
+    if (!bot) { bot = await loadNetBot(M, ort, './dist', net); botCache.set(net, bot); }
+    seatBots.push(bot);
+  }
+  $('menu-start').disabled = false;
+
+  const maxHistory = seatBots.find((b) => b)?.maxHistory ?? 8;
+  if (driver) driver.dispose();
+  driver = new GameDriver(M, { numPlayers, seatBots, maxHistory, seed });
+  driver.newGame();
+
+  $('log').replaceChildren();
+  $('overlay').classList.remove('show');
+  $('you-seat-note').textContent = `· you are “${playerName}”`;
+  log(`New ${numPlayers}-player game — you are seat 0.`);
+  showScreen('game');
+  loopToken++;
+  loop(loopToken);
+}
+
+$('game-menu').addEventListener('click', () => { loopToken++; showScreen('menu'); });
+$('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); showScreen('menu'); });
+$('overlay-again').addEventListener('click', startGame);
+
+/* ================= card rendering ================= */
+const SUIT_SYM = { C: '♣', D: '♦', H: '♥', S: '♠' };
+const RANK_NAME = { J: 'Jack', Q: 'Queen', K: 'King' };
+function parseCard(label) {
+  // labels are "<rank><suit>" with rank in A23456789TJQK and suit CDHS; joker = "X!"
+  const rank = label[0], suitCh = label[1];
+  const joker = rank === 'X';
+  const disp = joker ? '★' : (rank === 'T' ? '10' : rank);
+  const suit = joker ? '' : (SUIT_SYM[suitCh] || suitCh);
+  const red = suitCh === 'H' || suitCh === 'D';
+  return { disp, suit, red, joker };
+}
+function cardStrength(label) {
+  // pip values (core Card::strength): A=1, 2-9, T=J=10, Q=15, K=20, joker=0
+  const r = label[0];
+  if (r === 'A') return 1; if (r === 'T' || r === 'J') return 10;
+  if (r === 'Q') return 15; if (r === 'K') return 20; if (r === 'X') return 0;
+  const n = parseInt(r, 10); return Number.isNaN(n) ? 0 : n;
+}
+function cardEl(card, opts = {}) {
+  const p = parseCard(card.label);
+  const cls = 'card' + (opts.mini ? ' mini' : '') + (opts.royal ? ' royal' : '') +
+    (p.red ? ' red' : '') + (p.joker ? ' joker' : '');
+  const e = el('div', cls);
+  if (card.location != null) e.dataset.loc = card.location;
+  e.appendChild(el('span', 'rank', p.disp));
+  e.appendChild(el('span', 'suit', p.suit));
+  if (!opts.mini && !p.joker) e.appendChild(el('span', 'rank br', p.disp));
   return e;
 }
-function renderCards(container, labels) {
-  container.replaceChildren();
-  for (const l of labels) container.appendChild(cardEl(l));
+function royalName(label) {
+  const p = parseCard(label);
+  return `${RANK_NAME[label[0]] || label[0]} ${p.suit}`;
+}
+function renderPile(id, count) {
+  const p = $(id); p.replaceChildren();
+  p.appendChild(el('div', 'card back' + (count > 0 ? '' : ' empty')));
 }
 
-/* ---- board rendering ---- */
+/* ================= board render ================= */
 function render(snap) {
   const enemy = snap.enemy;
-  $('enemy-name').textContent = enemy ? enemy.label : '—';
+  // current royal as a face-up card + piles as card backs
+  const rc = $('royal-card'); rc.replaceChildren();
+  if (enemy) { rc.appendChild(cardEl({ label: enemy.label }, { royal: true })); $('royal-label').textContent = royalName(enemy.label); }
+  else { rc.appendChild(el('div', 'card royal empty')); $('royal-label').textContent = 'cleared'; }
+  renderPile('draw-pile', snap.drawPileSize);
+  renderPile('discard-pile', snap.discardPileSize);
+  $('draw-size').textContent = snap.drawPileSize;
+  $('disc-size').textContent = snap.discardPileSize;
+
   $('enemy-strength').textContent = enemy ? enemy.strength : 0;
+  $('cur-block').textContent = snap.currentBlock;
   const hp = enemy ? Math.max(0, enemy.hp) : 0;
-  const hpMax = enemy ? Math.max(hp, enemy.strength, 10) : 10; // rough scale for the bar
-  $('enemy-hp-txt').textContent = enemy ? `${enemy.hp}` : '—';
+  const hpMax = enemy ? Math.max(hp, enemy.strength, 10) : 10;
+  $('enemy-hp-lbl').textContent = enemy ? `${enemy.hp}` : '—';
   $('enemy-hp-bar').style.width = `${enemy ? Math.min(100, (hp / hpMax) * 100) : 0}%`;
+
+  const incoming = enemy ? Math.max(0, enemy.strength - snap.currentBlock) : 0;
+  const inc = $('incoming');
+  inc.textContent = enemy ? (incoming > 0 ? `Hits for ${incoming}` : 'Full-blocked') : '—';
+  inc.classList.toggle('blocked', incoming === 0);
+
   $('prog-txt').textContent = `${snap.progress} / 360`;
   $('prog-bar').style.width = `${Math.max(0, Math.min(100, (snap.progress / 360) * 100))}%`;
   $('enemies-left').textContent = snap.enemiesLeft;
-  $('draw-size').textContent = snap.drawPileSize;
-  $('cur-block').textContent = snap.currentBlock;
 
   const seats = $('seats'); seats.replaceChildren();
   for (let i = 0; i < snap.numPlayers; i++) {
-    const s = el('div', 'seat' + (i === snap.activeSeat ? ' active' : ''));
-    s.appendChild(el('div', 'who', i === humanSeat ? `Seat ${i} — you` : `Seat ${i}`));
-    s.appendChild(el('div', 'kind', `${snap.handCounts[i]} cards · ${i === humanSeat ? 'human' : 'bot'}`));
+    const you = i === HUMAN_SEAT;
+    const s = el('div', 'seat' + (i === snap.activeSeat ? ' active' : '') + (you ? ' you-seat' : ''));
+    s.appendChild(el('div', 'who', you ? playerName : `Seat ${i}`));
+    s.appendChild(el('div', 'kind', `${snap.handCounts[i]} cards · ${you ? 'you' : 'bot'}`));
     seats.appendChild(s);
   }
-  renderCards($('used-combos'), snap.usedCombos);
-  renderCards($('your-hand'), (snap.hands[humanSeat] || []).map((c) => c.label));
+
+  const used = $('used-combos'); used.replaceChildren();
+  if (!snap.usedCombos.length) used.appendChild(el('span', 'note', 'nothing yet'));
+  for (const combo of snap.usedCombos) {
+    const g = el('div', 'combo-group');
+    if (!combo.length) g.appendChild(el('span', 'note', 'yield'));
+    for (const c of combo) g.appendChild(cardEl(c, { mini: true }));
+    used.appendChild(g);
+  }
+
+  // your hand, read-only here (presentHuman makes it pickable on your turn)
+  const hand = $('your-hand'); hand.replaceChildren();
+  hand.classList.remove('pickable'); hand.classList.add('locked');
+  for (const c of (snap.hands[HUMAN_SEAT] || [])) hand.appendChild(cardEl(c));
 }
 
-/* ---- log ---- */
-function log(html, cls) {
-  const row = el('div', 'row' + (cls ? ' ' + cls : ''));
-  row.innerHTML = html;
-  $('log').prepend(row);
-}
+/* ================= log + status ================= */
+function log(html, cls) { const row = el('div', 'row' + (cls ? ' ' + cls : '')); row.innerHTML = html; $('log').prepend(row); }
 function moveText(dec, idx) {
   const c = dec.comboData[idx];
-  const who = dec.isBot ? `Bot seat ${dec.activeSeat}` : `You`;
+  const who = dec.isBot ? `Seat ${dec.activeSeat}` : playerName;
   const what = !c ? '?' : c.isYield ? 'yields' : `${dec.attacking ? 'attacks' : 'defends'} with ${c.labels.join(' ')}`;
   return `<b>${who}</b> ${what}`;
 }
+function setPill(text, cls) { const p = $('turn-status'); p.textContent = text; p.className = 'turn-pill' + (cls ? ' ' + cls : ''); }
 
-/* ---- human decision ---- */
-let resolveHuman = null;
-function presentHuman(dec) {
-  $('turn-status').textContent = `Your turn — ${dec.attacking ? 'choose an attack' : 'choose a defense'}:`;
-  $('turn-status').className = 'status you';
-  const moves = $('moves'); moves.replaceChildren();
-  for (const c of dec.comboData) {
-    const b = el('button', 'move' + (c.isYield ? ' yield' : ''));
-    if (c.isYield) b.appendChild(el('span', null, 'Yield'));
-    else {
-      const cc = el('div', 'combo-cards');
-      for (const l of c.labels) cc.appendChild(cardEl(l));
-      b.appendChild(cc);
-    }
-    b.appendChild(el('span', 'lab', c.isYield ? 'pass' : `move ${c.index}`));
-    b.addEventListener('click', () => { if (resolveHuman) { const r = resolveHuman; resolveHuman = null; r(c.index); } });
-    moves.appendChild(b);
+/* ================= human decision (pick cards) ================= */
+function setCombat(dec, snap) {
+  const combat = $('combat'); combat.replaceChildren();
+  if (dec.attacking) {
+    combat.appendChild(el('span', null, `Attack ${snap.enemy ? snap.enemy.label : ''}.`));
+  } else {
+    combat.appendChild(el('span', 'dmg', `Defend ${dec.damage ?? 0} damage.`));
+    combat.appendChild(el('span', 'need', `(block ${snap.currentBlock} already up)`));
   }
-  return new Promise((res) => { resolveHuman = res; });
+  return combat;
 }
-function clearMoves() { $('moves').replaceChildren(); }
 
-/* ---- main loop ---- */
-async function loop() {
-  while (true) {
+function presentHuman(dec, snap) {
+  setPill(`Your turn — ${dec.attacking ? 'choose an attack' : 'defend'}`, 'you');
+  const combat = setCombat(dec, snap);
+  const selSum = el('span', 'sel-sum'); combat.appendChild(selSum);
+
+  const hand = $('your-hand');
+  hand.classList.add('pickable'); hand.classList.remove('locked');
+  const selected = new Set();
+  const yieldCombo = dec.comboData.find((c) => c.isYield);
+  const sb = $('btn-submit');
+  let hovering = false;
+
+  const canYield = () => selected.size === 0 && !!yieldCombo;
+  const submitLabel = () => (hovering && canYield()) ? 'Yield' : 'Submit';
+  const matchIndex = () => {
+    for (const c of dec.comboData) {
+      if (c.locations.length === selected.size && c.locations.every((l) => selected.has(l))) return c.index;
+    }
+    return -1;
+  };
+  const refresh = () => {
+    let sum = 0; for (const c of (snap.hands[HUMAN_SEAT] || [])) if (selected.has(c.location)) sum += cardStrength(c.label);
+    selSum.textContent = selected.size ? `— selected ${selected.size} card${selected.size > 1 ? 's' : ''} (${sum})` : '';
+    sb.disabled = !(matchIndex() >= 0 || canYield());
+    sb.textContent = submitLabel();
+    $('btn-clear').disabled = selected.size === 0;
+  };
+
+  for (const cel of hand.children) {
+    cel.onclick = () => {
+      const loc = +cel.dataset.loc;
+      if (selected.has(loc)) { selected.delete(loc); cel.classList.remove('sel'); }
+      else { selected.add(loc); cel.classList.add('sel'); }
+      refresh();
+    };
+  }
+  sb.onmouseenter = () => { hovering = true; sb.textContent = submitLabel(); };
+  sb.onmouseleave = () => { hovering = false; sb.textContent = submitLabel(); };
+  refresh();
+
+  return new Promise((resolve) => {
+    const done = (index) => {
+      hand.classList.remove('pickable'); hand.classList.add('locked');
+      for (const cel of hand.children) cel.onclick = null;
+      sb.onmouseenter = sb.onmouseleave = sb.onclick = null;
+      sb.disabled = $('btn-clear').disabled = true;
+      sb.textContent = 'Submit';
+      resolve(index);
+    };
+    sb.onclick = () => {
+      if (canYield()) return done(yieldCombo.index);
+      const idx = matchIndex();
+      if (idx < 0) { flashInvalid(); return; }
+      done(idx);
+    };
+    $('btn-clear').onclick = () => { selected.clear(); for (const cel of hand.children) cel.classList.remove('sel'); refresh(); };
+  });
+}
+function flashInvalid() {
+  const w = el('span', 'need', ' — not a legal combo, pick again');
+  $('combat').appendChild(w);
+  setTimeout(() => w.remove(), 1600);
+}
+
+/* ================= main loop ================= */
+async function loop(token) {
+  while (token === loopToken) {
     const dec = driver.prepare();
-    render(driver.snapshot());
+    const snap = driver.snapshot();
+    render(snap);
     if (dec.kind === 'ended') { finish(dec.endValue); return; }
     if (dec.kind === 'auto') { driver.commit(-1); continue; }
 
-    let index;
     if (dec.isBot) {
-      $('turn-status').textContent = `Bot (seat ${dec.activeSeat}) is thinking…`;
-      $('turn-status').className = 'status think';
-      clearMoves();
-      index = await driver.seatBots[dec.activeSeat].runFeeds(dec.feeds, dec.K);
+      setPill(`Seat ${dec.activeSeat} is thinking…`, 'think');
+      $('combat').replaceChildren(el('span', 'note', 'waiting for the other players'));
+      const index = await driver.seatBots[dec.activeSeat].runFeeds(dec.feeds, dec.K);
+      if (token !== loopToken) return;
       log(moveText(dec, index));
       driver.commit(index);
+      render(driver.snapshot());
       await new Promise((r) => setTimeout(r, BOT_MOVE_DELAY_MS));
     } else {
-      index = await presentHuman(dec);
-      clearMoves();
+      const index = await presentHuman(dec, snap);
+      if (token !== loopToken) return;
       log(moveText(dec, index));
       driver.commit(index);
     }
@@ -132,48 +313,13 @@ async function loop() {
 }
 
 function finish(endValue) {
-  running = false;
-  clearMoves();
   const won = endValue === 1;
-  $('turn-status').textContent = won ? 'Victory — all enemies defeated!' : 'Defeat — the castle falls.';
-  $('turn-status').className = 'status';
+  setPill(won ? 'Victory' : 'Defeat', won ? 'win' : 'loss');
+  $('combat').replaceChildren();
+  $('your-hand').classList.add('locked');
   log(won ? 'The party <b>WINS</b> — all 12 royals defeated.' : 'The party <b>LOSES</b>.', won ? 'win' : 'loss');
   $('overlay-res').textContent = won ? 'Victory' : 'Defeat';
   $('overlay-res').className = 'res ' + (won ? 'win' : 'loss');
   $('overlay-sub').textContent = won ? 'All royals cleared.' : 'A player could not block, or ran out of moves.';
   $('overlay').classList.add('show');
 }
-
-/* ---- new game ---- */
-async function newGame() {
-  if (!M || running) return;
-  $('overlay').classList.remove('show');
-  const numPlayers = parseInt($('cfg-players').value, 10);
-  const netName = $('cfg-net').value;
-  const spectate = $('cfg-spectate').checked;
-  const seedRaw = $('cfg-seed').value.trim();
-  const seed = seedRaw === '' ? null : (parseInt(seedRaw, 10) >>> 0);
-  humanSeat = spectate ? -1 : 0;
-
-  $('new-game').disabled = true;
-  $('boot').textContent = 'loading net…';
-  let bot = botCache.get(netName);
-  if (!bot) { bot = await loadNetBot(M, ort, './dist', netName); botCache.set(netName, bot); }
-  $('boot').textContent = 'ready';
-  $('new-game').disabled = false;
-
-  const seatBots = [];
-  for (let i = 0; i < numPlayers; i++) seatBots.push(i === humanSeat ? null : bot);
-  if (driver) driver.dispose();
-  driver = new GameDriver(M, { numPlayers, seatBots, maxHistory: bot.maxHistory, seed });
-  driver.newGame();
-  $('log').replaceChildren();
-  $('you-seat-note').textContent = spectate ? '(spectating — all bots)' : '(seat 0)';
-  $('you-panel').classList.toggle('hidden', false);
-  log(`New ${numPlayers}-player game — ${spectate ? 'all bots' : 'you are seat 0'} · net ${netName}`);
-  running = true;
-  loop();
-}
-
-$('new-game').addEventListener('click', newGame);
-$('overlay-again').addEventListener('click', () => { $('overlay').classList.remove('show'); newGame(); });

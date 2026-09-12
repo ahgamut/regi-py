@@ -97,9 +97,15 @@ export class GameDriver {
     const progress = 360 - hpLeft; // 12 enemies * (10|15|20) hp = 360 total to clear
 
     const dp = ph.draw_pile; const drawPileSize = dp.size(); dp.delete();
+    const disc = ph.discard_pile; const discardPileSize = disc.size(); disc.delete();
     const up = ph.used_combos;
-    const usedCombos = [];
-    for (let i = 0; i < up.size(); i++) { const c = up.get(i); usedCombos.push(c.label); c.delete(); }
+    const usedCombos = []; // each entry is that combo's cards (for card-stack rendering)
+    for (let i = 0; i < up.size(); i++) {
+      const c = up.get(i); const parts = c.parts; const cards = [];
+      for (let j = 0; j < parts.size(); j++) { const cd = parts.get(j); cards.push({ location: cd.location, label: cd.label }); cd.delete(); }
+      parts.delete(); c.delete();
+      usedCombos.push(cards);
+    }
     up.delete();
 
     const snap = {
@@ -116,6 +122,7 @@ export class GameDriver {
       enemiesLeft: enemyLabels.length,
       progress,
       drawPileSize,
+      discardPileSize,
       usedCombos,
     };
     ph.delete();
@@ -135,7 +142,7 @@ export class GameDriver {
     const M = this.M;
     const history = this.history;
     let captured = null;
-    const grab = (combos, game) => {
+    const grab = (combos, game, extra) => {
       const phase = game.export_phaseinfo();
       const activeSeat = phase.active_player;
       const attacking = phase.phase_attacking;
@@ -151,14 +158,17 @@ export class GameDriver {
       const seatBot = this.seatBots[activeSeat] || null;
       if (seatBot) { const built = seatBot.buildFeeds(phase, combos, history, { reshuffle: true }); feeds = built.feeds; K = built.K; }
       phase.delete();
-      captured = { kind: 'decision', activeSeat, attacking, isBot: !!seatBot, comboData, feeds, K };
+      // `damage` (defense: what must be blocked) and `yieldAllowed` (attack: an
+      // empty combo is offered) drive the human panel's combat readout + yield gate.
+      captured = { kind: 'decision', activeSeat, attacking, isBot: !!seatBot, comboData, feeds, K,
+        damage: extra.damage ?? null, yieldAllowed: !!extra.yieldAllowed };
       return 0; // throwaway; commit() replays this onePhase with the real index
     };
     this._seedCycle();
     const ctx = this._seat({
       setup() { return 0; },
-      getAttackIndex(combos, p, y, game) { return grab(combos, game); },
-      getDefenseIndex(combos, p, d, game) { return grab(combos, game); },
+      getAttackIndex(combos, p, y, game) { return grab(combos, game, { yieldAllowed: y }); },
+      getDefenseIndex(combos, p, d, game) { return grab(combos, game, { damage: d }); },
       getRedirectIndex() { return 0; },
     });
     const running = ctx.g.is_runnable();

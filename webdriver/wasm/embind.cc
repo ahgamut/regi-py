@@ -191,6 +191,7 @@ EMSCRIPTEN_BINDINGS(regicore)
         .property("phase_attacking", &PhaseInfo::currentPhaseIsAttack)
         .property("player_cards", &PhaseInfo::player_cards)
         .property("draw_pile", &PhaseInfo::drawPile)
+        .property("discard_pile", &PhaseInfo::discardPile)
         .property("enemy_pile", &PhaseInfo::enemyPile)
         .property("used_combos", &PhaseInfo::usedPile);
 
