@@ -3,9 +3,11 @@
  * decision at a time: it subclasses Strategy (the offered combos arrive as an
  * argument to the attack/defense callbacks) and steps GameState to completion. */
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
 #include <regi.h>
 #include <dfsel.h>
 #include <phaseinfo.h>
+#include <featurize.h>
 #include <rng.h>
 #include <string>
 #include <vector>
@@ -104,6 +106,30 @@ static PhaseInfo phaseRandomizeFrom(const PhaseInfo &other, i32 currentID)
     return info;
 }
 
+/* Featurizer kernels (core/featurize.{cc,h}) -- the SAME functions the pybind ext
+ * exposes to training, so the browser and the trainer featurize identically. Each
+ * returns a fresh JS Float32Array (a copy of the flat row-major vector); JS reshapes
+ * by the documented dims and builds the onnxruntime input tensors. The net-specific
+ * candidate membership (adzmulti multi-hot / adzpool index+mask) is assembled in JS
+ * from each Combo's parts' card locations -- see the JS inference core. */
+static val toFloat32Array(const std::vector<float> &v)
+{
+    // new Float32Array(view) copies out of the WASM heap, so the returned array
+    // stays valid after `v` is destroyed and across later heap growth.
+    return val::global("Float32Array").new_(typed_memory_view(v.size(), v.data()));
+}
+static val featCardCapabilities(const PhaseInfo &p) { return toFloat32Array(cardCapabilities(p)); }
+static val featLocationArray(const PhaseInfo &p, int persp) { return toFloat32Array(locationArray(p, persp)); }
+static val featUsedPileArray(const PhaseInfo &p) { return toFloat32Array(usedPileArray(p)); }
+static val featCandidateSemantics(const PhaseInfo &p, const std::vector<Combo> &c)
+{
+    return toFloat32Array(candidateSemantics(p, c));
+}
+static val featFuseCardTokens(const std::vector<PhaseInfo> &phases, int persp)
+{
+    return toFloat32Array(fuseCardTokens(phases, persp));
+}
+
 EMSCRIPTEN_BINDINGS(regicore)
 {
     enum_<GameStatus>("GameStatus")
@@ -115,6 +141,7 @@ EMSCRIPTEN_BINDINGS(regicore)
     register_vector<Enemy>("VectorEnemy");
     register_vector<Combo>("VectorCombo");
     register_vector<std::vector<Card>>("VectorVectorCard");
+    register_vector<PhaseInfo>("VectorPhaseInfo");  // history window for fuse_card_tokens
 
     class_<Card>("Card")
         .property("entry", +[](const Card &c) { return (int)c.entry(); })
@@ -184,4 +211,12 @@ EMSCRIPTEN_BINDINGS(regicore)
         .property("used_combos", &GameState::usedPile);
 
     function("seed", +[](unsigned v) { regi::seed((std::uint64_t)v); });
+
+    // featurizer kernels (shared with the pybind training path); each returns a
+    // flat row-major Float32Array the JS inference core reshapes + tensorifies.
+    function("features_card_capabilities", &featCardCapabilities);
+    function("features_location_array", &featLocationArray);
+    function("features_used_pile_array", &featUsedPileArray);
+    function("features_candidate_semantics", &featCandidateSemantics);
+    function("features_fuse_card_tokens", &featFuseCardTokens);
 }
