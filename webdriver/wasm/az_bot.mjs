@@ -126,6 +126,32 @@ export class AZBot {
     return this.runFeeds(this.buildFeeds(rawPhase, combos, priorHistory, opts));
   }
 
+  /* MCTS leaf eval (rl/az/explorer.py AlphaZeroNode): one forward pass -> the value
+   * head (v, tanh) and the per-offered-combo priors -- the SAME scores the Direct bot
+   * ranks (attack: combomap grid a[cell]; defense: keepy max(0,1-Σk)). The Explorer
+   * smooths + normalizes these into child priors. Independent of scoreCombos so the
+   * golden-checked Direct path is untouched. */
+  async predictLeaf(built) {
+    const { feeds, K, comboLocs, attacking } = built;
+    const out = await this.session.run(feeds);
+    const value = out.v.data[0];
+    const priors = new Float32Array(K);
+    if (attacking) {
+      const a = out.a.data;
+      for (let i = 0; i < K; i++) {
+        const cell = this.comboMap[bitwiseOfLocations(comboLocs[i]).toString()];
+        priors[i] = cell ? a[cell[0] * PLAYED_STATUS + cell[1]] : 0;
+      }
+    } else {
+      const k = out.k.data;
+      for (let i = 0; i < K; i++) {
+        let wt = 0; for (const loc of comboLocs[i]) wt += k[loc];
+        priors[i] = Math.max(0, 1 - wt);
+      }
+    }
+    return { value, priors };
+  }
+
   /* Jester redirect (rl/az/explorer.py getRedirectIndex): hand the turn to the other
    * seat whose position the net values highest. N-1 forward passes. */
   async chooseRedirect(rawPhase, priorHistory, numPlayers) {

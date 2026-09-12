@@ -166,7 +166,10 @@ export class GameDriver {
       // The decision phase string is the search root for an Explorer (MCTS) bot; a
       // Direct bot instead uses `built` (feeds assembled here while the combos live).
       const decisionPhaseString = phase.to_string();
-      const built = seatBot ? seatBot.buildFeeds(phase, combos, history, { reshuffle: true }) : null;
+      // A Direct bot consumes `built` (feeds assembled here while the combos live); an
+      // Explorer bot searches from `decisionPhaseString` instead, so skip the wasted
+      // featurization for it.
+      const built = (seatBot && !seatBot.isExplorer) ? seatBot.buildFeeds(phase, combos, history, { reshuffle: true }) : null;
       phase.delete();
       // `damage` (defense: what must be blocked) and `yieldAllowed` (attack: an
       // empty combo is offered) drive the human panel's combat readout + yield gate.

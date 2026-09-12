@@ -5,6 +5,7 @@
 import RegiModule from './dist/regicore.mjs';
 import { GameDriver } from './game_driver.mjs';
 import { loadBot } from './load_bot.mjs';
+import { ExplorerBot } from './mcts.mjs';
 
 // ---- onnxruntime-web source (edit these two lines to change where ORT loads) ----
 //   npm:            ./node_modules/onnxruntime-web/dist/
@@ -18,6 +19,10 @@ ort.env.wasm.numThreads = 1; // single-thread wasm: no SharedArrayBuffer / COOP-
 // Selectable bots. ADZ (candidate-scoring) + AZ (card-space) Direct-net nets;
 // attntrunk is intentionally omitted (heaviest payload, redundant with basic).
 const NETS = ['adzpool', 'adzmulti', 'basic', 'percardmlp', 'cardtx', 'mixer'];
+// Search depth per bot: 0 = Direct-net (one forward pass, argmax); > 0 = an N-iteration
+// MCTS Explorer (~N+1 serial forward passes/move, so bigger = stronger but slower).
+const ITERS = [0, 16, 32, 64, 128];
+const itersLabel = (n) => (n === 0 ? 'Direct' : `MCTS ${n}`);
 const BOT_MOVE_DELAY_MS = 550; // let the human watch bot moves
 
 let humanSeat = 0; // which seat (turn-order position) the human took THIS game; shuffled at start
@@ -58,19 +63,26 @@ RegiModule().then((mod) => { M = mod; comboMap = mod.combo_map(); $('boot').text
 function buildOpponents() {
   const numPlayers = parseInt($('cfg-players').value, 10);
   const wrap = $('opponents');
-  const prev = {};
-  wrap.querySelectorAll('select').forEach((s) => { prev[s.dataset.bot] = s.value; });
+  const prevNet = {}, prevIters = {};
+  wrap.querySelectorAll('select.opp-net').forEach((s) => { prevNet[s.dataset.bot] = s.value; });
+  wrap.querySelectorAll('select.opp-iters').forEach((s) => { prevIters[s.dataset.bot] = s.value; });
   wrap.replaceChildren();
   // Configure the N-1 bot opponents; their turn-order seats are decided (shuffled)
-  // at game start, so these are just numbered bots, not fixed seats.
+  // at game start, so these are just numbered bots, not fixed seats. Each picks a net
+  // AND a search depth (Direct vs an MCTS Explorer).
   for (let i = 1; i < numPlayers; i++) {
     const row = el('div', 'opp-row');
     row.appendChild(el('span', 'seat-name', `Bot ${i}`));
-    const sel = el('select');
-    sel.dataset.bot = i;
-    for (const n of NETS) { const o = el('option', null, n); o.value = n; sel.appendChild(o); }
-    sel.value = prev[i] || 'adzpool';
-    row.appendChild(sel);
+    const net = el('select', 'opp-net');
+    net.dataset.bot = i;
+    for (const n of NETS) { const o = el('option', null, n); o.value = n; net.appendChild(o); }
+    net.value = prevNet[i] || 'adzpool';
+    row.appendChild(net);
+    const iters = el('select', 'opp-iters');
+    iters.dataset.bot = i;
+    for (const n of ITERS) { const o = el('option', null, itersLabel(n)); o.value = n; iters.appendChild(o); }
+    iters.value = prevIters[i] ?? '0';
+    row.appendChild(iters);
     row.appendChild(el('span', 'tag', 'bot'));
     wrap.appendChild(row);
   }
@@ -85,9 +97,10 @@ async function startGame() {
   const seed = seedRaw === '' ? null : (parseInt(seedRaw, 10) >>> 0);
   playerName = ($('cfg-name').value.trim() || 'Player').slice(0, 16);
 
-  // The configured bot nets, in menu order (N-1 of them).
-  const botNets = [];
-  $('opponents').querySelectorAll('select').forEach((s) => { botNets.push(s.value); });
+  // The configured bot nets + search depths, in menu order (N-1 of them).
+  const botNets = [], botIters = [];
+  $('opponents').querySelectorAll('select.opp-net').forEach((s) => { botNets.push(s.value); });
+  $('opponents').querySelectorAll('select.opp-iters').forEach((s) => { botIters.push(parseInt(s.value, 10) || 0); });
 
   // Shuffle the human into a random seat so turn order varies each game.
   humanSeat = Math.floor(Math.random() * numPlayers);
@@ -97,10 +110,14 @@ async function startGame() {
   let bi = 0;
   for (let i = 0; i < numPlayers; i++) {
     if (i === humanSeat) { seatBots.push(null); continue; }
-    const net = botNets[bi++] || 'adzpool';
-    let bot = botCache.get(net);
-    if (!bot) { bot = await loadBot(M, ort, './dist', net, { comboMap }); botCache.set(net, bot); }
-    seatBots.push(bot);
+    const net = botNets[bi] || 'adzpool';
+    const iters = botIters[bi] || 0;
+    bi++;
+    // Cache the Direct bot (session) per net; an Explorer just wraps it, so switching
+    // a seat's search depth doesn't reload the net.
+    let direct = botCache.get(net);
+    if (!direct) { direct = await loadBot(M, ort, './dist', net, { comboMap }); botCache.set(net, direct); }
+    seatBots.push(iters > 0 ? new ExplorerBot(M, direct, { iterations: iters }) : direct);
   }
   $('menu-start').disabled = false;
 
@@ -400,7 +417,11 @@ async function loop(token) {
       setPill(`${seatLabel(dec.activeSeat)} is thinking…`, 'think');
       $('combat').replaceChildren(el('span', 'note', 'waiting for the other players'));
       const bot = driver.seatBots[dec.activeSeat];
-      const index = await bot.runFeeds(dec.built);
+      // A Direct bot argmaxes its pre-built feeds; an Explorer searches from the
+      // captured decision phase (+ the real past decisions as its history window).
+      const index = bot.isExplorer
+        ? await bot.search(dec.decisionPhaseString, driver.history.map((p) => p.to_string()), dec.comboData)
+        : await bot.runFeeds(dec.built);
       if (token !== loopToken) return;
       // A bot Joker attack redirects like its reference strategy (AZ value-argmax,
       // ADZ random-other); non-joker moves pass null (no redirect asked).

@@ -35,6 +35,7 @@ export class NetBot {
     this.maxHistory = contract.max_history;
     this.inputNames = contract.inputs.map((i) => i.name);
     this.logitsName = contract.outputs.includes('cand_logits') ? 'cand_logits' : contract.outputs[1];
+    this.valueName = contract.outputs.includes('value') ? 'value' : contract.outputs[0];
   }
 
   /* Build the onnxruntime feeds for one decision. `rawPhase` is the current phase
@@ -126,6 +127,17 @@ export class NetBot {
 
   async choose(rawPhase, combos, priorHistory = [], opts = {}) {
     return this.runFeeds(this.buildFeeds(rawPhase, combos, priorHistory, opts));
+  }
+
+  /* MCTS leaf eval (rl/adz/explorer.py ADZNode: `v_hat, priors = net.predict(...)`).
+   * One forward pass over pre-built feeds -> the node's value estimate and its child
+   * priors: the value head, and softmax over the K real candidates' logits (aligned to
+   * the offered-combo order). The Explorer smooths + normalizes these. */
+  async predictLeaf(built) {
+    const { feeds, K } = built;
+    const out = await this.session.run(feeds);
+    const value = out[this.valueName].data[0];
+    return { value, priors: softmaxK(out[this.logitsName].data, K) };
   }
 }
 
