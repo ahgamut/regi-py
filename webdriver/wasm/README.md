@@ -25,7 +25,7 @@ per-move round-trip** — the static host just ships blobs (the `.wasm` engine, 
 | `tables/presets_{2,3,4}p.json` | committed starter openings (phase strings) the menu offers |
 | `gen_combomap.mjs`, `gen_presets.mjs` | (node) regenerate the combomap / preset openings from the WASM engine |
 | `tests/smoke*.mjs` | node smoke suites; `tests/smoke_all.mjs` runs them all (`npm run smoke`) |
-| `gen_golden.py`, `az_gen_golden.py`, `tests/check_golden.mjs` | JS-vs-Python Direct-net index parity check |
+| `gen_golden.py`, `tests/check_golden.mjs` | JS-vs-Python Direct-net index parity check (both paradigms) |
 
 ## Build & run
 
@@ -100,10 +100,11 @@ npm run golden    # JS-vs-Python Direct-net parity for EVERY net that has both a
 node tests/smoke_driver.mjs
 node tests/check_golden.mjs --net adzpool
 
-# The golden fixtures come from the torch env (one per net):
+# The golden fixtures come from the torch env (one per net; the paradigm is
+# auto-detected from the net name -- ADZ or AZ):
 python -m webdriver.wasm.gen_golden --net adzpool \
     --weights weights/best_adzpool.pt --out webdriver/wasm/golden/adzpool.json
-python -m webdriver.wasm.az_gen_golden --net basic \
+python -m webdriver.wasm.gen_golden --net basic \
     --weights weights/best_basic.pt --out webdriver/wasm/golden/basic.json
 ```
 

@@ -1,6 +1,6 @@
 /* Golden cross-check: the JS Direct-net bots pick the SAME combo index as their
  * Python reference strategy (ADZDirectStrategy / NetDirectStrategy), over the
- * fixtures from gen_golden.py / az_gen_golden.py. This closes the featurizer + ONNX
+ * fixtures from gen_golden.py (both paradigms). This closes the featurizer + ONNX
  * + argmax parity loop that the in-env node smoke tests can't cover (no onnxruntime).
  *
  * Checks EVERY net for which both a golden fixture (<golden>/<net>.json) and an export
