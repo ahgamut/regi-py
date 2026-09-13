@@ -2,7 +2,13 @@
 
 This repo contains a C++ implementation of the game mechanics of the card game
 [`regicide`](https://badgersfrommars.com/en-us/pages/learn-to-play-regicide), 
-with Python wrappers via `pybind11`.
+with Python wrappers (via `pybind11`), and a WASM wrapper.
+
+Try the WASM version of the game [here](https://ahgamut.github.io/regi-py): once
+loaded, the game (including neural-net bots) should run fully in the browser,
+without requiring any connection to a server.
+
+![](./webdriver/wasm/regi-runtime.png)
 
 ## Installation
 
@@ -32,14 +38,6 @@ pytest -q
 Re-run `pip install -e . --no-build-isolation` after any change to the C++ sources
 under `src/regi_py/core/` to rebuild the extension before testing.
 
-The `pytorch` training code (`regi_py.rl`, `trainers/`) and the web app
-(`webdriver/`) are exercised separately; their tests skip automatically when those
-dependencies are unavailable.
-
-The web app tests live outside the main suite (`webdriver/` is not part of the
-installed `regi_py` package). Run them from the repo root with `python -m` so the
-`webdriver` package is importable:
-
 ```sh
 python -m pytest webdriver/tests   # NOT bare `pytest webdriver/tests`
 ```
@@ -64,8 +62,7 @@ python driver.py --add-bot damage --add-bot preserve
 
 ## Playing with a bot
 
-Run `webdriver/driver.py` to play a 2-player game with a bot that picks random
-moves
+To play locally, run `webdriver/driver.py` to play a 2-player game on your local server:
 
 ```sh
 # install the package first
@@ -77,6 +74,9 @@ python driver.py \
 ```
 
 ![](./webdriver/regi-runtime.png)
+
+You can also build the WASM version and run it locally. To use the neural nets
+locally, you'll need to train them by yourself.
 
 ## Adding your own strategies
 
