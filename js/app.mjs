@@ -9,7 +9,7 @@ import { ExplorerBot } from './mcts.mjs';
 
 // ---- onnxruntime-web source (edit these two lines to change where ORT loads) ----
 // Paths are relative to THIS module (js/app.mjs), so they climb one level to the
-// webwasm root (../); a CDN URL is absolute and unaffected.
+// wasm root (../); a CDN URL is absolute and unaffected.
 //   npm:            ../node_modules/onnxruntime-web/dist/
 //   no-npm, CDN:    https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/
 //   no-npm, vendor: ../vendor/
@@ -79,7 +79,7 @@ async function boot() {
   const total = 3 + NETS.length; // engine, onnxruntime, presets, then one step per net
   let done = 0;
   try {
-    const s1 = addLoadStep('Game engine (WebAssembly)');
+    const s1 = addLoadStep('Game engine');
     if (typeof WebAssembly === 'undefined') throw new Error('WebAssembly is disabled or unsupported in this browser — enable it and reload');
     M = await RegiModule();
     comboMap = M.combo_map();
@@ -214,25 +214,39 @@ $('cfg-preset').addEventListener('change', clearPastedPhase);
  * fetch error we just fall back to "Random deal" (an empty list). */
 async function loadPresets(numPlayers) {
   if (presetCache.has(numPlayers)) return presetCache.get(numPlayers);
-  let phases = [];
+  // Flatten the difficulty tiers into ordered entries {tier, label, phase}, e.g.
+  // {tier:'Medium', label:'Medium 3', phase:'...'}; the entry's array index is its
+  // #cfg-preset option value.
+  let entries = [];
   try {
     const data = await fetch(`./tables/presets_${numPlayers}p.json`).then((r) => r.json());
-    if (Array.isArray(data.phases)) phases = data.phases;
-  } catch { phases = []; }
-  presetCache.set(numPlayers, phases);
-  return phases;
+    if (Array.isArray(data.tiers)) {
+      for (const tier of data.tiers) {
+        (tier.phases || []).forEach((phase, j) => {
+          entries.push({ tier: tier.name, label: `${tier.name} ${j + 1}`, phase });
+        });
+      }
+    }
+  } catch { entries = []; }
+  presetCache.set(numPlayers, entries);
+  return entries;
 }
 
-/* Repopulate #cfg-preset for the current player count: "Random deal" + one entry per
- * committed preset. Keeps the prior pick if it's still in range, else Random. */
+/* Repopulate #cfg-preset for the current player count: "Random deal" + the presets
+ * grouped into Easy/Medium/Hard <optgroup>s. Keeps the prior pick if it's still in
+ * range, else Random. */
 async function refreshPresets() {
   const numPlayers = parseInt($('cfg-players').value, 10);
   const sel = $('cfg-preset');
   const prev = sel.value;
-  const phases = await loadPresets(numPlayers);
+  const entries = await loadPresets(numPlayers);
   sel.replaceChildren();
   const rand = el('option', null, 'Random deal'); rand.value = ''; sel.appendChild(rand);
-  phases.forEach((_, i) => { const o = el('option', null, `Preset ${i + 1}`); o.value = String(i); sel.appendChild(o); });
+  let group = null, tier = null;
+  entries.forEach((e, i) => {
+    if (e.tier !== tier) { tier = e.tier; group = el('optgroup'); group.label = e.tier; sel.appendChild(group); }
+    const o = el('option', null, e.label); o.value = String(i); group.appendChild(o);
+  });
   sel.value = [...sel.options].some((o) => o.value === prev) ? prev : '';
 }
 
@@ -256,9 +270,10 @@ async function startGame() {
     startPhase = pastedPhase;
     opening = 'a pasted phase';
   } else if (presetVal !== '') {
-    const phases = await loadPresets(numPlayers);
-    startPhase = phases[parseInt(presetVal, 10)] || null;
-    if (startPhase) opening = `preset ${parseInt(presetVal, 10) + 1}`;
+    const entries = await loadPresets(numPlayers);
+    const chosen = entries[parseInt(presetVal, 10)];
+    startPhase = chosen ? chosen.phase : null;
+    if (startPhase) opening = `preset ${chosen.label}`; // e.g. "preset Medium 3"
   }
 
   // Shuffle the human into a random seat so turn order varies each game.
@@ -294,9 +309,45 @@ async function startGame() {
   loop(loopToken);
 }
 
+/* Restart the just-played game reusing the SAME bots/seats (the live driver — no
+ * reload). `deal`: 'same' replays the identical opening (driver.startPhase), 'new'
+ * deals fresh. `seed`: 'same' reuses the original per-cycle seed (a bit-identical
+ * replay), 'new' picks a fresh one (same deal, different play-out). */
+function restartGame({ deal, seed }) {
+  if (!driver) return;
+  const startPhase = deal === 'same' ? driver.startPhase : null;
+  driver.rng = ((seed === 'same' ? driver.startSeed : (Date.now() & 0x7fffffff)) >>> 0) || 1;
+  driver.newGame(startPhase);
+
+  moveCount = 0;
+  $('log').replaceChildren();
+  $('overlay').classList.remove('show');
+  $('show-summary').hidden = true;
+  setBotTurn(false);
+  $('you-seat-note').textContent = `· you are “${playerName}”`;
+  const opening = deal === 'same' ? 'same deal' : 'a new deal';
+  log(`New ${driver.numPlayers}-player game (${opening}) — you are <b>Player ${humanSeat + 1}</b>.`);
+  showScreen('game');
+  loopToken++;
+  loop(loopToken);
+}
+
 $('game-menu').addEventListener('click', () => { loopToken++; setBotTurn(false); $('show-summary').hidden = true; showScreen('menu'); });
 $('overlay-menu').addEventListener('click', () => { $('overlay').classList.remove('show'); $('show-summary').hidden = true; setBotTurn(false); showScreen('menu'); });
-$('overlay-again').addEventListener('click', startGame);
+// "Play again" is a dropdown: it opens a small menu of the three restart choices.
+const againPop = $('again-pop'), againBtn = $('overlay-again');
+function closeAgainMenu() { againPop.hidden = true; againBtn.setAttribute('aria-expanded', 'false'); }
+againBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = againPop.hidden; // opening if currently hidden
+  againPop.hidden = !open;
+  againBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('click', (e) => { if (!$('again-menu').contains(e.target)) closeAgainMenu(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAgainMenu(); });
+$('overlay-same').addEventListener('click', () => { closeAgainMenu(); restartGame({ deal: 'same', seed: 'same' }); });
+$('overlay-diff').addEventListener('click', () => { closeAgainMenu(); restartGame({ deal: 'same', seed: 'new' }); });
+$('overlay-new').addEventListener('click', () => { closeAgainMenu(); restartGame({ deal: 'new', seed: 'new' }); });
 // Dismiss the result overlay to look over the finished board; a floating button
 // (bottom-right) brings the summary back. Both keep you on the game screen.
 $('overlay-review').addEventListener('click', () => { $('overlay').classList.remove('show'); $('show-summary').hidden = false; });
@@ -338,7 +389,19 @@ function royalName(label) {
 }
 function renderPile(id, count) {
   const p = $(id); p.replaceChildren();
-  p.appendChild(el('div', 'card back' + (count > 0 ? '' : ' empty')));
+  const c = el('div', 'card back' + (count > 0 ? '' : ' empty'));
+  if (count > 0) {
+    // thickness = stacked offset-shadow "edges" down-right, growing with the count
+    const depth = Math.max(1, Math.min(8, Math.round(count / 5)));
+    const layers = [];
+    for (let i = 1; i <= depth; i++) {
+      const o = (i * 1.3).toFixed(1);
+      layers.push(`${o}px ${o}px 0 ${i % 2 ? '#2a2f3c' : '#20242e'}`);
+    }
+    layers.push('2px 2px 5px rgba(0,0,0,.45)'); // soft drop on top of the stack
+    c.style.boxShadow = layers.join(', ');
+  }
+  p.appendChild(c);
 }
 
 /* ================= board render ================= */

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>regi-py — client-side WASM</title>
+  <title>regi-py — play in your browser</title>
   <link rel="stylesheet" href="./app.css" />
 </head>
 <body>
@@ -21,9 +21,8 @@
     <div class="hero">
       <div class="logo">♠ ♥ ♦ ♣</div>
       <h1 class="hero-title mono">regi-py</h1>
-      <p class="hero-sub">This app runs the whole game engine and its neural-net bots
-        locally in your browser, so it needs <b>JavaScript</b> and <b>WebAssembly</b>
-        enabled. Please enable them and reload the page.</p>
+      <p class="hero-sub">This app runs the whole game and its bots in your browser,
+        so it needs <b>JavaScript</b> enabled. Please enable it and reload the page.</p>
       <div class="hero-links">
         <a href="https://github.com/ahgamut/regi-py">GitHub</a>
         <a href="https://www.regicidegame.com/site_files/33132/upload_files/RegicideRulesA4.pdf">Full rules (PDF)</a>
@@ -40,8 +39,8 @@
   <div class="hero">
     <div class="logo">♠ ♥ ♦ ♣</div>
     <h1 class="hero-title mono">regi-py</h1>
-    <p class="hero-sub">Loading the game engine, the neural-net bots, and the opening
-      deals — everything runs locally in your browser.</p>
+    <p class="hero-sub">Loading the game, the bots, and the opening deals —
+      everything runs in your browser.</p>
     <div class="meter load"><span id="load-bar" style="width:0%"></span></div>
     <div class="load-status" id="load-status">starting…</div>
     <ul class="load-steps" id="load-steps"></ul>
@@ -72,8 +71,7 @@
     <div class="logo">♠ ♥ ♦ ♣</div>
     <h1 class="hero-title mono">regi-py</h1>
     <p class="hero-sub">An open-source implementation of the card game Regicide.
-      The engine and the neural-net bots run entirely in your browser as WebAssembly —
-      nothing is sent to a server.</p>
+      The game and its bots run entirely in your browser.</p>
     <div class="hero-actions">
       <button class="btn primary big" id="intro-play">Play</button>
       <button class="btn ghost big" id="intro-howto">How to play</button>
@@ -108,7 +106,7 @@
         <p>Each royal has <b>health</b> (damage needed to defeat it) and an <b>attack value</b>
           (damage it deals back). On your turn you <b>attack</b>, then <b>defend</b> against the
           counter-strike.</p>
-        <p>In this app you take one seat; the other seats are neural-net bots running locally.</p>
+        <p>In this app you take one seat; the other seats are bots running in your browser.</p>
       </div>
 
       <div class="howto-pane" data-pane="attack" hidden>
@@ -121,6 +119,9 @@
           <div><span class="pip">♣</span> <b>Clubs</b> — double: the attack's damage counts twice.</div>
           <div><span class="pip">♠</span> <b>Spades</b> — shield: lower the royal's attack for the rest of the fight.</div>
         </div>
+        <p><b>Joker.</b> Playing a Joker deals no damage, but it prevents the royal's
+          counter-hit (no defense needed this turn) and lets you decide which player
+          takes the next turn.</p>
         <p>You may <b>Yield</b> (play nothing) when it's allowed — hover <i>Submit</i> with no card
           selected and it becomes <i>Yield</i>.</p>
       </div>
@@ -139,11 +140,12 @@
           <li><b>A single card.</b></li>
           <li><b>An Ace + one other card</b> — their values add together.</li>
           <li><b>Two to four cards of the same rank</b>, of different suits, whose values sum to
-            <b>≤ 10</b> (e.g. two 4s, or 2+3+5).</li>
+            <b>≤ 10</b> (e.g. two 4s, or three 3s).</li>
         </ul>
-        <p>Playing a multi-card combo triggers every suit power among its cards. In this app,
-          <b>click the cards</b> you want, then press <b>Submit</b> — it only lights up when your
-          selection is a legal combo.</p>
+        <p>Playing a multi-card combo triggers every suit power among its cards, and powers
+          <b>combine</b>: a suit's power uses the total value of that suit's cards in the combo.</p>
+        <p>In this app, <b>click the cards</b> you want, then press <b>Submit</b> — it only lights
+          up when your selection is a legal combo.</p>
       </div>
     </div>
 
@@ -181,16 +183,26 @@
         <div class="opponents" id="opponents"></div>
       </div>
 
-      <label class="field">
-        <span class="field-label">Opening deal</span>
-        <select id="cfg-preset">
-          <option value="">Random deal</option>
-        </select>
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">Opening deal</span>
+          <select id="cfg-preset">
+            <option value="">Random deal</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Seed <span class="hint">(optional — repeat a deal)</span></span>
+          <input type="number" id="cfg-seed" placeholder="random" />
+        </label>
+      </div>
 
       <details class="expert" id="cfg-phase-details">
-        <summary>Paste a phase <span class="hint">(Expert Mode)</span></summary>
+        <summary>Expert Mode</summary>
         <div class="expert-body">
+          <p class="expert-note">Paste a game <b>phase string</b> to start from a specific position
+            instead of a random or preset deal. The phase must match the selected player count;
+            press “Use this phase” to load it.</p>
           <textarea id="cfg-phase" rows="2" placeholder="paste a phase string, then “Use this phase”"></textarea>
           <div class="phase-load-row">
             <button class="btn ghost small" id="cfg-phase-load" type="button">Use this phase</button>
@@ -199,11 +211,6 @@
           </div>
         </div>
       </details>
-
-      <label class="field">
-        <span class="field-label">Seed <span class="hint">(optional — repeat a deal)</span></span>
-        <input type="number" id="cfg-seed" placeholder="random" />
-      </label>
     </div>
 
     <div class="sheet-foot">
@@ -233,7 +240,7 @@
         </div>
         <div class="royal-slot">
           <div id="royal-card"></div>
-          <div class="royal-label" id="royal-label">—</div>
+          <div class="royals-left"><b id="enemies-left">—</b> / 12 left</div>
         </div>
         <div class="pile-slot">
           <div class="pile" id="discard-pile"></div>
@@ -242,28 +249,34 @@
       </div>
 
       <div class="hp-block">
-        <div class="meter-label"><span>Royal HP</span><span id="enemy-hp-lbl">—</span></div>
-        <!-- enemy-hp-lbl shows current / max (e.g. 13 / 20) -->
-
+        <div class="hp-head">
+          <span class="royal-name" id="royal-label">—</span>
+          <!-- enemy-hp-lbl shows current / max (e.g. 13 / 20) -->
+          <span class="hp-num">HP <b id="enemy-hp-lbl">—</b></span>
+        </div>
         <div class="meter hp"><span id="enemy-hp-bar" style="width:0%"></span></div>
         <div class="stat-line">Attack <b id="enemy-strength">0</b>
           <span class="sep">·</span> Block <b id="cur-block">0</b>
           <span class="sep">·</span> <span id="incoming">—</span></div>
-        <div class="meter-label"><span>Dungeon progress</span><span id="prog-txt">0 / 360</span></div>
-        <div class="meter prog"><span id="prog-bar" style="width:0%"></span></div>
-        <div class="stat-line dim">Royals left <b id="enemies-left">—</b></div>
       </div>
-    </div>
 
-    <!-- used combos (below the enemy, left column) -->
-    <div class="panel used-panel">
-      <h3>Played on this royal</h3>
-      <div class="used" id="used-combos"></div>
+      <!-- combos played on this royal, part of the dungeon group -->
+      <div class="used-block">
+        <h3 class="sub">Played on this royal</h3>
+        <div class="used" id="used-combos"></div>
+      </div>
     </div>
 
     <!-- players -->
     <div class="panel party-panel">
-      <h3>Party</h3>
+      <div class="party-head">
+        <h3>Party</h3>
+        <div class="party-progress">
+          <span class="pp-label">Dungeon</span>
+          <div class="meter prog"><span id="prog-bar" style="width:0%"></span></div>
+          <span class="pp-txt" id="prog-txt">0 / 360</span>
+        </div>
+      </div>
       <div class="seats" id="seats"></div>
     </div>
 
@@ -302,7 +315,20 @@
       </div>
     </details>
     <div class="overlay-actions">
-      <button class="btn primary" id="overlay-again">Play again</button>
+      <div class="menu-btn" id="again-menu">
+        <button class="btn primary" id="overlay-again" aria-haspopup="true" aria-expanded="false">Play again ▾</button>
+        <div class="menu-pop" id="again-pop" hidden role="menu">
+          <button class="menu-item" id="overlay-same" role="menuitem">
+            <span class="mi-title">Same seed</span>
+            <span class="mi-sub">replay this game exactly</span></button>
+          <button class="menu-item" id="overlay-diff" role="menuitem">
+            <span class="mi-title">Different seed</span>
+            <span class="mi-sub">same deal, new play-out</span></button>
+          <button class="menu-item" id="overlay-new" role="menuitem">
+            <span class="mi-title">New deal</span>
+            <span class="mi-sub">same bots, fresh deal</span></button>
+        </div>
+      </div>
       <button class="btn ghost" id="overlay-review">Review board</button>
       <button class="btn ghost" id="overlay-menu">Menu</button>
     </div>

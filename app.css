@@ -89,6 +89,10 @@ a { color: var(--accent); }
 /* ---------- menu form ---------- */
 .form { display: flex; flex-direction: column; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
+/* two fields side by side (Opening deal | Seed) */
+.field-row { display: flex; gap: 14px; }
+.field-row .field { flex: 1 1 0; min-width: 0; }
+.field-row .field select, .field-row .field input { max-width: none; width: 100%; }
 .field-label { color: var(--dim); font-size: 13px; }
 .field .hint { color: var(--line); }
 .field input[type=text], .field input[type=number], .field select {
@@ -104,6 +108,8 @@ a { color: var(--accent); }
 .expert > summary:hover { color: var(--ink); }
 .expert[open] > summary { border-bottom: 1px solid var(--line); color: var(--ink); }
 .expert-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.expert-note { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.5; }
+.expert-note b { color: var(--ink); }
 .phase-load-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cfg-phase-msg { font-size: 12px; color: var(--dim); }
 .cfg-phase-msg.ok { color: var(--good); }
@@ -131,16 +137,14 @@ a { color: var(--accent); }
 /* ---------- game: board ---------- */
 /* enemy (dungeon) on the LEFT with the used pile below it; the party, your hand
    and the event log stack on the RIGHT. */
-.board { max-width: 1160px; margin: 0 auto; padding: 16px;
+.board { max-width: 1040px; margin: 0 auto; padding: 16px;
   display: grid; gap: 14px; align-items: start;
   grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
   grid-template-areas:
     "enemy party"
     "enemy you"
-    "used  you"
-    "used  log"; }
+    "enemy log"; }
 .board .enemy-panel { grid-area: enemy; }
-.board .used-panel  { grid-area: used; }
 .board .party-panel { grid-area: party; }
 .board .you-panel   { grid-area: you; }
 .board .log-panel   { grid-area: log; }
@@ -155,7 +159,15 @@ a { color: var(--accent); }
 .pile-label, .royal-label { margin-top: 8px; color: var(--dim); font-size: 12px; }
 .pile-label b, .royal-label { color: var(--ink); }
 .royal-label { font-weight: 650; }
+/* royals-left count, under the current royal card (X / 12) */
+.royals-left { margin-top: 8px; color: var(--dim); font-size: 12px; }
+.royals-left b { color: var(--ink); font-size: 15px; }
 .hp-block { max-width: 520px; margin: 0 auto; }
+/* name + HP readout on one row, above the HP bar */
+.hp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.royal-name { font-weight: 700; font-size: 16px; }
+.hp-num { color: var(--dim); font-size: 13px; white-space: nowrap; }
+.hp-num b { color: var(--ink); font-size: 15px; }
 .stat-line { margin: 6px 0; color: var(--ink); text-align: center; } .stat-line.dim { color: var(--dim); }
 .stat-line b { color: var(--ink); } .stat-line .sep { color: var(--line); margin: 0 4px; }
 .meter { height: 9px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin: 4px 0; }
@@ -165,6 +177,14 @@ a { color: var(--accent); }
 .meter-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 6px; }
 #incoming { color: var(--bad); font-weight: 650; }
 #incoming.blocked { color: var(--good); }
+
+/* dungeon progress shares the Party header's row */
+.party-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.party-head h3 { margin-bottom: 0; white-space: nowrap; }
+.party-progress { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.party-progress .meter.prog { flex: 1; margin: 0; }
+.pp-label { color: var(--dim); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.pp-txt { color: var(--dim); font-size: 11px; white-space: nowrap; }
 
 /* seats */
 .seats { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -189,9 +209,8 @@ a { color: var(--accent); }
 .card.joker { background: linear-gradient(135deg,#f6f7f9,#e7d7a6); }
 
 /* the current royal, face up and larger */
-.card.royal { width: 64px; height: 88px; border: 2px solid var(--gold);
-  box-shadow: 0 3px 8px rgba(0,0,0,.5); }
-.card.royal .rank { font-size: 15px; } .card.royal .suit { font-size: 32px; }
+/* same size as a hand card / pile; the gold border marks it as the current royal */
+.card.royal { border: 2px solid var(--gold); box-shadow: 0 3px 8px rgba(0,0,0,.5); }
 .card.royal.empty { background: var(--panel2); color: var(--dim); border-style: dashed; border-color: var(--line); box-shadow: none; }
 
 /* draw / discard piles: a patterned card back, stacked shadows imply depth */
@@ -204,10 +223,14 @@ a { color: var(--accent); }
   transition: transform .12s, box-shadow .12s, outline-color .12s;
   outline: 2px solid transparent; outline-offset: 1px; }
 .hand.pickable .card:hover { transform: translateY(-4px); }
-.card.sel { transform: translateY(-10px); outline-color: var(--accent);
-  box-shadow: 0 6px 10px rgba(0,0,0,.45); }
+/* selection is shown with a bold accent outline + ring — the card does NOT lift */
+.card.sel { outline: 2.5px solid #ffcf4d; outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(255,207,77,.5), 0 1px 2px rgba(0,0,0,.35); }
+.hand.pickable .card.sel:hover { transform: none; }
 .hand.locked .card { opacity: .8; }
 
+/* combos played: a subsection inside the dungeon panel */
+.used-block { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 /* used combos: each combo is a little stacked group */
 .used { gap: 12px; }
 .combo-group { display: flex; }
@@ -222,7 +245,7 @@ a { color: var(--accent); }
 .actions { display: flex; gap: 10px; margin-top: 12px; }
 
 /* log */
-#log { max-height: 220px; overflow-y: auto; font-size: 13px; }
+#log { max-height: 260px; overflow-y: auto; font-size: 15px; }
 #log .row { padding: 3px 0; border-bottom: 1px solid var(--line); color: var(--dim); }
 #log .row b { color: var(--ink); }
 #log .row.win { color: var(--good); font-weight: 700; }
@@ -261,6 +284,19 @@ a { color: var(--accent); }
 .overlay-stats .stat .lbl { font-size: 11px; color: var(--dim); text-transform: uppercase;
   letter-spacing: .05em; margin-top: 2px; }
 .overlay-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+/* "Play again" dropdown: the same-seed / different-seed / new-deal restarts live here */
+.menu-btn { position: relative; display: inline-block; }
+.menu-pop { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 2;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 6px;
+  display: flex; flex-direction: column; gap: 4px; min-width: 220px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.menu-pop[hidden] { display: none; } /* explicit: the class's display:flex otherwise beats [hidden] */
+.menu-item { font: inherit; cursor: pointer; text-align: left; background: transparent;
+  color: var(--ink); border: 0; border-radius: 7px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 1px; }
+.menu-item:hover { background: var(--panel); }
+.menu-item .mi-title { font-weight: 650; }
+.menu-item .mi-sub { color: var(--dim); font-size: 12px; }
 /* floating "bring the result back" button shown while reviewing the finished board */
 .summary-fab { position: fixed; right: 18px; bottom: 18px; z-index: 15;
   box-shadow: 0 6px 22px rgba(0,0,0,.35); }
@@ -281,10 +317,21 @@ a { color: var(--accent); }
 .start-note { color: var(--dim); font-size: 12px; margin: 8px 0 0; }
 
 /* ---------- responsive ---------- */
+/* desktop: scale the game view up ~10% and enlarge the cards (≤860px is left as-is) */
+@media (min-width: 861px) {
+  #screen-game { font-size: 15px; }
+  .board { max-width: 1150px; grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); }
+  .card { width: 52px; height: 72px; }
+  .card .rank { font-size: 13px; } .card .suit { font-size: 25px; }
+  .card.mini { width: 38px; height: 54px; }
+  .card.mini .rank { font-size: 11px; } .card.mini .suit { font-size: 17px; }
+  .combo-group .card.mini + .card.mini { margin-left: -20px; }
+}
+
 /* tablet / narrow: one-column board */
 @media (max-width: 860px) {
   .board { grid-template-columns: 1fr;
-    grid-template-areas: "enemy" "used" "party" "you" "log"; }
+    grid-template-areas: "enemy" "party" "you" "log"; }
   .hero-title { font-size: 46px; }
   .suit-grid { grid-template-columns: 1fr; }
 }
@@ -299,7 +346,13 @@ a { color: var(--accent); }
   .sheet { padding: 18px 15px; border-radius: 12px; }
   .sheet-head h2 { font-size: 20px; }
   .sheet-foot { flex-wrap: wrap; }
+
+  /* how-to tabs: keep them on one row and scroll horizontally instead of overflowing */
+  .tabs { gap: 2px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 8px 10px; font-size: 13px; white-space: nowrap; }
   .field input[type=text], .field input[type=number], .field select { max-width: none; }
+  .field-row { flex-direction: column; } /* stack Opening deal + Seed on phones */
 
   /* opponent rows can wrap so the selects never overflow a narrow screen */
   .opp-row { flex-wrap: wrap; gap: 8px; }
