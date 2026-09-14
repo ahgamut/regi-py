@@ -117,6 +117,9 @@ namespace regi
                 if (!usedPile[i].parts[j].fromLocation(ind)) { return false; }
                 if ((j + 1) != usedPile[i].parts.size()) { EXPECT_SEPARATOR(ss, SEP3); }
             }
+            // the string stores only the combo's cards; recompute the derived
+            // baseDmg/powers/bitrep (spade-block + joker-nerf math reads these).
+            usedPile[i].loadDetails();
             if ((i + 1) != usedPile.size()) { EXPECT_SEPARATOR(ss, SEP2); }
         }
         EXPECT_SEPARATOR(ss, SEP1);

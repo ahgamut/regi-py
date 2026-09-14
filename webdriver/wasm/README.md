@@ -1,0 +1,133 @@
+# Client-side Regicide (WASM + ONNX)
+
+The whole game runs in the browser: the C++ engine compiled to WebAssembly plus
+net bots run under onnxruntime-web. There is **no server game state and no
+per-move round-trip** — the static host just ships blobs (the `.wasm` engine, the
+`.onnx` net weights, and this JS).
+
+## Layout
+
+| file | role |
+|------|------|
+| `CMakeLists.txt`, `embind.cc` | WASM build of the core engine + Embind bindings |
+| `dist/regicore.{mjs,wasm}` | built engine module (git-ignored) |
+| `dist/<net>.onnx`, `dist/<net>.io.json` | exported net + its IO contract (git-ignored) |
+| `js/` | all browser runtime modules (below); `index.html` loads `js/app.mjs` |
+| `js/adz_bot.mjs` | `NetBot` — featurize + onnxruntime forward + argmax (ADZ Direct) |
+| `js/az_bot.mjs` | `AZBot` — card-space Direct bot (combomap grid / keepy defense) |
+| `js/load_bot.mjs` | `loadBot`/`buildBot` — pick `NetBot`/`AZBot`/`ExplorerBot` from the contract + iters |
+| `js/phase_expander.mjs` | `PhaseExpander` — step to the next decision node (MCTS child gen) |
+| `js/mcts.mjs` | `MCTSNode` + `ExplorerBot` — net-guided search (both paradigms) |
+| `js/net_common.mjs` | shared helpers (perspectivize, bitwise, history trim, softmax) |
+| `js/game_driver.mjs` | `GameDriver` — the browser game loop (`prepare()`/`commit()`) |
+| `js/app.mjs`, `index.html`, `app.css` | the UI |
+| `tables/combomap.json` | AZ combo bitwise → `(loc, played-status)` grid cell map |
+| `tables/presets_{2,3,4}p.json` | committed starter openings the menu offers, in Easy/Medium/Hard tiers (5 each) |
+| `gen_combomap.mjs`, `gen_presets.mjs` | (node) regenerate the combomap / preset openings from the WASM engine |
+| `tests/smoke*.mjs` | node smoke suites; `tests/smoke_all.mjs` runs them all (`npm run smoke`) |
+| `gen_golden.py`, `tests/check_golden.mjs` | JS-vs-Python Direct-net index parity check (both paradigms) |
+
+## Build & run
+
+From the repo root, in an environment with the Emscripten SDK + CMake + Ninja +
+Node, and (for the ONNX export) the torch env:
+
+```bash
+# 1. build the WASM engine
+cd webdriver/wasm
+emcmake cmake -G Ninja -B build && cmake --build build      # -> dist/regicore.{mjs,wasm}
+
+# 2. export the net(s) to ONNX (torch env; run from the repo root)
+cd ../..
+python -m trainers.export_onnx export --net adzpool \
+    --weights weights/best_adzpool.pt --out webdriver/wasm/dist/adzpool.onnx --verify
+python -m trainers.export_onnx export --net adzmulti \
+    --weights weights/best_adzmulti.pt --out webdriver/wasm/dist/adzmulti.onnx --verify
+
+# 3. get onnxruntime-web (pick ONE) and serve
+cd webdriver/wasm
+npm install                                   # installs into node_modules/ (the default)
+python3 -m http.server 8000                   # serve (no npm needed for this step)
+```
+
+Export any nets you want to offer as bots (`adzpool`/`adzmulti` are ADZ;
+`basic`/`percardmlp`/`cardtx`/`mixer`/`movetoken` are AZ — the AZ nets also need
+`tables/combomap.json`, which is committed). Everything (engine, every net, presets)
+loads once on a **loading screen** before the menu opens. Set the player count, pick
+each opponent's net AND its search depth (Direct, or an MCTS Explorer at
+16/32/64/128 iterations), choose the **opening deal** (a random deal, or one of the
+committed presets for that player count, grouped Easy/Medium/Hard), then play your
+(shuffled) seat.
+
+The presets in `tables/presets_{2,3,4}p.json` are fixed opening deals (replayed via
+`init_string`) so a known scenario can be re-played. Each file holds three difficulty
+tiers (`{num_players, tiers: [{name, phases[5]}]}`) = 15 presets/count, which the menu
+shows as "Easy 1"…"Hard 5". Regenerate them with `node gen_presets.mjs` (committed with
+`git add -f`, past the global `*.json` ignore, like `combomap.json`). NOTE: the deals are
+currently arbitrary placeholders -- the Easy/Medium/Hard split isn't tuned yet.
+
+Instead of a preset you can **paste a phase string** (any exported opening or
+mid-game state — e.g. the one the end-of-game overlay's *Copy opening phase* gives)
+into the menu's **Expert Mode** box and hit *Use this phase*: if it parses into a
+runnable 2–4 player game the table is set to its player count (you still pick the
+bots), otherwise an inline error explains why it was rejected.
+
+### Running without npm
+
+Serving never needs npm — any static server works (`python3 -m http.server 8000`).
+Only onnxruntime-web has to come from somewhere; set `ORT_DIST` at the top of
+`js/app.mjs` to one of (relative paths are resolved from `js/`, hence the `../`):
+
+- **CDN** (needs network once, then browser-cached):
+  `const ORT_DIST = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist/';`
+- **Vendored** (fully offline): download the two files with curl and point at them:
+  ```bash
+  mkdir -p vendor && cd vendor
+  base=https://cdn.jsdelivr.net/npm/onnxruntime-web@1.29.0/dist
+  curl -LO $base/ort.wasm.bundle.min.mjs
+  curl -LO $base/ort-wasm-simd-threaded.wasm
+  cd .. # then (in js/app.mjs): const ORT_DIST = '../vendor/';
+  ```
+
+The ESM loads its `.wasm` sidecar (~10 MB) from `ORT_DIST` (set as
+`ort.env.wasm.wasmPaths`), so the `.mjs` and the `.wasm` must sit in the same dir.
+
+## Tests
+
+```bash
+npm run smoke     # runs every tests/smoke_*.mjs suite in one process (tests/smoke_all.mjs)
+npm run golden    # JS-vs-Python Direct-net parity for EVERY net that has both a
+                  # golden fixture (golden/<net>.json) and an export (dist/<net>.onnx)
+
+# A single suite / single net (run from wasm/; each file is still runnable alone):
+node tests/smoke_driver.mjs
+node tests/check_golden.mjs --net adzpool
+
+# The golden fixtures come from the torch env (one per net; the paradigm is
+# auto-detected from the net name -- ADZ or AZ):
+python -m webdriver.wasm.gen_golden --net adzpool \
+    --weights weights/best_adzpool.pt --out webdriver/wasm/golden/adzpool.json
+python -m webdriver.wasm.gen_golden --net basic \
+    --weights weights/best_basic.pt --out webdriver/wasm/golden/basic.json
+```
+
+`tests/smoke_all.mjs` imports each suite's `runSmoke()` and calls it (summing
+failures); `tests/check_golden.mjs` with no `--net` discovers and checks every
+available net.
+
+## Notes
+
+- **Single-threaded** onnxruntime-web (no SharedArrayBuffer), so no COOP/COEP
+  headers are required — a plain static host (or GitHub Pages) works.
+- Both paradigms are wired as bots: **ADZ** (`adzpool`, `adzmulti`, candidate
+  scoring) and **AZ** (`basic`, `percardmlp`, `cardtx`, `mixer`, `movetoken`,
+  card-space via the `combomap` grid + keepyness defense fallback). `attntrunk` is
+  omitted.
+- Bots play either **Direct-net** (search-free argmax) or an **MCTS Explorer**
+  (net-guided search, ~iters+1 forward passes/move; picked per bot, 16–128 iters).
+- When a game ends, the result overlay shows summary stats (royals cleared / damage
+  dealt / moves) and its opening deal. **Play again** opens a menu of three restarts,
+  all reusing the same bots: *same seed* (replay the identical game), *different seed*
+  (same opening deal, new play-out), and *new deal* (a fresh random deal). **Review
+  board** dismisses the overlay to inspect the finished board (a floating **Show
+  result** button brings the summary back), and **Menu** returns to setup.

@@ -143,6 +143,7 @@ namespace regi
     struct BaseLog
     {
        public:
+        virtual ~BaseLog() = default;
         virtual void attack(const Player &, const Enemy &, const Combo &, const i32,
                             const GameState &) = 0;
         virtual void defend(const Player &, const Combo &, const i32,
@@ -166,6 +167,7 @@ namespace regi
     struct Strategy
     {
        public:
+        virtual ~Strategy() = default;
         virtual i32 setup(const Player &, const GameState &) = 0;
         virtual i32 getDefenseIndex(const std::vector<Combo> &, const Player &, i32,
                                     const GameState &) = 0;
