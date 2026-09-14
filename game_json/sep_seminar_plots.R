@@ -82,6 +82,8 @@ r1_2p_progress_top10_plot <- ggplot(data = r1_2p_max_progress_top10,
 
 r1_2p_progress_top10_plot
 
+# ggsave("game_json/top_10_teams_sep.png", r1_2p_progress_top10_plot, width = 9, height = 5)
+
 # How the best brute teams from last time are doing now (AKA number of futures plot for brute) ----
 brute_teams <- c("brute-256|brute-256", "brute-128|brute-128",
                  "brute-64|brute-64", "brute-32|brute-32",
@@ -109,7 +111,9 @@ brute_plot <- ggplot(data = brutes,
 
 brute_plot
 
-# Number of futures plotadzmulti ----
+# ggsave("game_json/brute_plot_futures.png", brute_plot, width = 9, height = 5)
+
+# Number of futures plot adzmulti ----
 adzmulti_teams <- c("adz-adzmulti-256|adz-adzmulti-256", "adz-adzmulti-128|adz-adzmulti-128",
               "adz-adzmulti-64|adz-adzmulti-64", "adz-adzmulti-32|adz-adzmulti-32",
             "adz-adzmulti-16|adz-adzmulti-16", "adz-direct-adzmulti|adz-direct-adzmulti")
@@ -135,6 +139,8 @@ adzmulti_plot <- ggplot(data = adzmulti,
         title = glue("Game Progress for the Adzmulti Strategies"))
 
 adzmulti_plot
+
+# ggsave("game_json/adzmulti_plot_futures.png", adzmulti_plot, width = 9, height = 5)
 
 # Info files (bots allowed to cheat) ----
 box_dl(file_id = 2461324458761, local_dir = tempdir(), overwrite = TRUE, pb = TRUE)
